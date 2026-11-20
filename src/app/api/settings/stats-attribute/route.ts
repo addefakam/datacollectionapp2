@@ -1,18 +1,15 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, requireAdmin } from '@/lib/api-auth';
+import { STATS_ATTRIBUTES, isStatsAttributeKey } from '@/lib/stats-attributes';
+import { STATS_ATTRIBUTE_KEY, loadAttributeOptions } from '@/lib/stats-attribute-server';
 
 export const dynamic = 'force-dynamic';
 
-// Key in the AppSetting table that stores the Sector Distribution attribution
-const STATS_ATTRIBUTE_KEY = 'statsSectorDistributionGroupBy';
-
-const VALID_ATTRIBUTES = ['category', 'woreda', 'employees'] as const;
-
 /**
  * GET /api/settings/stats-attribute
- * Returns the attribute the Sector Distribution stats group by.
- * Any logged-in user can read it (the stats page needs it).
+ * Returns the default attribute the Sector Distribution stats group by plus the
+ * admin-managed options. Any logged-in user can read it (the stats page needs it).
  */
 export async function GET() {
   try {
@@ -21,13 +18,20 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const setting = await db.appSetting.findUnique({ where: { key: STATS_ATTRIBUTE_KEY } });
-    const attribute =
-      setting && (VALID_ATTRIBUTES as readonly string[]).includes(setting.value)
-        ? setting.value
-        : 'category';
+    const [setting, options] = await Promise.all([
+      db.appSetting.findUnique({ where: { key: STATS_ATTRIBUTE_KEY } }),
+      loadAttributeOptions(),
+    ]);
 
-    return NextResponse.json({ attribute });
+    // Saved default must be a valid key AND still enabled — otherwise use the
+    // first enabled option so the chart can never break.
+    let attribute =
+      setting && isStatsAttributeKey(setting.value) ? setting.value : STATS_ATTRIBUTES[0].key;
+    if (!options.some((o) => o.key === attribute)) {
+      attribute = options[0].key;
+    }
+
+    return NextResponse.json({ attribute, options });
   } catch (error) {
     console.error('Error fetching stats attribute:', error);
     return NextResponse.json({ error: 'Failed to fetch stats attribute' }, { status: 500 });
@@ -37,7 +41,7 @@ export async function GET() {
 /**
  * PUT /api/settings/stats-attribute
  * Admin only — saves which attribute the Sector Distribution stats group by.
- * Body: { attribute: 'category' | 'woreda' | 'employees' }
+ * Body: { attribute: <registry key> }
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -46,9 +50,11 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
     const attribute = String(body?.attribute || '');
-    if (!(VALID_ATTRIBUTES as readonly string[]).includes(attribute)) {
+    if (!isStatsAttributeKey(attribute)) {
       return NextResponse.json(
-        { error: 'attribute must be one of: category, woreda, employees' },
+        {
+          error: `attribute must be one of: ${STATS_ATTRIBUTES.map((a) => a.key).join(', ')}`,
+        },
         { status: 400 }
       );
     }

@@ -16,7 +16,7 @@ const EMPLOYEE_BUCKETS: { label: string; min: number; max: number | null }[] = [
 // GET /api/industries/stats — aggregate statistics for the industry dashboard
 export async function GET() {
   try {
-    const [total, totalEmployees, sectorStats, subCityStats, woredaStats, withLicense, employeeCounts] =
+    const [total, totalEmployees, sectorStats, subCityStats, woredaStats, withLicense, employeeCounts, ownershipStats, surveyorStats] =
       await Promise.all([
         db.industry.count(),
         db.industry.aggregate({ _sum: { employeeCount: true }, _avg: { employeeCount: true } }),
@@ -41,6 +41,18 @@ export async function GET() {
         db.industry.count({ where: { licenseNumber: { not: null } } }),
         // Only fetch employee counts (small payload) to bucket in memory
         db.industry.findMany({ select: { employeeCount: true } }),
+        db.industry.groupBy({
+          by: ['ownershipType'],
+          _count: true,
+          _sum: { employeeCount: true },
+          orderBy: { ownershipType: 'asc' },
+        }),
+        db.industry.groupBy({
+          by: ['surveyorName'],
+          _count: true,
+          _sum: { employeeCount: true },
+          orderBy: { surveyorName: 'asc' },
+        }),
       ]);
 
     // Employee-size buckets (count of industries + employees per range)
@@ -68,6 +80,54 @@ export async function GET() {
       });
     }
 
+    // Uniform chart buckets per groupable attribute (see lib/stats-attributes.ts).
+    // Each bucket carries the /api/industries filter for its click-through dialog.
+    const attributeBuckets: Record<
+      string,
+      { label: string; subLabel?: string; count: number; employees: number; filter: Record<string, string> }[]
+    > = {
+      category: sectorStats.map((s) => ({
+        label: s.sector,
+        count: s._count,
+        employees: s._sum.employeeCount || 0,
+        filter: { sector: s.sector },
+      })),
+      subCity: subCityStats.map((s) => ({
+        label: s.subCity,
+        count: s._count,
+        employees: s._sum.employeeCount || 0,
+        filter: { subCity: s.subCity },
+      })),
+      woreda: woredaStats.map((w) => ({
+        label: w.area,
+        subLabel: w.subCity,
+        count: w._count,
+        employees: w._sum.employeeCount || 0,
+        filter: { subCity: w.subCity, area: w.area },
+      })),
+      employees: employeeRanges.map((r) => ({
+        label: r.label,
+        count: r.count,
+        employees: r.employees,
+        filter:
+          r.max === null
+            ? { minEmployees: String(r.min) }
+            : { minEmployees: String(r.min), maxEmployees: String(r.max) },
+      })),
+      ownershipType: ownershipStats.map((o) => ({
+        label: o.ownershipType || '(not set)',
+        count: o._count,
+        employees: o._sum.employeeCount || 0,
+        filter: { ownershipType: o.ownershipType || '' },
+      })),
+      surveyorName: surveyorStats.map((s) => ({
+        label: s.surveyorName || '(not set)',
+        count: s._count,
+        employees: s._sum.employeeCount || 0,
+        filter: { surveyorName: s.surveyorName || '' },
+      })),
+    };
+
     return NextResponse.json({
       total,
       totalEmployees: totalEmployees._sum.employeeCount || 0,
@@ -93,6 +153,7 @@ export async function GET() {
         employees: s._sum.employeeCount || 0,
         woredas: (woredaBySubCity[s.subCity] || []).sort((a, b) => b.count - a.count),
       })),
+      attributeBuckets,
     });
   } catch (error) {
     console.error('Error fetching industry stats:', error);

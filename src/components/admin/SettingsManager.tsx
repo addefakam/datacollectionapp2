@@ -20,6 +20,13 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -39,6 +46,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings, SubCityData } from '@/components/SettingsProvider';
+import { STATS_ATTRIBUTES } from '@/lib/stats-attributes';
 
 // ============ Sub-Cities & Areas section ============
 
@@ -577,15 +585,25 @@ function CategoriesSection() {
 
 // ============ Sector Distribution attribution section ============
 
-const STATS_ATTRIBUTE_OPTIONS: { value: string; label: string; desc: string }[] = [
-  { value: 'category', label: 'Category / Goossa', desc: 'Group industries by their sector (default)' },
-  { value: 'woreda', label: 'Woreda / Werada', desc: 'Group industries by the woreda they are in' },
-  { value: 'employees', label: 'Number of Employees / Lakkoofsa Hojjetaa', desc: 'Group industries by employee size ranges (0, 1–5, 6–10, …)' },
-];
+interface AttributeOption {
+  key: string;
+  label: string;
+  description: string;
+}
+
+/** Registry fallback used when the settings request fails (offline etc.). */
+const DEFAULT_ATTRIBUTE_OPTIONS: AttributeOption[] = STATS_ATTRIBUTES.map((a) => ({
+  key: a.key,
+  label: a.label,
+  description: a.description,
+}));
 
 function StatsSection() {
   const { toast } = useToast();
   const [attribute, setAttribute] = useState('category');
+  const [options, setOptions] = useState<AttributeOption[]>([]);
+  const [newKey, setNewKey] = useState('');
+  const [newLabel, setNewLabel] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -597,11 +615,17 @@ function StatsSection() {
         if (res.ok && !cancelled) {
           const data = await res.json();
           setAttribute(data.attribute);
+          if (Array.isArray(data.options) && data.options.length > 0) {
+            setOptions(data.options);
+          }
         }
       } catch {
-        // keep default
+        // offline — fall back to the registry defaults below
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setOptions((cur) => (cur.length > 0 ? cur : DEFAULT_ATTRIBUTE_OPTIONS));
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -609,16 +633,49 @@ function StatsSection() {
     };
   }, []);
 
+  /** Registry keys not yet enabled — these can be added. */
+  const addable = STATS_ATTRIBUTES.filter((a) => !options.some((o) => o.key === a.key));
+
+  const addOption = () => {
+    const def = STATS_ATTRIBUTES.find((a) => a.key === newKey);
+    if (!def) return;
+    setOptions([
+      ...options,
+      { key: def.key, label: newLabel.trim() || def.label, description: def.description },
+    ]);
+    setNewKey('');
+    setNewLabel('');
+  };
+
+  const removeOption = (key: string) => {
+    const next = options.filter((o) => o.key !== key);
+    if (next.length === 0) return; // keep at least one option
+    setOptions(next);
+    if (attribute === key) setAttribute(next[0].key);
+  };
+
   const save = async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/settings/stats-attribute', {
+      const optRes = await fetch('/api/settings/stats-attribute-options', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          options: options
+            .map(({ key, label }) => ({ key, label: label.trim() }))
+            .filter((o) => o.label),
+        }),
+      });
+      const optData = await optRes.json();
+      if (!optRes.ok) throw new Error(optData.error || 'Failed to save options');
+
+      const attrRes = await fetch('/api/settings/stats-attribute', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ attribute }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      const attrData = await attrRes.json();
+      if (!attrRes.ok) throw new Error(attrData.error || 'Failed to save default');
       toast({ title: 'Stats attribution saved / Qoodaan olmaa' });
     } catch (err) {
       toast({
@@ -638,35 +695,116 @@ function StatsSection() {
           Sector Distribution Attribution / Qooda Goossa
         </CardTitle>
         <CardDescription>
-          Choose what the Industry Stats &ldquo;Sector Distribution&rdquo; chart groups by by
-          default. The chart can still be switched between category, woreda and employees at any
-          time.
+          Manage what the Industry Stats &ldquo;Sector Distribution&rdquo; chart can group by:
+          rename options, add new ones, remove unneeded ones, and pick the default. The chart can
+          still be switched between the enabled options at any time.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {loading ? (
           <div className="flex items-center justify-center py-6">
             <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
           </div>
         ) : (
-          <RadioGroup value={attribute} onValueChange={setAttribute} className="gap-2">
-            {STATS_ATTRIBUTE_OPTIONS.map((o) => (
-              <label
-                key={o.value}
-                className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors ${
-                  attribute === o.value
-                    ? 'border-teal-500 bg-teal-50'
-                    : 'hover:bg-muted/40'
-                }`}
-              >
-                <RadioGroupItem value={o.value} className="mt-0.5" />
-                <span>
-                  <span className="block text-sm font-medium">{o.label}</span>
-                  <span className="block text-xs text-muted-foreground">{o.desc}</span>
-                </span>
-              </label>
-            ))}
-          </RadioGroup>
+          <>
+            {/* Enabled options — rename inline or remove */}
+            <div className="space-y-2">
+              <Label>Attribution options / Filannoo Qooda Goossa</Label>
+              <div className="space-y-2">
+                {options.map((o) => (
+                  <div key={o.key} className="flex items-center gap-2">
+                    <Input
+                      value={o.label}
+                      onChange={(e) =>
+                        setOptions(
+                          options.map((x) => (x.key === o.key ? { ...x, label: e.target.value } : x))
+                        )
+                      }
+                      className="h-9 flex-1"
+                      aria-label={`Label for ${o.key}`}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => removeOption(o.key)}
+                      disabled={options.length <= 1}
+                      aria-label={`Remove ${o.label}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add a new attribute from the registry */}
+            {addable.length > 0 ? (
+              <div className="space-y-2">
+                <Label>Add attribute / Qooda dabaluu</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Select value={newKey} onValueChange={setNewKey}>
+                    <SelectTrigger className="h-9 sm:w-56">
+                      <SelectValue placeholder="Choose / Filadhu" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {addable.map((a) => (
+                        <SelectItem key={a.key} value={a.key}>
+                          {a.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    placeholder={
+                      STATS_ATTRIBUTES.find((a) => a.key === newKey)?.label ||
+                      'Custom label (optional) / Maqaa'
+                    }
+                    className="h-9 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={addOption}
+                    disabled={!newKey}
+                    className="gap-1"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add / Dabaluu
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                All available attributes are in use / Filannoo hunduu kan fayyadamaa jiru
+              </p>
+            )}
+
+            {/* Default grouping among enabled options */}
+            <div className="space-y-2">
+              <Label>Default grouping / Qooda durtii</Label>
+              <RadioGroup value={attribute} onValueChange={setAttribute} className="gap-2">
+                {options.map((o) => (
+                  <label
+                    key={o.key}
+                    className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors ${
+                      attribute === o.key ? 'border-teal-500 bg-teal-50' : 'hover:bg-muted/40'
+                    }`}
+                  >
+                    <RadioGroupItem value={o.key} className="mt-0.5" />
+                    <span>
+                      <span className="block text-sm font-medium">{o.label}</span>
+                      <span className="block text-xs text-muted-foreground">{o.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+          </>
         )}
         <Button onClick={save} disabled={saving || loading}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

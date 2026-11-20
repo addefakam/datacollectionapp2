@@ -34,6 +34,7 @@ import {
   Pie,
   Legend,
 } from 'recharts';
+import { STATS_ATTRIBUTES, statsAttributeDef } from '@/lib/stats-attributes';
 
 interface SectorStat {
   sector: string;
@@ -72,6 +73,8 @@ interface StatsData {
   woredas: WoredaStat[];
   employeeRanges: EmployeeRangeStat[];
   subCities: SubCityStat[];
+  /** Uniform chart buckets per groupable attribute (keyed by registry key). */
+  attributeBuckets?: Record<string, ChartDatum[]>;
 }
 
 interface IndustryRecord {
@@ -96,14 +99,26 @@ interface ChartDatum {
   filter: Record<string, string>;
 }
 
-type Dimension = 'category' | 'woreda' | 'employees';
+type Dimension = string;
 type Metric = 'count' | 'employees';
 
-const DIMENSIONS: { value: Dimension; label: string }[] = [
-  { value: 'category', label: 'Category' },
-  { value: 'woreda', label: 'Woreda' },
-  { value: 'employees', label: 'Employees' },
-];
+interface DimensionOption {
+  value: string;
+  label: string;
+  description: string;
+}
+
+/** Short toggle label — the part before the slash of a bilingual label. */
+function shortLabel(label: string): string {
+  return label.split('/')[0].trim() || label;
+}
+
+/** Used until the settings request resolves / when it fails. */
+const FALLBACK_DIMENSIONS: DimensionOption[] = STATS_ATTRIBUTES.map((a) => ({
+  value: a.key,
+  label: shortLabel(a.label),
+  description: a.description,
+}));
 
 const SECTOR_COLORS = [
   '#0d9488', '#0284c7', '#7c3aed', '#db2777', '#ea580c', '#16a34a',
@@ -111,50 +126,16 @@ const SECTOR_COLORS = [
   '#be185d', '#4f46e5',
 ];
 
-const DIM_DESCRIPTION: Record<Dimension, string> = {
-  category: 'Industries by sector / Goossa armaan gadii',
-  woreda: 'Industries by woreda / Werada armaan gadii',
-  employees: 'Industries by number of employees / Lakkoofsa hojjetaa',
-};
-
 function buildChartData(dimension: Dimension, stats: StatsData): ChartDatum[] {
-  if (dimension === 'category') {
-    return [...stats.sectors]
-      .sort((a, b) => b.count - a.count)
-      .map((s) => ({
-        label: s.sector,
-        count: s.count,
-        employees: s.employees,
-        filter: { sector: s.sector },
-      }));
-  }
-  if (dimension === 'woreda') {
-    return [...stats.woredas]
-      .sort((a, b) => b.count - a.count)
-      .map((w) => ({
-        label: w.area,
-        subLabel: w.subCity,
-        count: w.count,
-        employees: w.employees,
-        filter: { subCity: w.subCity, area: w.area },
-      }));
-  }
-  return stats.employeeRanges.map((r) => ({
-    label: r.label,
-    count: r.count,
-    employees: r.employees,
-    filter:
-      r.max === null
-        ? { minEmployees: String(r.min) }
-        : { minEmployees: String(r.min), maxEmployees: String(r.max) },
-  }));
+  return stats.attributeBuckets?.[dimension] ?? [];
 }
 
 export default function IndustryStats() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
-  const [dimension, setDimension] = useState<Dimension>('category');
+  const [dimension, setDimension] = useState<Dimension>(FALLBACK_DIMENSIONS[0].value);
+  const [dimensions, setDimensions] = useState<DimensionOption[]>(FALLBACK_DIMENSIONS);
   const [metric, setMetric] = useState<Metric>('count');
   const [expandedSubCities, setExpandedSubCities] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<{
@@ -176,8 +157,19 @@ export default function IndustryStats() {
       if (!res.ok) throw new Error();
       setStats(await res.json());
       if (attrRes.ok) {
-        const { attribute } = await attrRes.json();
-        if (attribute === 'category' || attribute === 'woreda' || attribute === 'employees') {
+        const { attribute, options } = await attrRes.json();
+        if (Array.isArray(options) && options.length > 0) {
+          const next: DimensionOption[] = options.map(
+            (o: { key: string; label: string; description?: string }) => ({
+              value: o.key,
+              label: shortLabel(o.label),
+              description: o.description || statsAttributeDef(o.key)?.description || '',
+            })
+          );
+          setDimensions(next);
+          // Default to the saved attribute when it is still enabled
+          setDimension(next.some((d) => d.value === attribute) ? attribute : next[0].value);
+        } else if (statsAttributeDef(attribute)) {
           setDimension(attribute);
         }
       }
@@ -219,14 +211,8 @@ export default function IndustryStats() {
     const p = e?.payload;
     const datum = p?.filter ? p : p?.payload?.filter ? p.payload : null;
     if (!datum) return;
-    const title = dimension === 'employees' ? `${datum.label} Employees` : datum.label;
-    const sub =
-      dimension === 'woreda'
-        ? `Woreda — Sub-city: ${datum.subLabel ?? '—'}`
-        : dimension === 'category'
-          ? 'Sector / Goossa'
-          : 'Employee size range / Safaa hojjetaa';
-    openRecords(datum.filter, title, sub);
+    const sub = dimensions.find((d) => d.value === dimension)?.description ?? '';
+    openRecords(datum.filter, datum.label, sub);
   };
 
   if (loading) {
@@ -309,7 +295,9 @@ export default function IndustryStats() {
           <div className="flex items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base sm:text-lg">Sector Distribution</CardTitle>
-              <CardDescription className="text-xs">{DIM_DESCRIPTION[dimension]}</CardDescription>
+              <CardDescription className="text-xs">
+                {dimensions.find((d) => d.value === dimension)?.description ?? ''}
+              </CardDescription>
             </div>
             <button
               type="button"
@@ -326,7 +314,7 @@ export default function IndustryStats() {
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Group by</span>
               <div className="flex overflow-hidden rounded-lg border">
-                {DIMENSIONS.map((d) => (
+                {dimensions.map((d) => (
                   <button
                     key={d.value}
                     type="button"
@@ -376,19 +364,19 @@ export default function IndustryStats() {
           ) : chartType === 'bar' ? (
             <div className="h-[280px] w-full sm:h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData.slice(0, 10)}
-                  layout="vertical"
-                  margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                  <YAxis
+                <BarChart data={chartData.slice(0, 10)} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
                     type="category"
                     dataKey="label"
                     tick={{ fontSize: 9 }}
-                    width={120}
+                    interval={0}
+                    angle={-30}
+                    textAnchor="end"
+                    height={64}
+                    tickMargin={4}
                   />
+                  <YAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} width={44} />
                   <Tooltip
                     formatter={(value: number, name: string) =>
                       name === 'count' ? [value, 'Industries'] : [value, 'Employees']
@@ -400,7 +388,7 @@ export default function IndustryStats() {
                     }}
                     cursor={{ fill: 'rgba(13, 148, 136, 0.08)' }}
                   />
-                  <Bar dataKey={metric} radius={[0, 4, 4, 0]} barSize={16} cursor="pointer" onClick={handleChartClick}>
+                  <Bar dataKey={metric} radius={[4, 4, 0, 0]} barSize={22} cursor="pointer" onClick={handleChartClick}>
                     {chartData.slice(0, 10).map((_, i) => (
                       <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />
                     ))}

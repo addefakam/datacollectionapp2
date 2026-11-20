@@ -78,13 +78,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/industries?subCity=&area=&sector=&search=&minEmployees=&maxEmployees=&page=&limit=
+// GET /api/industries?subCity=&area=&sector=&ownershipType=&surveyorName=&search=&minEmployees=&maxEmployees=&page=&limit=
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const subCity = searchParams.get('subCity');
     const area = searchParams.get('area');
     const sector = searchParams.get('sector');
+    const ownershipType = searchParams.get('ownershipType');
+    const surveyorName = searchParams.get('surveyorName');
     const search = searchParams.get('search');
     const minEmployees = searchParams.get('minEmployees');
     const maxEmployees = searchParams.get('maxEmployees');
@@ -96,6 +98,9 @@ export async function GET(request: NextRequest) {
     if (subCity) where.subCity = subCity;
     if (area) where.area = area;
     if (sector) where.sector = sector;
+    // Click-through filters for the chart's Ownership / Surveyor dimensions
+    if (ownershipType) where.ownershipType = ownershipType;
+    if (surveyorName) where.surveyorName = surveyorName;
     if (minEmployees !== null && minEmployees !== '') {
       where.employeeCount = { ...(where.employeeCount as Record<string, number> | undefined), gte: Number(minEmployees) };
     }
