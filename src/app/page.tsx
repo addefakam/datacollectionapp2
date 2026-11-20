@@ -54,6 +54,10 @@ export default function Home() {
     setRefreshTrigger((t) => t + 1);
   };
 
+  // Tab groups — used to highlight the owning dropdown trigger
+  const industryTabs = ['survey', 'indData', 'indStats', 'attInd'];
+  const hotelTabs = ['hotelSurvey', 'hotelData', 'hotelStats', 'attHotel'];
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-gray-50">
@@ -136,49 +140,52 @@ export default function Home() {
       {/* Main Content */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 ${isAdmin ? 'grid grid-cols-4 gap-0.5 sm:gap-1' : 'grid grid-cols-3 gap-0.5 sm:gap-1'}`}>
-            {/* Industry Survey — primary tab */}
-            <TabsTrigger
-              value="survey"
-              className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
-            >
-              <Factory className="h-4 w-4" />
-              <span>Industry Survey</span>
-            </TabsTrigger>
-
-            {isAdmin && (
-              <TabsTrigger
-                value="indData"
-                className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
-              >
-                <Database className="h-4 w-4" />
-                <span>Industry Data</span>
-              </TabsTrigger>
-            )}
-
-            {isAdmin && (
-              <TabsTrigger
-                value="indStats"
-                className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span>Industry Stats</span>
-              </TabsTrigger>
-            )}
+          <TabsList className={`mb-3 w-full sm:mb-4 ${isAdmin ? 'grid grid-cols-4 gap-0.5 sm:gap-1' : 'grid grid-cols-2 gap-0.5 sm:gap-1'}`}>
+            {/* Industry ▾ — all industry tabs live here */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${dropTriggerClass} ${industryTabs.includes(activeTab) ? 'bg-accent text-accent-foreground' : ''}`}
+                >
+                  <Factory className="h-4 w-4" />
+                  <span>Industry</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuItem onClick={() => setActiveTab('survey')}>
+                  <ClipboardList className="mr-2 h-4 w-4" /> Industry Survey
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('indData')}>
+                    <Database className="mr-2 h-4 w-4" /> Industry Records
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('indStats')}>
+                    <BarChart3 className="mr-2 h-4 w-4" /> Industry Stats
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setActiveTab('attInd')}>
+                  <Users className="mr-2 h-4 w-4" /> Industry Attendance
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Hotel ▾ — all hotel tabs live here */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className={`${dropTriggerClass} ${activeTab.startsWith('hotel') ? 'bg-accent text-accent-foreground' : ''}`}
+                  className={`${dropTriggerClass} ${hotelTabs.includes(activeTab) ? 'bg-accent text-accent-foreground' : ''}`}
                 >
                   <Building2 className="h-4 w-4" />
                   <span>Hotel</span>
                   <ChevronDown className="h-3 w-3 opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-44">
+              <DropdownMenuContent align="start" className="w-52">
                 <DropdownMenuItem onClick={() => setActiveTab('hotelSurvey')}>
                   <ClipboardList className="mr-2 h-4 w-4" /> Hotel Survey
                 </DropdownMenuItem>
@@ -192,6 +199,9 @@ export default function Home() {
                     <BarChart3 className="mr-2 h-4 w-4" /> Hotel Stats
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem onClick={() => setActiveTab('attHotel')}>
+                  <Users className="mr-2 h-4 w-4" /> Hotel Attendance
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -204,28 +214,6 @@ export default function Home() {
                 <span>Meetings</span>
               </TabsTrigger>
             )}
-
-            {/* Attendance ▾ — industry & hotel attendance */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`${dropTriggerClass} ${activeTab.startsWith('att') ? 'bg-accent text-accent-foreground' : ''}`}
-                >
-                  <Users className="h-4 w-4" />
-                  <span>Attendance</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-44">
-                <DropdownMenuItem onClick={() => setActiveTab('attInd')}>
-                  <Factory className="mr-2 h-4 w-4" /> Industry Attendance
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setActiveTab('attHotel')}>
-                  <Building2 className="mr-2 h-4 w-4" /> Hotel Attendance
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
 
             {isAdmin && (
               <TabsTrigger
