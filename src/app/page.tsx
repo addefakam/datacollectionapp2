@@ -78,7 +78,9 @@ export default function Home() {
   }
 
   // Shared styles for dropdown triggers (styled like TabsTrigger)
-  const dropTriggerClass = `flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] data-[state=open]:bg-accent data-[state=open]:text-accent-foreground sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm hover:bg-muted cursor-pointer`;
+  const dropTriggerClass = `flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-medium transition-all duration-200 sm:gap-2 sm:px-3.5 sm:py-2.5 sm:text-sm cursor-pointer select-none`;
+  const dropTriggerActive = 'bg-teal-600 text-white shadow-md shadow-teal-600/30';
+  const dropTriggerIdle = 'text-teal-900/70 hover:bg-teal-100/80 hover:text-teal-900 data-[state=open]:bg-teal-100 data-[state=open]:text-teal-900';
 
   return (
     <SettingsProvider>
@@ -145,13 +147,13 @@ export default function Home() {
       {/* Main Content */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24 lg:max-w-5xl xl:max-w-7xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl ${isAdmin ? 'grid grid-cols-3 gap-0.5 sm:gap-1' : 'grid grid-cols-2 gap-0.5 sm:gap-1'}`}>
+          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl h-auto rounded-2xl border border-teal-100 bg-white p-1.5 shadow-sm shadow-teal-900/5 ${isAdmin ? 'grid grid-cols-3 gap-1 sm:gap-1.5' : 'grid grid-cols-2 gap-1 sm:gap-1.5'}`}>
             {/* Industry ▾ — all industry tabs live here */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className={`${dropTriggerClass} ${industryTabs.includes(activeTab) ? 'bg-accent text-accent-foreground' : ''}`}
+                  className={`${dropTriggerClass} ${industryTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
                 >
                   <Factory className="h-4 w-4" />
                   <span>Industry</span>
@@ -183,7 +185,7 @@ export default function Home() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className={`${dropTriggerClass} ${hotelTabs.includes(activeTab) ? 'bg-accent text-accent-foreground' : ''}`}
+                  className={`${dropTriggerClass} ${hotelTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
                 >
                   <Building2 className="h-4 w-4" />
                   <span>Hotel</span>
@@ -216,7 +218,7 @@ export default function Home() {
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className={`${dropTriggerClass} ${manageTabs.includes(activeTab) ? 'bg-accent text-accent-foreground' : ''}`}
+                    className={`${dropTriggerClass} ${manageTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
                   >
                     <Wrench className="h-4 w-4" />
                     <span>Manage</span>
