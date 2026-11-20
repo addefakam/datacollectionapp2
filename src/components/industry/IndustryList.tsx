@@ -383,11 +383,11 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       ) : (
         <>
           {/* Desktop: full data table */}
-          <Card className="hidden md:block">
+          <Card className="hidden md:block overflow-hidden">
             <CardContent className="px-0 py-0">
-              <Table className="text-xs [&_th]:px-2.5 [&_th]:py-2 [&_td]:px-2.5 [&_td]:py-2">
+              <Table className="text-xs [&_th]:px-2.5 [&_th]:py-2 [&_th]:text-white [&_th]:font-semibold [&_td]:px-2.5 [&_td]:py-2">
                 <TableHeader>
-                  <TableRow className="bg-muted/60 hover:bg-muted/60">
+                  <TableRow className="bg-teal-600 hover:bg-teal-700">
                     <TableHead className="w-10 text-center">#</TableHead>
                     <TableHead>Establishment Name</TableHead>
                     <TableHead>Sector</TableHead>
