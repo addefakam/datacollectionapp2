@@ -199,7 +199,7 @@ export default function IndustrySurveyForm({
   ];
 
   return (
-    <div>
+    <div className="mx-auto max-w-2xl">
       {/* Step Indicator */}
       <div className="mb-4 sm:mb-6">
         <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:gap-0 sm:pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>

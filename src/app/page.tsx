@@ -85,7 +85,7 @@ export default function Home() {
       <div className="flex min-h-[100dvh] flex-col bg-gray-50">
       {/* Header */}
       <header className="sticky top-0 z-50 shrink-0 border-b bg-white shadow-sm safe-top">
-        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 lg:max-w-5xl xl:max-w-7xl">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <img src="/icon.png" alt="Industry Survey" className="h-8 w-8 shrink-0 rounded-lg sm:h-10 sm:w-10 sm:rounded-xl" />
             <div className="min-w-0">
@@ -143,9 +143,9 @@ export default function Home() {
       )}
 
       {/* Main Content */}
-      <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24">
+      <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24 lg:max-w-5xl xl:max-w-7xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 ${isAdmin ? 'grid grid-cols-3 gap-0.5 sm:gap-1' : 'grid grid-cols-2 gap-0.5 sm:gap-1'}`}>
+          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl ${isAdmin ? 'grid grid-cols-3 gap-0.5 sm:gap-1' : 'grid grid-cols-2 gap-0.5 sm:gap-1'}`}>
             {/* Industry ▾ — all industry tabs live here */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -318,7 +318,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white safe-bottom">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2">
+        <div className="mx-auto flex max-w-2xl items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 lg:max-w-5xl xl:max-w-7xl">
           <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Bishoftu Industry Data Collection</span>
           <span className={`flex shrink-0 items-center gap-1 text-[10px] sm:text-xs ${isOnline ? 'text-teal-600' : 'text-amber-500'}`}>
             {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
