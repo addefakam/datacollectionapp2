@@ -32,12 +32,8 @@ import {
   Eye,
 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  locationData,
-  getAreasForSubCity,
-  SECTORS,
-  OWNERSHIP_TYPES,
-} from '@/lib/location-data';
+import { OWNERSHIP_TYPES } from '@/lib/location-data';
+import { useSettings } from '@/components/SettingsProvider';
 
 interface IndustrySurveyFormProps {
   onSubmit: () => void;
@@ -62,6 +58,7 @@ export default function IndustrySurveyForm({
   onOfflineSave,
 }: IndustrySurveyFormProps) {
   const { toast } = useToast();
+  const { subCities, sectors, areasFor } = useSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSubCity, setSelectedSubCity] = useState('');
@@ -86,7 +83,7 @@ export default function IndustrySurveyForm({
 
   const handleSubCityChange = (value: string) => {
     setSelectedSubCity(value);
-    setAreas(getAreasForSubCity(value));
+    setAreas(areasFor(value));
     setFormData((prev) => ({ ...prev, subCity: value, area: '' }));
   };
 
@@ -263,7 +260,7 @@ export default function IndustrySurveyForm({
                   <Label htmlFor="sector" className="text-xs sm:text-sm">Sector / Goossa Indastrii <span className="text-red-500">*</span></Label>
                   <Select value={formData.sector} onValueChange={(v) => handleSelectChange('sector', v)}>
                     <SelectTrigger id="sector" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
-                    <SelectContent className="max-h-64">{SECTORS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
+                    <SelectContent className="max-h-64">{sectors.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
@@ -271,7 +268,7 @@ export default function IndustrySurveyForm({
                     <Label htmlFor="subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
-                      <SelectContent>{locationData.subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+                      <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">

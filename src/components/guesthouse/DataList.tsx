@@ -56,7 +56,8 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { locationData, getAllSubCities, getAreasForSubCity, LICENSE_TYPES, LICENSE_LEVELS } from '@/lib/location-data';
+import { LICENSE_TYPES, LICENSE_LEVELS } from '@/lib/location-data';
+import { useSettings } from '@/components/SettingsProvider';
 
 interface GuestHouse {
   id: string;
@@ -105,6 +106,7 @@ interface DataListProps {
 }
 
 export default function DataList({ refreshTrigger }: DataListProps) {
+  const { subCities, areasFor } = useSettings();
   const { toast } = useToast();
   const [data, setData] = useState<GuestHouse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,12 +173,7 @@ export default function DataList({ refreshTrigger }: DataListProps) {
     setFilterSubCity(value);
     setFilterArea('');
     setPage(1);
-    if (value) {
-      const sc = locationData.subCities.find((s) => s.name === value);
-      setAreas(sc ? sc.areas : []);
-    } else {
-      setAreas([]);
-    }
+    setAreas(value ? areasFor(value) : []);
   };
 
   const handleDelete = async () => {
@@ -264,12 +261,12 @@ export default function DataList({ refreshTrigger }: DataListProps) {
       contactName: item.contactName || '',
       contactPhone: item.contactPhone || '',
     });
-    setEditAreas(getAreasForSubCity(item.subCity));
+    setEditAreas(areasFor(item.subCity));
   };
 
   const handleEditSubCityChange = (value: string) => {
     if (!editForm) return;
- setEditAreas(getAreasForSubCity(value));
+ setEditAreas(areasFor(value));
     setEditForm({ ...editForm, subCity: value, area: '' });
   };
 
@@ -391,8 +388,8 @@ export default function DataList({ refreshTrigger }: DataListProps) {
                 <SelectValue placeholder="Filter by sub-city" />
               </SelectTrigger>
               <SelectContent>
-                {getAllSubCities().map((sc) => (
-                  <SelectItem key={sc} value={sc}>{sc}</SelectItem>
+                {subCities.map((sc) => (
+                  <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -761,7 +758,7 @@ export default function DataList({ refreshTrigger }: DataListProps) {
                     <Select value={editForm.subCity} onValueChange={handleEditSubCityChange}>
                       <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {getAllSubCities().map((sc) => (<SelectItem key={sc} value={sc}>{sc}</SelectItem>))}
+                        {subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -864,9 +861,9 @@ export default function DataList({ refreshTrigger }: DataListProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label className="text-xs">Sub-City / Kuttaa Maggalaa <span className="text-red-500">*</span></Label>
-                  <Select value={regForm.subCity} onValueChange={(v) => { setRegForm({...regForm, subCity: v, area: ''}); setRegSubCity(v); setRegAreas(getAreasForSubCity(v)); }}>
+                  <Select value={regForm.subCity} onValueChange={(v) => { setRegForm({...regForm, subCity: v, area: ''}); setRegSubCity(v); setRegAreas(areasFor(v)); }}>
                     <SelectTrigger className="text-xs"><SelectValue placeholder="Filadhu / Select" /></SelectTrigger>
-                    <SelectContent>{getAllSubCities().map((sc) => <SelectItem key={sc} value={sc}>{sc}</SelectItem>)}</SelectContent>
+                    <SelectContent>{subCities.map((sc) => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">

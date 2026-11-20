@@ -40,7 +40,7 @@ import {
   X,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
-import { locationData } from '@/lib/location-data';
+import { useSettings } from '@/components/SettingsProvider';
 
 interface UserData {
   id: string;
@@ -105,11 +105,12 @@ export default function AdminPanel() {
   const [selectedAreas, setSelectedAreas] = useState<Record<string, boolean>>({}); // "subCity|area" -> checked
   const [savingAssignments, setSavingAssignments] = useState(false);
 
-  // Use the same location data as SurveyForm (source of truth)
-  const subCities = locationData.subCities.map((sc) => sc.name);
+  // Use the same live location data as the survey forms (admin-managed in Settings)
+  const { subCities: subCityData, areasFor } = useSettings();
+  const subCities = subCityData.map((sc) => sc.name);
   const areasBySubCity: Record<string, string[]> = {};
-  for (const sc of locationData.subCities) {
-    areasBySubCity[sc.name] = sc.areas;
+  for (const sc of subCityData) {
+    areasBySubCity[sc.name] = areasFor(sc.name);
   }
 
   const fetchUsers = useCallback(async () => {

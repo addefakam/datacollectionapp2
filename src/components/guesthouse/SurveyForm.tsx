@@ -33,12 +33,8 @@ import {
 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import SignaturePad, { SignaturePadHandle } from '@/components/SignaturePad';
-import {
-  locationData,
-  getAreasForSubCity,
-  LICENSE_TYPES,
-  LICENSE_LEVELS,
-} from '@/lib/location-data';
+import { LICENSE_TYPES, LICENSE_LEVELS } from '@/lib/location-data';
+import { useSettings } from '@/components/SettingsProvider';
 
 interface SurveyFormProps {
   onSubmit: () => void;
@@ -56,6 +52,7 @@ const STEPS = [
 ];
 
 export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnline = true, onOfflineSave }: SurveyFormProps) {
+  const { subCities, areasFor } = useSettings();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -85,7 +82,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
 
   const handleSubCityChange = (value: string) => {
     setSelectedSubCity(value);
-    setAreas(getAreasForSubCity(value));
+    setAreas(areasFor(value));
     setFormData((prev) => ({ ...prev, subCity: value, area: '' }));
   };
 
@@ -269,7 +266,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
                     <Label htmlFor="subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
-                      <SelectContent>{locationData.subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+                      <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">

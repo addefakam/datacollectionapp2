@@ -53,7 +53,8 @@ import {
   Loader2,
   Save,
 } from 'lucide-react';
-import { locationData, getAllSubCities, getAreasForSubCity, SECTORS, OWNERSHIP_TYPES } from '@/lib/location-data';
+import { OWNERSHIP_TYPES } from '@/lib/location-data';
+import { useSettings } from '@/components/SettingsProvider';
 
 interface Industry {
   id: string;
@@ -93,6 +94,7 @@ interface IndustryListProps {
 
 export default function IndustryList({ refreshTrigger }: IndustryListProps) {
   const { toast } = useToast();
+  const { subCities, sectors, areasFor } = useSettings();
   const [data, setData] = useState<Industry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -144,7 +146,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
     setFilterSubCity(value);
     setFilterArea('');
     setPage(1);
-    setAreas(value ? getAreasForSubCity(value) : []);
+    setAreas(value ? areasFor(value) : []);
   };
 
   const handleDelete = async () => {
@@ -178,7 +180,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       contactName: item.contactName,
       contactPhone: item.contactPhone,
     });
-    setEditAreas(getAreasForSubCity(item.subCity));
+    setEditAreas(areasFor(item.subCity));
   };
 
   const handleSaveEdit = async () => {
@@ -269,14 +271,14 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
               <SelectTrigger className="text-xs sm:text-sm"><SelectValue placeholder="All sectors" /></SelectTrigger>
               <SelectContent className="max-h-64">
                 <SelectItem value="all">All sectors</SelectItem>
-                {SECTORS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                {sectors.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
               </SelectContent>
             </Select>
             <Select value={filterSubCity || undefined} onValueChange={(v) => { handleSubCityFilterChange(v === 'all' ? '' : v); }}>
               <SelectTrigger className="text-xs sm:text-sm"><SelectValue placeholder="All sub-cities" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All sub-cities</SelectItem>
-                {getAllSubCities().map((sc) => (<SelectItem key={sc} value={sc}>{sc}</SelectItem>))}
+                {subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}
               </SelectContent>
             </Select>
             <Select value={filterArea || undefined} onValueChange={(v) => { setFilterArea(v === 'all' ? '' : v); setPage(1); }} disabled={!filterSubCity}>
@@ -421,15 +423,15 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                 <Label className="text-xs">Sector</Label>
                 <Select value={editForm.sector} onValueChange={(v) => setEditForm({ ...editForm, sector: v })}>
                   <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent className="max-h-64">{SECTORS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
+                  <SelectContent className="max-h-64">{sectors.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Sub-City</Label>
-                  <Select value={editForm.subCity} onValueChange={(v) => { setEditForm({ ...editForm, subCity: v, area: '' }); setEditAreas(getAreasForSubCity(v)); }}>
+                  <Select value={editForm.subCity} onValueChange={(v) => { setEditForm({ ...editForm, subCity: v, area: '' }); setEditAreas(areasFor(v)); }}>
                     <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>{locationData.subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+                    <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">

@@ -134,3 +134,34 @@ model IndustryAttendance {
 
   @@unique([meetingId, industryId]) // one attendance record per industry per meeting
 }
+
+// Admin-managed locations (sub-cities + woredas/areas) used across all survey forms
+model SubCity {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  areas SubCityArea[]
+}
+
+model SubCityArea {
+  id        String @id @default(cuid())
+  subCityId String
+  name      String
+  sortOrder Int    @default(0)
+
+  subCity SubCity @relation(fields: [subCityId], references: [id], onDelete: Cascade)
+
+  @@unique([subCityId, name])
+}
+
+// Admin-managed industry categories (sectors) used in the industry survey
+model IndustryCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

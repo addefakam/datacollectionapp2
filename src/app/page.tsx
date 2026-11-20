@@ -25,6 +25,7 @@ import {
   Factory,
   Building2,
   ChevronDown,
+  Wrench,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import SurveyForm from '@/components/guesthouse/SurveyForm';
@@ -40,6 +41,8 @@ import IndustryList from '@/components/industry/IndustryList';
 import IndustryStats from '@/components/industry/IndustryStats';
 import IndustryAttendance from '@/components/industry/IndustryAttendance';
 import IndustryAttendanceDashboard from '@/components/industry/IndustryAttendanceDashboard';
+import SettingsManager from '@/components/admin/SettingsManager';
+import { SettingsProvider } from '@/components/SettingsProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 
@@ -57,6 +60,7 @@ export default function Home() {
   // Tab groups — used to highlight the owning dropdown trigger
   const industryTabs = ['survey', 'indData', 'indStats', 'attInd'];
   const hotelTabs = ['hotelSurvey', 'hotelData', 'hotelStats', 'attHotel'];
+  const manageTabs = ['meetings', 'settings', 'admin'];
 
   if (status === 'loading') {
     return (
@@ -77,7 +81,8 @@ export default function Home() {
   const dropTriggerClass = `flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] data-[state=open]:bg-accent data-[state=open]:text-accent-foreground sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm hover:bg-muted cursor-pointer`;
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-gray-50">
+    <SettingsProvider>
+      <div className="flex min-h-[100dvh] flex-col bg-gray-50">
       {/* Header */}
       <header className="sticky top-0 z-50 shrink-0 border-b bg-white shadow-sm safe-top">
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
@@ -140,7 +145,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 ${isAdmin ? 'grid grid-cols-4 gap-0.5 sm:gap-1' : 'grid grid-cols-2 gap-0.5 sm:gap-1'}`}>
+          <TabsList className={`mb-3 w-full sm:mb-4 ${isAdmin ? 'grid grid-cols-3 gap-0.5 sm:gap-1' : 'grid grid-cols-2 gap-0.5 sm:gap-1'}`}>
             {/* Industry ▾ — all industry tabs live here */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -205,24 +210,31 @@ export default function Home() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Manage ▾ — admin tools: meetings, settings, users */}
             {isAdmin && (
-              <TabsTrigger
-                value="meetings"
-                className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
-              >
-                <Calendar className="h-4 w-4" />
-                <span>Meetings</span>
-              </TabsTrigger>
-            )}
-
-            {isAdmin && (
-              <TabsTrigger
-                value="admin"
-                className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
-              >
-                <Shield className="h-4 w-4" />
-                <span>Users</span>
-              </TabsTrigger>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`${dropTriggerClass} ${manageTabs.includes(activeTab) ? 'bg-accent text-accent-foreground' : ''}`}
+                  >
+                    <Wrench className="h-4 w-4" />
+                    <span>Manage</span>
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => setActiveTab('meetings')}>
+                    <Calendar className="mr-2 h-4 w-4" /> Meetings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('settings')}>
+                    <Wrench className="mr-2 h-4 w-4" /> Settings (Locations &amp; Categories)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('admin')}>
+                    <Shield className="mr-2 h-4 w-4" /> Users
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </TabsList>
 
@@ -279,6 +291,13 @@ export default function Home() {
             </TabsContent>
           )}
 
+          {/* ============ Settings — locations & categories (admin) ============ */}
+          {isAdmin && (
+            <TabsContent value="settings" className="mt-2 sm:mt-3">
+              <SettingsManager />
+            </TabsContent>
+          )}
+
           {/* ============ Attendance module ============ */}
           <TabsContent value="attInd" className="mt-2 sm:mt-3">
             {isAdmin ? <IndustryAttendanceDashboard /> : <IndustryAttendance />}
@@ -307,6 +326,7 @@ export default function Home() {
           </span>
         </div>
       </footer>
-    </div>
+      </div>
+    </SettingsProvider>
   );
 }
