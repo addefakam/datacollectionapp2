@@ -50,6 +50,13 @@ export async function POST(request: NextRequest) {
       if (val.includes('ownership') || val.includes('gosa abbaa')) {
         headers.ownershipType = colNumber;
       }
+      // Word-boundary match so "Employee Count" is not mistaken for EMP
+      if (/(^|\W)eia(\W|$)/.test(val)) {
+        headers.hasEia = colNumber;
+      }
+      if (/(^|\W)emp(\W|$)/.test(val) || val.includes('management plan')) {
+        headers.hasEmp = colNumber;
+      }
       if (val.includes('employee') || val.includes('hojjetaa')) {
         headers.employeeCount = colNumber;
       }
@@ -75,6 +82,8 @@ export async function POST(request: NextRequest) {
     }
 
     const phoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
+    // Yes/No cell values: Yes, Y, True, 1, Eyee
+    const parseYesNo = (v: string) => /^(yes|y|true|1|eyee)$/.test(v.trim().toLowerCase());
     const results = { success: 0, failed: 0, errors: [] as string[] };
 
     // Read data rows (skip header)
@@ -94,6 +103,8 @@ export async function POST(request: NextRequest) {
       const specificAddress = getCell(headers.specificAddress!);
       const licenseNumber = getCell(headers.licenseNumber!);
       const ownershipType = getCell(headers.ownershipType!);
+      const hasEia = headers.hasEia ? parseYesNo(getCell(headers.hasEia)) : false;
+      const hasEmp = headers.hasEmp ? parseYesNo(getCell(headers.hasEmp)) : false;
       const employeeCount = getCell(headers.employeeCount!);
       const startupCapital = headers.startupCapital ? getCell(headers.startupCapital) : '';
       const contactName = getCell(headers.contactName!);
@@ -132,6 +143,8 @@ export async function POST(request: NextRequest) {
             specificAddress,
             licenseNumber: licenseNumber || null,
             ownershipType,
+            hasEia,
+            hasEmp,
             employeeCount: Math.round(employees),
             startupCapital: capital != null && Number.isFinite(capital) ? capital : null,
             contactName,

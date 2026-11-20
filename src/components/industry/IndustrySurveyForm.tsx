@@ -73,6 +73,8 @@ export default function IndustrySurveyForm({
     specificAddress: '',
     licenseNumber: '',
     ownershipType: '',
+    hasEia: 'no',
+    hasEmp: 'no',
     employeeCount: '',
     startupCapital: '',
     contactName: '',
@@ -157,6 +159,8 @@ export default function IndustrySurveyForm({
       ...formData,
       employeeCount: Number(formData.employeeCount),
       startupCapital: formData.startupCapital === '' ? null : Number(formData.startupCapital),
+      hasEia: formData.hasEia === 'yes',
+      hasEmp: formData.hasEmp === 'yes',
       surveyorName,
       surveyorId,
     };
@@ -193,6 +197,8 @@ export default function IndustrySurveyForm({
     { label: 'Address / Baka Addaa', value: formData.specificAddress },
     { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
     { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
+    { label: 'EIA (Environmental Impact Assessment)', value: formData.hasEia === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+    { label: 'EMP (Environmental Management Plan)', value: formData.hasEmp === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
     { label: 'Employees / Hojjetaa', value: formData.employeeCount },
     { label: 'Startup Capital / Qabiyyee Jalqabaa', value: formData.startupCapital ? `${formData.startupCapital} ETB` : '—' },
     { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
@@ -321,6 +327,35 @@ export default function IndustrySurveyForm({
                   <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="startupCapital" className="text-xs sm:text-sm">Startup Capital (ETB)<br /><span className="text-xs font-normal text-muted-foreground">Qabiyyee Jalqabaa</span></Label>
                     <Input id="startupCapital" name="startupCapital" type="number" min="0" placeholder="e.g., 500000" value={formData.startupCapital} onChange={handleChange} className="text-sm sm:text-base" />
+                  </div>
+                </div>
+                {/* Environmental compliance */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label className="text-xs sm:text-sm">EIA — Environmental Impact Assessment<br /><span className="text-xs font-normal text-muted-foreground">Qorannoo Naannoo</span></Label>
+                    <RadioGroup value={formData.hasEia} onValueChange={(v) => handleSelectChange('hasEia', v)} className="flex gap-4">
+                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                        <RadioGroupItem value="yes" id="eia-yes" />
+                        <Label htmlFor="eia-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                        <RadioGroupItem value="no" id="eia-no" />
+                        <Label htmlFor="eia-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label className="text-xs sm:text-sm">EMP — Environmental Management Plan<br /><span className="text-xs font-normal text-muted-foreground">Karoora Naannoo</span></Label>
+                    <RadioGroup value={formData.hasEmp} onValueChange={(v) => handleSelectChange('hasEmp', v)} className="flex gap-4">
+                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                        <RadioGroupItem value="yes" id="emp-yes" />
+                        <Label htmlFor="emp-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                        <RadioGroupItem value="no" id="emp-no" />
+                        <Label htmlFor="emp-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                 </div>
               </CardContent>

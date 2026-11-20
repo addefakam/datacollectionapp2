@@ -62,6 +62,12 @@ export async function PUT(
         specificAddress: body.specificAddress ?? existing.specificAddress,
         licenseNumber: body.licenseNumber ?? existing.licenseNumber,
         ownershipType: body.ownershipType ?? existing.ownershipType,
+        hasEia: body.hasEia != null
+          ? (body.hasEia === true || body.hasEia === 'true' || body.hasEia === 'yes' || body.hasEia === 1)
+          : existing.hasEia,
+        hasEmp: body.hasEmp != null
+          ? (body.hasEmp === true || body.hasEmp === 'true' || body.hasEmp === 'yes' || body.hasEmp === 1)
+          : existing.hasEmp,
         employeeCount: employees != null && Number.isFinite(employees) ? Math.round(employees) : existing.employeeCount,
         startupCapital: capital != null && Number.isFinite(capital) ? capital : existing.startupCapital,
         contactName: body.contactName ?? existing.contactName,

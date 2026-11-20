@@ -1,6 +1,11 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
+/** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
+function toBool(v: unknown): boolean {
+  return v === true || v === 'true' || v === 'yes' || v === 1;
+}
+
 // POST /api/industries — create an industry record
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +18,8 @@ export async function POST(request: NextRequest) {
       specificAddress,
       licenseNumber,
       ownershipType,
+      hasEia,
+      hasEmp,
       employeeCount,
       startupCapital,
       contactName,
@@ -59,6 +66,8 @@ export async function POST(request: NextRequest) {
         specificAddress: specificAddress || '',
         licenseNumber: licenseNumber || null,
         ownershipType,
+        hasEia: toBool(hasEia),
+        hasEmp: toBool(hasEmp),
         employeeCount: Math.round(employees),
         startupCapital: capital != null && Number.isFinite(capital) ? capital : null,
         contactName,

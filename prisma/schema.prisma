@@ -108,6 +108,8 @@ model Industry {
   specificAddress   String
   licenseNumber     String?
   ownershipType     String
+  hasEia            Boolean  @default(false) // Environmental Impact Assessment done
+  hasEmp            Boolean  @default(false) // Environmental Management Plan prepared
   employeeCount     Int      @default(0)
   startupCapital    Float?
   contactName       String

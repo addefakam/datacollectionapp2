@@ -67,6 +67,7 @@ import {
   Coins,
   FileBadge,
   Building2,
+  Leaf,
 } from 'lucide-react';
 import { OWNERSHIP_TYPES } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
@@ -82,6 +83,8 @@ interface Industry {
   specificAddress: string;
   licenseNumber: string | null;
   ownershipType: string;
+  hasEia: boolean;
+  hasEmp: boolean;
   employeeCount: number;
   startupCapital: number | null;
   contactName: string;
@@ -99,6 +102,8 @@ interface EditForm {
   specificAddress: string;
   licenseNumber: string;
   ownershipType: string;
+  hasEia: string;
+  hasEmp: string;
   employeeCount: string;
   startupCapital: string;
   contactName: string;
@@ -199,6 +204,8 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       specificAddress: item.specificAddress,
       licenseNumber: item.licenseNumber || '',
       ownershipType: item.ownershipType,
+      hasEia: item.hasEia ? 'yes' : 'no',
+      hasEmp: item.hasEmp ? 'yes' : 'no',
       employeeCount: String(item.employeeCount),
       startupCapital: item.startupCapital != null ? String(item.startupCapital) : '',
       contactName: item.contactName,
@@ -215,6 +222,8 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
         ...editForm,
         employeeCount: Number(editForm.employeeCount),
         startupCapital: editForm.startupCapital === '' ? null : Number(editForm.startupCapital),
+        hasEia: editForm.hasEia === 'yes',
+        hasEmp: editForm.hasEmp === 'yes',
       };
       const res = await fetch(`/api/industries/${editItem.id}`, {
         method: 'PUT',
@@ -396,6 +405,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                     <TableHead>Address</TableHead>
                     <TableHead>License No</TableHead>
                     <TableHead>Ownership</TableHead>
+                    <TableHead>EIA / EMP</TableHead>
                     <TableHead className="text-right">Employees</TableHead>
                     <TableHead className="text-right">Capital (ETB)</TableHead>
                     <TableHead>Contact Person</TableHead>
@@ -416,6 +426,11 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                       <TableCell className="max-w-[140px] truncate text-muted-foreground" title={item.specificAddress}>{item.specificAddress}</TableCell>
                       <TableCell className="whitespace-nowrap">{item.licenseNumber || '—'}</TableCell>
                       <TableCell className="max-w-[120px] truncate" title={item.ownershipType}>{item.ownershipType}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        <span className={item.hasEia ? 'font-medium text-green-600' : 'text-muted-foreground'}>EIA {item.hasEia ? '✓' : '✗'}</span>
+                        <span className="mx-1 text-muted-foreground">·</span>
+                        <span className={item.hasEmp ? 'font-medium text-green-600' : 'text-muted-foreground'}>EMP {item.hasEmp ? '✓' : '✗'}</span>
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{item.employeeCount}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmtCapital(item.startupCapital)}</TableCell>
                       <TableCell className="whitespace-nowrap">{item.contactName}</TableCell>
@@ -481,6 +496,14 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                         <p className="truncate text-[11px] font-medium">{fmtCapital(item.startupCapital)}</p>
                       </div>
                     </div>
+                    <div className="col-span-2 flex items-center gap-1.5">
+                      <Leaf className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="text-[9px] uppercase tracking-wide text-muted-foreground">Environment</span>
+                      <span className="ml-auto flex gap-1">
+                        <Badge variant="outline" className={`text-[10px] ${item.hasEia ? 'border-green-200 bg-green-50 text-green-700' : 'bg-muted text-muted-foreground'}`}>EIA {item.hasEia ? 'Yes' : 'No'}</Badge>
+                        <Badge variant="outline" className={`text-[10px] ${item.hasEmp ? 'border-green-200 bg-green-50 text-green-700' : 'bg-muted text-muted-foreground'}`}>EMP {item.hasEmp ? 'Yes' : 'No'}</Badge>
+                      </span>
+                    </div>
                     <div className="col-span-2">
                       <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Address</p>
                       <p className="text-[11px] font-medium">{item.specificAddress}</p>
@@ -536,6 +559,8 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                 ['Specific Address', viewItem.specificAddress],
                 ['License Number', viewItem.licenseNumber || '—'],
                 ['Ownership Type', viewItem.ownershipType],
+                ['EIA (Environmental Impact Assessment)', viewItem.hasEia ? 'Yes / Eyee' : 'No / Lakki'],
+                ['EMP (Environmental Management Plan)', viewItem.hasEmp ? 'Yes / Eyee' : 'No / Lakki'],
                 ['Employee Count', String(viewItem.employeeCount)],
                 ['Startup Capital (ETB)', viewItem.startupCapital != null ? viewItem.startupCapital.toLocaleString() : '—'],
                 ['Contact Person', viewItem.contactName],
@@ -606,6 +631,28 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   <Select value={editForm.ownershipType} onValueChange={(v) => setEditForm({ ...editForm, ownershipType: v })}>
                     <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>{OWNERSHIP_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">EIA (Environmental Impact Assessment)</Label>
+                  <Select value={editForm.hasEia} onValueChange={(v) => setEditForm({ ...editForm, hasEia: v })}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Yes / Eyee</SelectItem>
+                      <SelectItem value="no">No / Lakki</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">EMP (Environmental Management Plan)</Label>
+                  <Select value={editForm.hasEmp} onValueChange={(v) => setEditForm({ ...editForm, hasEmp: v })}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Yes / Eyee</SelectItem>
+                      <SelectItem value="no">No / Lakki</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
