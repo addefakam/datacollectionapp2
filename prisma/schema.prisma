@@ -165,3 +165,11 @@ model IndustryCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Simple key-value store for app-wide configuration (admin editable),
+// e.g. which attribute the Sector Distribution stats group by.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

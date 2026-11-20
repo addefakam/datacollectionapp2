@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/industries?subCity=&area=&sector=&search=&page=&limit=
+// GET /api/industries?subCity=&area=&sector=&search=&minEmployees=&maxEmployees=&page=&limit=
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -86,6 +86,8 @@ export async function GET(request: NextRequest) {
     const area = searchParams.get('area');
     const sector = searchParams.get('sector');
     const search = searchParams.get('search');
+    const minEmployees = searchParams.get('minEmployees');
+    const maxEmployees = searchParams.get('maxEmployees');
     const page = Number(searchParams.get('page')) || 1;
     const limit = Number(searchParams.get('limit')) || 20;
 
@@ -94,6 +96,12 @@ export async function GET(request: NextRequest) {
     if (subCity) where.subCity = subCity;
     if (area) where.area = area;
     if (sector) where.sector = sector;
+    if (minEmployees !== null && minEmployees !== '') {
+      where.employeeCount = { ...(where.employeeCount as Record<string, number> | undefined), gte: Number(minEmployees) };
+    }
+    if (maxEmployees !== null && maxEmployees !== '') {
+      where.employeeCount = { ...(where.employeeCount as Record<string, number> | undefined), lte: Number(maxEmployees) };
+    }
     if (search) {
       where.OR = [
         { establishmentName: { contains: search } },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   MapPin,
   Factory,
@@ -10,6 +10,7 @@ import {
   Loader2,
   X,
   MapPinned,
+  BarChart3,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Dialog,
   DialogContent,
@@ -557,13 +559,115 @@ function CategoriesSection() {
   );
 }
 
+// ============ Sector Distribution attribution section ============
+
+const STATS_ATTRIBUTE_OPTIONS: { value: string; label: string; desc: string }[] = [
+  { value: 'category', label: 'Category / Goossa', desc: 'Group industries by their sector (default)' },
+  { value: 'woreda', label: 'Woreda / Werada', desc: 'Group industries by the woreda they are in' },
+  { value: 'employees', label: 'Number of Employees / Lakkoofsa Hojjetaa', desc: 'Group industries by employee size ranges (0, 1–5, 6–10, …)' },
+];
+
+function StatsSection() {
+  const { toast } = useToast();
+  const [attribute, setAttribute] = useState('category');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/settings/stats-attribute');
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setAttribute(data.attribute);
+        }
+      } catch {
+        // keep default
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/settings/stats-attribute', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attribute }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      toast({ title: 'Stats attribution saved / Qoodaan olmaa' });
+    } catch (err) {
+      toast({
+        title: err instanceof Error ? err.message : 'Failed to save',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BarChart3 className="h-4 w-4 text-teal-600" />
+          Sector Distribution Attribution / Qooda Goossa
+        </CardTitle>
+        <CardDescription>
+          Choose what the Industry Stats &ldquo;Sector Distribution&rdquo; chart groups by by
+          default. The chart can still be switched between category, woreda and employees at any
+          time.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+          </div>
+        ) : (
+          <RadioGroup value={attribute} onValueChange={setAttribute} className="gap-2">
+            {STATS_ATTRIBUTE_OPTIONS.map((o) => (
+              <label
+                key={o.value}
+                className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors ${
+                  attribute === o.value
+                    ? 'border-teal-500 bg-teal-50'
+                    : 'hover:bg-muted/40'
+                }`}
+              >
+                <RadioGroupItem value={o.value} className="mt-0.5" />
+                <span>
+                  <span className="block text-sm font-medium">{o.label}</span>
+                  <span className="block text-xs text-muted-foreground">{o.desc}</span>
+                </span>
+              </label>
+            ))}
+          </RadioGroup>
+        )}
+        <Button onClick={save} disabled={saving || loading}>
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save / Olmaa
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ============ Main component ============
 
 export default function SettingsManager() {
   return (
     <div className="space-y-3">
       <Tabs defaultValue="locations">
-        <TabsList className="w-full grid grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="locations" className="gap-1.5">
             <MapPinned className="h-4 w-4" />
             <span className="text-[11px] sm:text-sm">Locations</span>
@@ -572,6 +676,10 @@ export default function SettingsManager() {
             <Factory className="h-4 w-4" />
             <span className="text-[11px] sm:text-sm">Categories</span>
           </TabsTrigger>
+          <TabsTrigger value="stats" className="gap-1.5">
+            <BarChart3 className="h-4 w-4" />
+            <span className="text-[11px] sm:text-sm">Stats</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="locations" className="mt-3">
@@ -579,6 +687,9 @@ export default function SettingsManager() {
         </TabsContent>
         <TabsContent value="categories" className="mt-3">
           <CategoriesSection />
+        </TabsContent>
+        <TabsContent value="stats" className="mt-3">
+          <StatsSection />
         </TabsContent>
       </Tabs>
     </div>
