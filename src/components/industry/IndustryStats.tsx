@@ -1,16 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Factory,
   Users,
@@ -20,6 +13,7 @@ import {
   Loader2,
   MousePointerClick,
   Phone,
+  X,
 } from 'lucide-react';
 import {
   BarChart,
@@ -138,7 +132,7 @@ export default function IndustryStats() {
   const [dimensions, setDimensions] = useState<DimensionOption[]>(FALLBACK_DIMENSIONS);
   const [metric, setMetric] = useState<Metric>('count');
   const [expandedSubCities, setExpandedSubCities] = useState<Set<string>>(new Set());
-  const [dialog, setDialog] = useState<{
+  const [detail, setDetail] = useState<{
     open: boolean;
     title: string;
     sub: string;
@@ -146,6 +140,7 @@ export default function IndustryStats() {
     records: IndustryRecord[];
     total: number;
   }>({ open: false, title: '', sub: '', loading: false, records: [], total: 0 });
+  const recordsPanelRef = useRef<HTMLDivElement | null>(null);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -193,15 +188,19 @@ export default function IndustryStats() {
 
   /** Fetch and show the industry records behind a chart segment / breakdown row. */
   const openRecords = useCallback(async (filter: Record<string, string>, title: string, sub: string) => {
-    setDialog({ open: true, title, sub, loading: true, records: [], total: 0 });
+    setDetail({ open: true, title, sub, loading: true, records: [], total: 0 });
+    // Bring the records table (rendered below the chart) into view
+    requestAnimationFrame(() =>
+      recordsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    );
     try {
       const params = new URLSearchParams({ ...filter, limit: '500', page: '1' });
       const res = await fetch(`/api/industries?${params.toString()}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setDialog((d) => ({ ...d, loading: false, records: data.data ?? [], total: data.total ?? 0 }));
+      setDetail((d) => ({ ...d, loading: false, records: data.data ?? [], total: data.total ?? 0 }));
     } catch {
-      setDialog((d) => ({ ...d, loading: false }));
+      setDetail((d) => ({ ...d, loading: false }));
     }
   }, []);
 
@@ -430,8 +429,90 @@ export default function IndustryStats() {
 
           <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <MousePointerClick className="h-3 w-3 shrink-0 text-teal-600" />
-            Click a bar or slice to view its records / Sararra tuquun daataa ilaalaa
+            Click a bar or slice to view its records below / Sararra tuquun daataan jalatti baa'uu
           </p>
+
+          {/* Drill-down records — styled table opened below the chart on click */}
+          {detail.open && (
+            <div ref={recordsPanelRef} className="overflow-hidden rounded-lg border border-teal-200">
+              <div className="flex items-center justify-between gap-2 border-b border-teal-100 bg-teal-50/70 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-teal-800">
+                    <span className="truncate">{detail.title}</span>
+                    <Badge className="shrink-0 bg-teal-100 text-[10px] text-teal-700">
+                      {detail.total} record{detail.total === 1 ? '' : 's'}
+                    </Badge>
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground">{detail.sub}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetail((d) => ({ ...d, open: false }))}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-teal-100 hover:text-teal-800"
+                  aria-label="Close records"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {detail.loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+                </div>
+              ) : detail.records.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">No records found</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-teal-100 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <th className="px-2.5 py-2 font-semibold">#</th>
+                        <th className="px-2.5 py-2 font-semibold">Establishment / Mana</th>
+                        <th className="px-2.5 py-2 font-semibold">Sector / Goossa</th>
+                        <th className="px-2.5 py-2 font-semibold">Location</th>
+                        <th className="px-2.5 py-2 text-right font-semibold">Emp.</th>
+                        <th className="px-2.5 py-2 font-semibold">License</th>
+                        <th className="px-2.5 py-2 font-semibold">Contact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-muted">
+                      {detail.records.map((r, i) => (
+                        <tr key={r.id} className="odd:bg-white even:bg-teal-50/30 transition-colors hover:bg-teal-50">
+                          <td className="px-2.5 py-2 text-muted-foreground">{i + 1}</td>
+                          <td className="max-w-[200px] truncate px-2.5 py-2 font-medium">
+                            {r.establishmentName}
+                          </td>
+                          <td className="px-2.5 py-2">
+                            <Badge className="bg-teal-100 text-[10px] text-teal-700">{r.sector}</Badge>
+                          </td>
+                          <td className="max-w-[180px] truncate px-2.5 py-2 text-muted-foreground">
+                            {r.subCity} — {r.area}
+                          </td>
+                          <td className="px-2.5 py-2 text-right font-semibold text-sky-700">
+                            {r.employeeCount}
+                          </td>
+                          <td className="px-2.5 py-2 text-muted-foreground">{r.licenseNumber || '—'}</td>
+                          <td className="max-w-[160px] truncate px-2.5 py-2 text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Phone className="h-3 w-3 shrink-0" />
+                              {r.contactPhone}
+                              {r.contactName ? ` · ${r.contactName}` : ''}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!detail.loading && detail.records.length > 0 && (
+                <p className="border-t border-teal-100 bg-teal-50/50 px-3 py-1.5 text-center text-[10px] text-muted-foreground">
+                  {detail.records.length < detail.total
+                    ? `Showing first ${detail.records.length} of ${detail.total} records`
+                    : 'End of list / Xumura'}
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -530,61 +611,6 @@ export default function IndustryStats() {
         </Card>
       )}
 
-      {/* Records drill-down dialog */}
-      <Dialog open={dialog.open} onOpenChange={(open) => setDialog((d) => ({ ...d, open }))}>
-        <DialogContent className="flex max-h-[85dvh] flex-col overflow-hidden sm:max-w-2xl">
-          <DialogHeader className="shrink-0">
-            <DialogTitle className="flex flex-wrap items-center gap-2 text-base">
-              {dialog.title}
-              <Badge className="bg-teal-100 text-xs text-teal-700">{dialog.total} record{dialog.total === 1 ? '' : 's'}</Badge>
-            </DialogTitle>
-            <DialogDescription>{dialog.sub}</DialogDescription>
-          </DialogHeader>
-          <div className="-mx-1 flex-1 overflow-y-auto px-1">
-            {dialog.loading ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
-              </div>
-            ) : dialog.records.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">No records found</p>
-            ) : (
-              <div className="space-y-1.5 py-1">
-                {dialog.records.map((r) => (
-                  <div key={r.id} className="rounded-lg border p-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{r.establishmentName}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {r.subCity} — {r.area}{r.specificAddress ? ` · ${r.specificAddress}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <Badge className="bg-teal-100 text-[10px] text-teal-700">{r.sector}</Badge>
-                        <Badge className="bg-sky-100 text-[10px] text-sky-700">{r.employeeCount} emp.</Badge>
-                      </div>
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {r.contactPhone}
-                      </span>
-                      {r.contactName && <span>{r.contactName}</span>}
-                      {r.licenseNumber && <span>License: {r.licenseNumber}</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          {!dialog.loading && dialog.records.length > 0 && (
-            <p className="shrink-0 pt-1 text-center text-[10px] text-muted-foreground">
-              {dialog.records.length < dialog.total
-                ? `Showing first ${dialog.records.length} of ${dialog.total} records`
-                : 'End of list'}
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
