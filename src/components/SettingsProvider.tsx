@@ -33,6 +33,8 @@ const CACHE_KEY = 'app_settings_cache_v2';
 
 // Hardcoded defaults — used before the first fetch resolves and whenever the
 // network is unavailable with no cached copy (e.g. first-ever offline visit).
+// Their ids ("default-N") are NOT real database ids, so lists shown from them
+// must never be used for edits (PUT/DELETE would 404).
 const FALLBACK: CachedSettings = {
   subCities: locationData.subCities.map((sc, i) => ({
     id: `default-${i}`,
@@ -41,6 +43,26 @@ const FALLBACK: CachedSettings = {
   })),
   categories: SECTORS.map((s, i) => ({ id: `default-${i}`, name: s })),
 };
+
+/** True when a list is empty or still comes from the hardcoded defaults. */
+function isFallbackList(list: SubCityData[]): boolean {
+  return list.length === 0 || list.some((s) => s.id.startsWith('default-'));
+}
+
+/** Merges freshly fetched lists into the settings cache without losing the other list. */
+function persistCache(subCities: SubCityData[] | null, categories: CategoryData[] | null): void {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    const cached = raw ? (JSON.parse(raw) as Partial<CachedSettings>) : {};
+    const next: CachedSettings = {
+      subCities: subCities ?? cached.subCities ?? FALLBACK.subCities,
+      categories: categories ?? cached.categories ?? FALLBACK.categories,
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+  } catch {
+    // storage full or corrupted — non-fatal
+  }
+}
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
@@ -77,41 +99,63 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         fetch('/api/industry-categories', { cache: 'no-store' }),
       ]);
 
-      if (scRes.ok && catRes.ok) {
-        const scData = await scRes.json();
-        const catData = await catRes.json();
-        const nextSubCities: SubCityData[] = Array.isArray(scData.subCities)
-          ? scData.subCities
-          : FALLBACK.subCities;
-        const nextCategories: CategoryData[] = Array.isArray(catData.categories)
-          ? catData.categories
-          : FALLBACK.categories;
+      // Parse each response independently — a failure in one list (e.g. the
+      // categories endpoint erroring) must NOT throw away the other list.
+      let nextSubCities: SubCityData[] | null = null;
+      let nextCategories: CategoryData[] | null = null;
 
-        setSubCities(nextSubCities);
-        setCategories(nextCategories);
+      if (scRes.ok) {
         try {
-          localStorage.setItem(
-            CACHE_KEY,
-            JSON.stringify({ subCities: nextSubCities, categories: nextCategories })
-          );
+          const scData = await scRes.json();
+          if (Array.isArray(scData.subCities) && scData.subCities.length > 0) {
+            nextSubCities = scData.subCities;
+            setSubCities(nextSubCities);
+          }
         } catch {
-          // storage full — non-fatal
+          // malformed body — treat as failed
         }
+      }
+      if (catRes.ok) {
+        try {
+          const catData = await catRes.json();
+          if (Array.isArray(catData.categories) && catData.categories.length > 0) {
+            nextCategories = catData.categories;
+            setCategories(nextCategories);
+          }
+        } catch {
+          // malformed body — treat as failed
+        }
+      }
+
+      if (nextSubCities || nextCategories) {
+        // At least one list refreshed — cache what we have (successful lists
+        // replace their cache entry, the other one keeps its cached copy).
+        persistCache(nextSubCities, nextCategories);
       } else if (scRes.status === 401 || catRes.status === 401) {
         // Session expired — keep whatever we have (cached or defaults)
         loadFromCache();
       } else {
-        // Server error / offline — fall back to cache, then defaults
+        // Both failed (server error / offline) — refresh from cache, but never
+        // overwrite server-backed data with the hardcoded defaults, otherwise
+        // edit dialogs would show fake ids and saves would 404.
         if (!loadFromCache()) {
-          setSubCities(FALLBACK.subCities);
-          setCategories(FALLBACK.categories);
+          setSubCities((cur) => (isFallbackList(cur) ? FALLBACK.subCities : cur));
+          setCategories((cur) =>
+            cur.length === 0 || cur.some((c) => c.id.startsWith('default-'))
+              ? FALLBACK.categories
+              : cur
+          );
         }
       }
     } catch {
-      // Network error / offline — fall back to cache, then defaults
+      // Network error / offline — same policy as both requests failing
       if (!loadFromCache()) {
-        setSubCities(FALLBACK.subCities);
-        setCategories(FALLBACK.categories);
+        setSubCities((cur) => (isFallbackList(cur) ? FALLBACK.subCities : cur));
+        setCategories((cur) =>
+          cur.length === 0 || cur.some((c) => c.id.startsWith('default-'))
+            ? FALLBACK.categories
+            : cur
+        );
       }
     } finally {
       setLoading(false);

@@ -180,6 +180,22 @@ function SubCitiesSection() {
   const [deleteTarget, setDeleteTarget] = useState<SubCityData | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Rows from the hardcoded fallback list carry fake ids ("default-N") that
+  // don't exist in the database — editing them would always fail to save.
+  // Refresh from the server first so the user edits a real row.
+  const openEdit = (sc: SubCityData) => {
+    if (sc.id.startsWith('default-')) {
+      toast({
+        title: 'Refreshing data… / Deetaa haaromsaa jira…',
+        description: 'The sub-city list was not loaded from the server yet. Try Edit again in a moment.',
+        variant: 'destructive',
+      });
+      reload();
+      return;
+    }
+    setEditTarget(sc);
+  };
+
   const add = async () => {
     if (!newName.trim()) {
       toast({ title: 'Name is required / Maqaa barbaachisa', variant: 'destructive' });
@@ -285,7 +301,7 @@ function SubCitiesSection() {
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8"
-                    onClick={() => setEditTarget(sc)}
+                    onClick={() => openEdit(sc)}
                     title="Edit"
                   >
                     <Pencil className="h-4 w-4" />
