@@ -62,3 +62,30 @@ export const LICENSE_LEVELS = [
   'Not Rated',
   'Under License',
 ];
+
+// Industry (Indastrii) data classification — Bishoftu industry survey
+export const SECTORS = [
+  'Food & Beverage Processing',
+  'Agro-Processing',
+  'Textile & Garment',
+  'Leather & Leather Products',
+  'Wood & Furniture',
+  'Metal Works & Fabrication',
+  'Construction Materials',
+  'Chemicals & Plastics',
+  'Bottling & Water',
+  'Flour Mill & Grain Processing',
+  'Garage & Auto Repair',
+  'Mining & Quarrying',
+  'Energy & Utilities',
+  'Other Manufacturing',
+];
+
+export const OWNERSHIP_TYPES = [
+  'Sole Proprietorship',
+  'Private Limited Company',
+  'Share Company',
+  'Cooperative',
+  'Government',
+  'Other',
+];

@@ -50,7 +50,9 @@ export function useOfflineSync() {
 
       for (const record of pending) {
         try {
-          const response = await fetch('/api/guesthouses', {
+          // Route each record to the right module endpoint
+          const endpoint = record.kind === 'industry' ? '/api/industries' : '/api/guesthouses';
+          const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(record.data),
@@ -81,9 +83,12 @@ export function useOfflineSync() {
     return { synced, errors };
   }, []);
 
-  const saveOffline = useCallback(async (data: Record<string, unknown>) => {
+  const saveOffline = useCallback(async (
+    data: Record<string, unknown>,
+    kind: 'guesthouse' | 'industry' = 'guesthouse'
+  ) => {
     try {
-      await savePendingSurvey(data);
+      await savePendingSurvey(data, kind);
       await refreshPendingCount();
       return true;
     } catch {

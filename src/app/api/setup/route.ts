@@ -14,6 +14,8 @@ async function ensureTables(prisma: PrismaClient) {
       "password" TEXT NOT NULL,
       "name" TEXT NOT NULL,
       "role" TEXT NOT NULL DEFAULT 'COLLECTOR',
+      "assignedSubCity" TEXT,
+      "assignedArea" TEXT,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL
     );
@@ -21,6 +23,14 @@ async function ensureTables(prisma: PrismaClient) {
 
   await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "User_username_key" ON "User"("username");
+  `);
+
+  // Repair older deployments whose User table predates the assignment columns
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "assignedSubCity" TEXT;
+  `);
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "assignedArea" TEXT;
   `);
 
   await prisma.$executeRawUnsafe(`
@@ -61,6 +71,44 @@ async function ensureTables(prisma: PrismaClient) {
   `);
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "GuestHouse" ADD COLUMN IF NOT EXISTS "contactName2" TEXT;
+  `);
+
+  // Industry module (industry data collection) tables
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Industry" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "establishmentName" TEXT NOT NULL,
+      "sector" TEXT NOT NULL,
+      "subCity" TEXT NOT NULL,
+      "area" TEXT NOT NULL,
+      "specificAddress" TEXT NOT NULL,
+      "licenseNumber" TEXT,
+      "ownershipType" TEXT NOT NULL,
+      "employeeCount" INTEGER NOT NULL DEFAULT 0,
+      "startupCapital" DOUBLE PRECISION,
+      "contactName" TEXT NOT NULL,
+      "contactPhone" TEXT NOT NULL,
+      "surveyorName" TEXT,
+      "surveyorId" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "IndustryAttendance" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "meetingId" TEXT NOT NULL,
+      "industryId" TEXT NOT NULL,
+      "collectorId" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'ABSENT',
+      "markedAt" TIMESTAMP(3) NOT NULL
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "IndustryAttendance_meetingId_industryId_key"
+      ON "IndustryAttendance"("meetingId", "industryId");
   `);
 }
 

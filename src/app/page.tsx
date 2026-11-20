@@ -3,8 +3,29 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardList, BarChart3, Database, Shield, LogOut, Wifi, WifiOff, RefreshCw, CloudOff, Users, Calendar } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import {
+  ClipboardList,
+  BarChart3,
+  Database,
+  Shield,
+  LogOut,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  CloudOff,
+  Users,
+  Calendar,
+  Factory,
+  Building2,
+  ChevronDown,
+} from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import SurveyForm from '@/components/guesthouse/SurveyForm';
 import DataList from '@/components/guesthouse/DataList';
@@ -14,12 +35,18 @@ import AdminPanel from '@/components/AdminPanel';
 import MeetingManager from '@/components/guesthouse/MeetingManager';
 import AttendanceDashboard from '@/components/guesthouse/AttendanceDashboard';
 import CollectorAttendance from '@/components/guesthouse/CollectorAttendance';
+import IndustrySurveyForm from '@/components/industry/IndustrySurveyForm';
+import IndustryList from '@/components/industry/IndustryList';
+import IndustryStats from '@/components/industry/IndustryStats';
+import IndustryAttendance from '@/components/industry/IndustryAttendance';
+import IndustryAttendanceDashboard from '@/components/industry/IndustryAttendanceDashboard';
 import { useAuth } from '@/components/AuthProvider';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 export default function Home() {
   const { status } = useSession();
-  const { isAdmin, isCollector, userName, userId } = useAuth();
+  const { isAdmin, userName, userId } = useAuth();
+  const [activeTab, setActiveTab] = useState('survey');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { isOnline, pendingCount, isSyncing, syncPendingSurveys, saveOffline } = useOfflineSync();
 
@@ -31,7 +58,7 @@ export default function Home() {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent" />
+          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-teal-600 border-t-transparent" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -42,21 +69,8 @@ export default function Home() {
     return <LoginForm />;
   }
 
-  // Admin tabs: Survey, Data, Dashboard, Meetings, Attendance, Users
-  // Collector tabs: Survey, Attendance
-  const tabs = isAdmin
-    ? [
-        { value: 'survey', label: "Qo'annoo", icon: <ClipboardList className="h-4 w-4" /> },
-        { value: 'data', label: 'Galmeewwan', icon: <Database className="h-4 w-4" /> },
-        { value: 'dashboard', label: 'Istaatiksii', icon: <BarChart3 className="h-4 w-4" /> },
-        { value: 'meetings', label: 'Meetings', icon: <Calendar className="h-4 w-4" /> },
-        { value: 'attendance', label: 'Attendance', icon: <Users className="h-4 w-4" /> },
-        { value: 'admin', label: 'Fayyadamtoota', icon: <Shield className="h-4 w-4" /> },
-      ]
-    : [
-        { value: 'survey', label: "Qo'annoo", icon: <ClipboardList className="h-4 w-4" /> },
-        { value: 'attendance', label: 'Attendance', icon: <Users className="h-4 w-4" /> },
-      ];
+  // Shared styles for dropdown triggers (styled like TabsTrigger)
+  const dropTriggerClass = `flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] data-[state=open]:bg-accent data-[state=open]:text-accent-foreground sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm hover:bg-muted cursor-pointer`;
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-gray-50">
@@ -64,9 +78,9 @@ export default function Home() {
       <header className="sticky top-0 z-50 shrink-0 border-b bg-white shadow-sm safe-top">
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <img src="/icon.png" alt="BGH Survey" className="h-8 w-8 shrink-0 rounded-lg sm:h-10 sm:w-10 sm:rounded-xl" />
+            <img src="/icon.png" alt="Industry Survey" className="h-8 w-8 shrink-0 rounded-lg sm:h-10 sm:w-10 sm:rounded-xl" />
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-bold leading-tight sm:text-lg">Qorannoo Mana Keessummootaa Bishooftuu</h1>
+              <h1 className="truncate text-sm font-bold leading-tight sm:text-lg">Qorannoo Indastrii Bishooftuu</h1>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
                 {isAdmin ? 'Admin' : 'Data Collector'}: {userName}
               </p>
@@ -113,7 +127,7 @@ export default function Home() {
 
       {/* Syncing Banner */}
       {isOnline && isSyncing && (
-        <div className="flex shrink-0 items-center justify-center gap-1.5 bg-emerald-500 px-3 py-1 sm:px-4 sm:py-1.5 sm:text-sm">
+        <div className="flex shrink-0 items-center justify-center gap-1.5 bg-teal-500 px-3 py-1 sm:px-4 sm:py-1.5 sm:text-sm">
           <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0 sm:h-4 sm:w-4" />
           <span className="text-xs font-medium text-white sm:text-sm">Syncing... / Dhiheenyaa jira...</span>
         </div>
@@ -121,46 +135,172 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24">
-        <Tabs defaultValue="survey" className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 ${isAdmin ? 'grid grid-cols-3 gap-0.5 sm:gap-1' : 'grid grid-cols-2 gap-0.5 sm:gap-1'}`}>
-            {tabs.map((tab) => (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className={`mb-3 w-full sm:mb-4 ${isAdmin ? 'grid grid-cols-4 gap-0.5 sm:gap-1' : 'grid grid-cols-3 gap-0.5 sm:gap-1'}`}>
+            {/* Industry Survey — primary tab */}
+            <TabsTrigger
+              value="survey"
+              className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
+            >
+              <Factory className="h-4 w-4" />
+              <span>Industry Survey</span>
+            </TabsTrigger>
+
+            {isAdmin && (
               <TabsTrigger
-                key={tab.value}
-                value={tab.value}
+                value="indData"
                 className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
               >
-                {tab.icon}
-                <span>{tab.label}</span>
+                <Database className="h-4 w-4" />
+                <span>Industry Data</span>
               </TabsTrigger>
-            ))}
+            )}
+
+            {isAdmin && (
+              <TabsTrigger
+                value="indStats"
+                className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>Industry Stats</span>
+              </TabsTrigger>
+            )}
+
+            {/* Hotel ▾ — all hotel tabs live here */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${dropTriggerClass} ${activeTab.startsWith('hotel') ? 'bg-accent text-accent-foreground' : ''}`}
+                >
+                  <Building2 className="h-4 w-4" />
+                  <span>Hotel</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                <DropdownMenuItem onClick={() => setActiveTab('hotelSurvey')}>
+                  <ClipboardList className="mr-2 h-4 w-4" /> Hotel Survey
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('hotelData')}>
+                    <Database className="mr-2 h-4 w-4" /> Hotel Records
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('hotelStats')}>
+                    <BarChart3 className="mr-2 h-4 w-4" /> Hotel Stats
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {isAdmin && (
+              <TabsTrigger
+                value="meetings"
+                className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
+              >
+                <Calendar className="h-4 w-4" />
+                <span>Meetings</span>
+              </TabsTrigger>
+            )}
+
+            {/* Attendance ▾ — industry & hotel attendance */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${dropTriggerClass} ${activeTab.startsWith('att') ? 'bg-accent text-accent-foreground' : ''}`}
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Attendance</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                <DropdownMenuItem onClick={() => setActiveTab('attInd')}>
+                  <Factory className="mr-2 h-4 w-4" /> Industry Attendance
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveTab('attHotel')}>
+                  <Building2 className="mr-2 h-4 w-4" /> Hotel Attendance
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {isAdmin && (
+              <TabsTrigger
+                value="admin"
+                className="flex items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
+              >
+                <Shield className="h-4 w-4" />
+                <span>Users</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
+          {/* ============ Industry module ============ */}
           <TabsContent value="survey" className="mt-2 sm:mt-3">
+            <IndustrySurveyForm
+              onSubmit={handleSurveySubmit}
+              surveyorName={userName || ''}
+              surveyorId={userId || ''}
+              isOnline={isOnline}
+              onOfflineSave={(data) => saveOffline(data, 'industry')}
+            />
+          </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="indData" className="mt-2 sm:mt-3">
+              <IndustryList refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="indStats" className="mt-2 sm:mt-3">
+              <IndustryStats />
+            </TabsContent>
+          )}
+
+          {/* ============ Hotel module (legacy, under dropdown) ============ */}
+          <TabsContent value="hotelSurvey" className="mt-2 sm:mt-3">
             <SurveyForm
               onSubmit={handleSurveySubmit}
               surveyorName={userName || ''}
               surveyorId={userId || ''}
               isOnline={isOnline}
-              onOfflineSave={saveOffline}
+              onOfflineSave={(data) => saveOffline(data, 'guesthouse')}
             />
           </TabsContent>
 
-          <TabsContent value="data" className="mt-2 sm:mt-3">
-            <DataList refreshTrigger={refreshTrigger} />
+          {isAdmin && (
+            <TabsContent value="hotelData" className="mt-2 sm:mt-3">
+              <DataList refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="hotelStats" className="mt-2 sm:mt-3">
+              <Dashboard />
+            </TabsContent>
+          )}
+
+          {/* ============ Meetings (shared) ============ */}
+          {isAdmin && (
+            <TabsContent value="meetings" className="mt-2 sm:mt-3">
+              <MeetingManager />
+            </TabsContent>
+          )}
+
+          {/* ============ Attendance module ============ */}
+          <TabsContent value="attInd" className="mt-2 sm:mt-3">
+            {isAdmin ? <IndustryAttendanceDashboard /> : <IndustryAttendance />}
           </TabsContent>
 
-          <TabsContent value="dashboard" className="mt-2 sm:mt-3">
-            <Dashboard />
-          </TabsContent>
-
-          <TabsContent value="meetings" className="mt-2 sm:mt-3">
-            <MeetingManager />
-          </TabsContent>
-
-          <TabsContent value="attendance" className="mt-2 sm:mt-3">
+          <TabsContent value="attHotel" className="mt-2 sm:mt-3">
             {isAdmin ? <AttendanceDashboard /> : <CollectorAttendance />}
           </TabsContent>
 
+          {/* ============ Users (admin) ============ */}
           {isAdmin && (
             <TabsContent value="admin" className="mt-2 sm:mt-3">
               <AdminPanel />
@@ -172,8 +312,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white safe-bottom">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2">
-          <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Bishoftu Guest House Survey</span>
-          <span className={`flex shrink-0 items-center gap-1 text-[10px] sm:text-xs ${isOnline ? 'text-emerald-600' : 'text-amber-500'}`}>
+          <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Bishoftu Industry Data Collection</span>
+          <span className={`flex shrink-0 items-center gap-1 text-[10px] sm:text-xs ${isOnline ? 'text-teal-600' : 'text-amber-500'}`}>
             {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {isOnline ? 'Online' : 'Offline'}
           </span>

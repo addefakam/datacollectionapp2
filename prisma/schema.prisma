@@ -22,6 +22,7 @@ model User {
   updatedAt      DateTime @updatedAt
 
   attendances       Attendance[]
+  industryAttendances IndustryAttendance[]
   meetingAssignments CollectorAssignment[]
 }
 
@@ -66,6 +67,7 @@ model Meeting {
 
   attendances Attendance[]
   assignments  CollectorAssignment[]
+  industryAttendances IndustryAttendance[]
 }
 
 model Attendance {
@@ -95,4 +97,40 @@ model CollectorAssignment {
   meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 
   @@unique([collectorId, meetingId, subCity, area]) // no duplicate assignments
+}
+
+model Industry {
+  id                String   @id @default(cuid())
+  establishmentName String
+  sector            String
+  subCity           String
+  area              String
+  specificAddress   String
+  licenseNumber     String?
+  ownershipType     String
+  employeeCount     Int      @default(0)
+  startupCapital    Float?
+  contactName       String
+  contactPhone      String
+  surveyorName      String?
+  surveyorId        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  attendances IndustryAttendance[]
+}
+
+model IndustryAttendance {
+  id          String   @id @default(cuid())
+  meetingId   String
+  industryId  String
+  collectorId String
+  status      String   @default("ABSENT") // PRESENT or ABSENT
+  markedAt    DateTime @updatedAt
+
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  industry  Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  collector User     @relation(fields: [collectorId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, industryId]) // one attendance record per industry per meeting
 }
