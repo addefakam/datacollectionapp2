@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +36,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -52,9 +60,18 @@ import {
   Pencil,
   Loader2,
   Save,
+  Upload,
+  Phone,
+  MapPin,
+  Users,
+  Coins,
+  FileBadge,
+  Building2,
 } from 'lucide-react';
 import { OWNERSHIP_TYPES } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+
+const PAGE_SIZE = 50;
 
 interface Industry {
   id: string;
@@ -92,6 +109,9 @@ interface IndustryListProps {
   refreshTrigger: number;
 }
 
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-GB');
+const fmtCapital = (v: number | null) => (v != null ? v.toLocaleString('en-US') : '—');
+
 export default function IndustryList({ refreshTrigger }: IndustryListProps) {
   const { toast } = useToast();
   const { subCities, sectors, areasFor } = useSettings();
@@ -113,6 +133,10 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{success: number, failed: number, errors: string[]} | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -123,7 +147,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       if (filterArea) params.set('area', filterArea);
       if (filterSector) params.set('sector', filterSector);
       params.set('page', String(page));
-      params.set('limit', '50');
+      params.set('limit', String(PAGE_SIZE));
 
       const res = await fetch(`/api/industries?${params}`);
       if (!res.ok) throw new Error('Failed to fetch');
@@ -241,6 +265,41 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
     }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/industries/import', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Import failed');
+      setImportResult(json);
+      toast({ title: 'Galmeessaa Keessaa / Import Complete', description: json.message });
+      fetchData();
+    } catch (error) {
+      toast({ title: 'Import Failed', description: error instanceof Error ? error.message : 'Check file format', variant: 'destructive' });
+    } finally { setImporting(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+  };
+
+  const actionButtons = (item: Industry) => (
+    <>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewItem(item)} title="View">
+        <Eye className="h-4 w-4" />
+      </Button>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)} title="Edit">
+        <Pencil className="h-4 w-4" />
+      </Button>
+      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => setDeleteId(item.id)} title="Delete">
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </>
+  );
+
+  const startIndex = (page - 1) * PAGE_SIZE;
+
   return (
     <div className="space-y-3 sm:space-y-4">
       <Card>
@@ -258,7 +317,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search name, address, license..."
+              placeholder="Search name, address, license, contact..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-9 text-sm sm:text-base"
@@ -290,13 +349,16 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
             </Select>
           </div>
 
-          {/* Export buttons */}
+          {/* Export / Import buttons */}
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => handleExport('csv')} disabled={exporting} className="flex-1 text-xs sm:text-sm">
               <Download className="h-3.5 w-3.5" /> CSV
             </Button>
             <Button variant="outline" size="sm" onClick={() => handleExport('excel')} disabled={exporting} className="flex-1 text-xs sm:text-sm">
               <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="flex-1 text-xs sm:text-sm">
+              <Upload className="h-3.5 w-3.5" /> Import
             </Button>
             <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="shrink-0">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -315,43 +377,131 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Factory className="mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm font-medium text-muted-foreground">No industry records found</p>
-            <p className="mt-1 text-xs text-muted-foreground/70">Collect a survey or adjust your filters</p>
+            <p className="mt-1 text-xs text-muted-foreground/70">Collect a survey, import Excel, or adjust your filters</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {data.map((item) => (
-            <Card key={item.id} className="transition-shadow hover:shadow-md">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Factory className="h-4 w-4 shrink-0 text-teal-600" />
-                      <p className="truncate text-sm font-semibold sm:text-base">{item.establishmentName}</p>
+        <>
+          {/* Desktop: full data table */}
+          <Card className="hidden md:block">
+            <CardContent className="px-0 py-0">
+              <Table className="text-xs [&_th]:px-2.5 [&_th]:py-2 [&_td]:px-2.5 [&_td]:py-2">
+                <TableHeader>
+                  <TableRow className="bg-muted/60 hover:bg-muted/60">
+                    <TableHead className="w-10 text-center">#</TableHead>
+                    <TableHead>Establishment Name</TableHead>
+                    <TableHead>Sector</TableHead>
+                    <TableHead>Sub-City</TableHead>
+                    <TableHead>Werreda</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>License No</TableHead>
+                    <TableHead>Ownership</TableHead>
+                    <TableHead className="text-right">Employees</TableHead>
+                    <TableHead className="text-right">Capital (ETB)</TableHead>
+                    <TableHead>Contact Person</TableHead>
+                    <TableHead>Contact Phone</TableHead>
+                    <TableHead>Surveyor</TableHead>
+                    <TableHead>Collected</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.map((item, i) => (
+                    <TableRow key={item.id} className="hover:bg-teal-50/40">
+                      <TableCell className="text-center text-muted-foreground">{startIndex + i + 1}</TableCell>
+                      <TableCell className="max-w-[180px] truncate font-medium" title={item.establishmentName}>{item.establishmentName}</TableCell>
+                      <TableCell className="max-w-[130px] truncate text-teal-700" title={item.sector}>{item.sector}</TableCell>
+                      <TableCell className="whitespace-nowrap">{item.subCity}</TableCell>
+                      <TableCell className="whitespace-nowrap">{item.area}</TableCell>
+                      <TableCell className="max-w-[140px] truncate text-muted-foreground" title={item.specificAddress}>{item.specificAddress}</TableCell>
+                      <TableCell className="whitespace-nowrap">{item.licenseNumber || '—'}</TableCell>
+                      <TableCell className="max-w-[120px] truncate" title={item.ownershipType}>{item.ownershipType}</TableCell>
+                      <TableCell className="text-right tabular-nums">{item.employeeCount}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmtCapital(item.startupCapital)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{item.contactName}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">{item.contactPhone}</TableCell>
+                      <TableCell className="text-muted-foreground">{item.surveyorName || '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(item.createdAt)}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-center gap-0.5">{actionButtons(item)}</div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Mobile: enriched record cards */}
+          <div className="space-y-2 md:hidden">
+            {data.map((item, i) => (
+              <Card key={item.id} className="transition-shadow hover:shadow-md">
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{startIndex + i + 1}.</span>
+                        <p className="truncate text-sm font-semibold">{item.establishmentName}</p>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <Badge variant="outline" className="bg-teal-50 text-[10px] text-teal-700">{item.sector}</Badge>
+                        <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{item.subCity} — {item.area}</span>
+                      </div>
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground sm:text-xs">
-                      <Badge variant="outline" className="bg-teal-50 text-[10px] text-teal-700">{item.sector}</Badge>
-                      <span>{item.subCity} — {item.area}</span>
-                      <span>•</span>
-                      <span>{item.employeeCount} employees</span>
+                    <div className="flex shrink-0 gap-0.5">{actionButtons(item)}</div>
+                  </div>
+
+                  {/* Key details grid */}
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t pt-2">
+                    <div className="flex items-center gap-1.5">
+                      <FileBadge className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">License</p>
+                        <p className="truncate text-[11px] font-medium">{item.licenseNumber || '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Ownership</p>
+                        <p className="truncate text-[11px] font-medium">{item.ownershipType}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Employees</p>
+                        <p className="text-[11px] font-medium">{item.employeeCount}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Coins className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Capital (ETB)</p>
+                        <p className="truncate text-[11px] font-medium">{fmtCapital(item.startupCapital)}</p>
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Address</p>
+                      <p className="text-[11px] font-medium">{item.specificAddress}</p>
                     </div>
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewItem(item)} title="View">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)} title="Edit">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => setDeleteId(item.id)} title="Delete">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
+                  {/* Contact row */}
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
+                    <div className="min-w-0">
+                      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Contact</p>
+                      <p className="truncate text-[11px] font-medium">{item.contactName}</p>
+                    </div>
+                    <a href={`tel:${item.contactPhone}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-2 py-1 text-[11px] font-medium text-teal-700 active:bg-teal-100">
+                      <Phone className="h-3 w-3" /> {item.contactPhone}
+                    </a>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Pagination */}
@@ -381,7 +531,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
             <div className="space-y-1 text-sm">
               {[
                 ['Sector / Goossa', viewItem.sector],
-                ['Sub-City / Kuttaa Maggalaa', viewItem.subCity],
+                ['Sub-City / Kututtaa Maggalaa', viewItem.subCity],
                 ['Werreda', viewItem.area],
                 ['Specific Address', viewItem.specificAddress],
                 ['License Number', viewItem.licenseNumber || '—'],
@@ -391,7 +541,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                 ['Contact Person', viewItem.contactName],
                 ['Contact Phone', viewItem.contactPhone],
                 ['Surveyor', viewItem.surveyorName || '—'],
-                ['Collected On', new Date(viewItem.createdAt).toLocaleDateString('en-GB')],
+                ['Collected On', fmtDate(viewItem.createdAt)],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3 border-b py-1.5 last:border-b-0">
                   <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
@@ -509,6 +659,49 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Import Dialog */}
+      <Dialog open={showImport} onOpenChange={(open) => { setShowImport(open); if (!open) setImportResult(null); }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-teal-600" />
+              <span>Galmeessaa Keessaa / Bulk Import</span>
+            </DialogTitle>
+            <DialogDescription>Import industry records from Excel file</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/50 p-6 text-center">
+              <Upload className="mx-auto h-10 w-10 text-teal-400" />
+              <p className="mt-2 text-sm font-medium">Fiilii Excel Dabali / Drop Excel File</p>
+              <p className="mt-1 text-xs text-muted-foreground">.xlsx files only</p>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                {importing ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Importing...</> : <><Upload className="mr-1 h-4 w-4" /> Select File</>}
+              </Button>
+            </div>
+            <Button variant="outline" size="sm" className="w-full" onClick={() => window.open('/api/industries/import/template', '_blank')}>
+              <Download className="mr-1 h-4 w-4" /> Download Template / Daawwii Mallatteessaa
+            </Button>
+            {importResult && (
+              <div className={`rounded-lg border p-3 ${importResult.failed === 0 ? 'border-teal-200 bg-teal-50' : 'border-amber-200 bg-amber-50'}`}>
+                <p className="text-sm font-semibold">
+                  <span className="text-teal-700">{importResult.success} succeeded</span>
+                  {importResult.failed > 0 && <span className="text-red-600 ml-2">{importResult.failed} failed</span>}
+                </p>
+                {importResult.errors.length > 0 && (
+                  <div className="mt-2 max-h-24 overflow-y-auto">
+                    {importResult.errors.slice(0, 10).map((err, i) => (
+                      <p key={i} className="text-xs text-red-600">{err}</p>
+                    ))}
+                    {importResult.errors.length > 10 && <p className="text-xs text-muted-foreground">...and {importResult.errors.length - 10} more</p>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
