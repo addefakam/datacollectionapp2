@@ -39,16 +39,6 @@ export const STATS_ATTRIBUTES: StatsAttributeDef[] = [
     label: 'Number of Employees / Lakkoofsa Hojjetaa',
     description: 'Industries by number of employees / Lakkoofsa hojjetaa armaan gadii',
   },
-  {
-    key: 'ownershipType',
-    label: 'Ownership Type / Gosa Abbaa Qabuu',
-    description: 'Industries by ownership type / Gosa Abbaa Qabuu armaan gadii',
-  },
-  {
-    key: 'surveyorName',
-    label: 'Surveyor / Galmeeffachaa',
-    description: 'Industries by surveyor / Namni galmeeffachaa armaan gadii',
-  },
 ];
 
 /** Default admin-managed option list: every registry key with its default label. */
