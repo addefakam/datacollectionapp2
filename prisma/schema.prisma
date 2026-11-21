@@ -137,6 +137,29 @@ model IndustryAttendance {
   @@unique([meetingId, industryId]) // one attendance record per industry per meeting
 }
 
+model HealthCenter {
+  id              String   @id @default(cuid())
+  facilityName    String
+  facilityType    String // Hospital, Health Center, Private Clinic, ...
+  ownershipType   String // Government / Public, Private, NGO, ...
+  subCity         String
+  area            String
+  specificAddress String
+  licenseNumber   String?
+  staffCount      Int      @default(0) // health professionals & support staff
+  bedCount        Int      @default(0) // inpatient beds (0 for outpatient-only)
+  hasLaboratory   Boolean  @default(false) // on-site laboratory service
+  hasPharmacy     Boolean  @default(false) // on-site pharmacy service
+  hasMaternity    Boolean  @default(false) // maternity / delivery service
+  hasEmergency    Boolean  @default(false) // emergency service, open 24/7
+  contactName     String
+  contactPhone    String
+  surveyorName    String?
+  surveyorId      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 // Admin-managed locations (sub-cities + woredas/areas) used across all survey forms
 model SubCity {
   id        String        @id @default(cuid())

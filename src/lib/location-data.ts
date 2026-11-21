@@ -89,3 +89,23 @@ export const OWNERSHIP_TYPES = [
   'Government',
   'Other',
 ];
+
+// Health facility (Manaa Yaalaa) data classification — Bishoftu health survey
+export const HEALTH_FACILITY_TYPES = [
+  'Hospital',
+  'Health Center',
+  'Private Clinic',
+  'Health Post',
+  'Pharmacy',
+  'Diagnostic Laboratory',
+  'Dental Clinic',
+  'Specialized Center',
+];
+
+export const HEALTH_OWNERSHIP_TYPES = [
+  'Government / Public',
+  'Private',
+  'NGO',
+  'Faith-Based',
+  'Public-Private Partnership',
+];

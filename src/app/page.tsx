@@ -24,6 +24,7 @@ import {
   Calendar,
   Factory,
   Building2,
+  Stethoscope,
   ChevronDown,
   Wrench,
 } from 'lucide-react';
@@ -41,6 +42,9 @@ import IndustryList from '@/components/industry/IndustryList';
 import IndustryStats from '@/components/industry/IndustryStats';
 import IndustryAttendance from '@/components/industry/IndustryAttendance';
 import IndustryAttendanceDashboard from '@/components/industry/IndustryAttendanceDashboard';
+import HealthSurveyForm from '@/components/health/HealthSurveyForm';
+import HealthList from '@/components/health/HealthList';
+import HealthStats from '@/components/health/HealthStats';
 import SettingsManager from '@/components/admin/SettingsManager';
 import { SettingsProvider } from '@/components/SettingsProvider';
 import { useAuth } from '@/components/AuthProvider';
@@ -60,6 +64,7 @@ export default function Home() {
   // Tab groups — used to highlight the owning dropdown trigger
   const industryTabs = ['survey', 'indData', 'indStats', 'attInd'];
   const hotelTabs = ['hotelSurvey', 'hotelData', 'hotelStats', 'attHotel'];
+  const healthTabs = ['healthSurvey', 'healthData', 'healthStats'];
   const manageTabs = ['meetings', 'settings', 'admin'];
 
   if (status === 'loading') {
@@ -147,7 +152,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24 lg:max-w-5xl xl:max-w-7xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl h-auto rounded-2xl border border-teal-100 bg-white p-1.5 shadow-sm shadow-teal-900/5 ${isAdmin ? 'grid grid-cols-3 gap-1 sm:gap-1.5' : 'grid grid-cols-2 gap-1 sm:gap-1.5'}`}>
+          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl h-auto rounded-2xl border border-teal-100 bg-white p-1.5 shadow-sm shadow-teal-900/5 ${isAdmin ? 'grid grid-cols-4 gap-0.5 sm:gap-1' : 'grid grid-cols-3 gap-0.5 sm:gap-1'}`}>
             {/* Industry ▾ — all industry tabs live here */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -209,6 +214,35 @@ export default function Home() {
                 <DropdownMenuItem onClick={() => setActiveTab('attHotel')}>
                   <Users className="mr-2 h-4 w-4" /> Hotel Attendance
                 </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Health ▾ — all health facility tabs live here */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${dropTriggerClass} ${healthTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
+                >
+                  <Stethoscope className="h-4 w-4" />
+                  <span>Health</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuItem onClick={() => setActiveTab('healthSurvey')}>
+                  <ClipboardList className="mr-2 h-4 w-4" /> Health Survey
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('healthData')}>
+                    <Database className="mr-2 h-4 w-4" /> Health Records
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('healthStats')}>
+                    <BarChart3 className="mr-2 h-4 w-4" /> Health Stats
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -283,6 +317,29 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="hotelStats" className="mt-2 sm:mt-3">
               <Dashboard />
+            </TabsContent>
+          )}
+
+          {/* ============ Health facility module ============ */}
+          <TabsContent value="healthSurvey" className="mt-2 sm:mt-3">
+            <HealthSurveyForm
+              onSubmit={handleSurveySubmit}
+              surveyorName={userName || ''}
+              surveyorId={userId || ''}
+              isOnline={isOnline}
+              onOfflineSave={(data) => saveOffline(data, 'health')}
+            />
+          </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="healthData" className="mt-2 sm:mt-3">
+              <HealthList refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="healthStats" className="mt-2 sm:mt-3">
+              <HealthStats />
             </TabsContent>
           )}
 
