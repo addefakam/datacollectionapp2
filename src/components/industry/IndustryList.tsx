@@ -63,11 +63,10 @@ import {
   Upload,
   Phone,
   MapPin,
-  Users,
-  Coins,
   FileBadge,
-  Building2,
   Leaf,
+  Check,
+  X,
 } from 'lucide-react';
 import { OWNERSHIP_TYPES } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
@@ -295,14 +294,14 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
 
   const actionButtons = (item: Industry) => (
     <>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewItem(item)} title="View">
-        <Eye className="h-4 w-4" />
+      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewItem(item)} title="View">
+        <Eye className="h-3.5 w-3.5" />
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)} title="Edit">
-        <Pencil className="h-4 w-4" />
+      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)} title="Edit">
+        <Pencil className="h-3.5 w-3.5 text-blue-600" />
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => setDeleteId(item.id)} title="Delete">
-        <Trash2 className="h-4 w-4" />
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteId(item.id)} title="Delete">
+        <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </>
   );
@@ -313,13 +312,16 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
     <div className="space-y-3 sm:space-y-4">
       <Card>
         <CardHeader className="pb-2 sm:pb-3">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Factory className="h-5 w-5 text-teal-600" />
-            Industry Records / Galmee Indastrii
+          <CardTitle className="flex items-center justify-between gap-2 text-base sm:text-lg">
+            <span className="flex items-center gap-2">
+              <Factory className="h-5 w-5 text-teal-600" />
+              Industry Records / Galmee Indastrii
+            </span>
+            <Badge variant="secondary" className="shrink-0 bg-teal-100 text-teal-700 text-xs sm:text-sm">
+              {total} record{total !== 1 ? 's' : ''}
+            </Badge>
           </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            {total} record{total !== 1 ? 's' : ''} collected
-          </CardDescription>
+          <CardDescription className="text-xs sm:text-sm">View and manage all collected industry survey data</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2.5 sm:space-y-3">
           {/* Search */}
@@ -394,48 +396,57 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
           {/* Desktop: full data table */}
           <Card className="hidden md:block overflow-hidden">
             <CardContent className="px-0 py-0">
-              <Table className="text-xs [&_th]:px-2.5 [&_th]:py-2 [&_th]:text-white [&_th]:font-semibold [&_td]:px-2.5 [&_td]:py-2">
+              <Table className="text-xs [&_td]:px-2.5 [&_td]:py-2">
                 <TableHeader>
-                  <TableRow className="bg-teal-600 hover:bg-teal-700">
-                    <TableHead className="w-10 text-center">#</TableHead>
-                    <TableHead>Establishment Name</TableHead>
-                    <TableHead>Sector</TableHead>
-                    <TableHead>Sub-City</TableHead>
-                    <TableHead>Werreda</TableHead>
-                    <TableHead>Address</TableHead>
-                    <TableHead>License No</TableHead>
-                    <TableHead>Ownership</TableHead>
-                    <TableHead>EIA / EMP</TableHead>
-                    <TableHead className="text-right">Employees</TableHead>
-                    <TableHead className="text-right">Capital (ETB)</TableHead>
-                    <TableHead>Contact Person</TableHead>
-                    <TableHead>Contact Phone</TableHead>
-                    <TableHead>Surveyor</TableHead>
-                    <TableHead>Collected</TableHead>
-                    <TableHead className="text-center">Actions</TableHead>
+                  <TableRow className="border-b bg-gradient-to-r from-slate-50 via-teal-50/60 to-slate-50 hover:bg-none">
+                    <TableHead className="w-10 text-center font-semibold text-teal-900/60">##</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Establishment</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Sector</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Sub-City</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Werreda</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">License No</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Ownership</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">EIA / EMP</TableHead>
+                    <TableHead className="text-center font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Employees</TableHead>
+                    <TableHead className="text-right font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Capital (ETB)</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Contact</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Surveyor</TableHead>
+                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Collected</TableHead>
+                    <TableHead className="text-center font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.map((item, i) => (
-                    <TableRow key={item.id} className="hover:bg-teal-50/40">
-                      <TableCell className="text-center text-muted-foreground">{startIndex + i + 1}</TableCell>
-                      <TableCell className="max-w-[180px] truncate font-medium" title={item.establishmentName}>{item.establishmentName}</TableCell>
-                      <TableCell className="max-w-[130px] truncate text-teal-700" title={item.sector}>{item.sector}</TableCell>
+                    <TableRow key={item.id} className="hover:bg-teal-50/40 transition-colors">
+                      <TableCell className="text-center text-muted-foreground/70">{startIndex + i + 1}</TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <p className="truncate font-semibold text-foreground" title={item.establishmentName}>{item.establishmentName}</p>
+                        <p className="truncate text-[10px] text-muted-foreground" title={item.specificAddress}>
+                          <span className="inline-flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{item.specificAddress}</span>
+                        </p>
+                      </TableCell>
+                      <TableCell className="max-w-[130px]">
+                        <Badge variant="outline" className="max-w-full truncate bg-teal-50 text-[10px] font-normal text-teal-700" title={item.sector}>{item.sector}</Badge>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">{item.subCity}</TableCell>
                       <TableCell className="whitespace-nowrap">{item.area}</TableCell>
-                      <TableCell className="max-w-[140px] truncate text-muted-foreground" title={item.specificAddress}>{item.specificAddress}</TableCell>
-                      <TableCell className="whitespace-nowrap">{item.licenseNumber || '—'}</TableCell>
-                      <TableCell className="max-w-[120px] truncate" title={item.ownershipType}>{item.ownershipType}</TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">
-                        <span className={item.hasEia ? 'font-medium text-green-600' : 'text-muted-foreground'}>EIA {item.hasEia ? '✓' : '✗'}</span>
-                        <span className="mx-1 text-muted-foreground">·</span>
-                        <span className={item.hasEmp ? 'font-medium text-green-600' : 'text-muted-foreground'}>EMP {item.hasEmp ? '✓' : '✗'}</span>
+                      <TableCell className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</TableCell>
+                      <TableCell className="max-w-[110px] truncate text-muted-foreground" title={item.ownershipType}>{item.ownershipType}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EIA {item.hasEia ? '✓' : '✗'}</span>
+                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EMP {item.hasEmp ? '✓' : '✗'}</span>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{item.employeeCount}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtCapital(item.startupCapital)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{item.contactName}</TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums">{item.contactPhone}</TableCell>
-                      <TableCell className="text-muted-foreground">{item.surveyorName || '—'}</TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-teal-100 px-1.5 text-xs font-semibold text-teal-700">{item.employeeCount}</span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">{fmtCapital(item.startupCapital)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <p className="truncate max-w-[110px] font-medium" title={item.contactName}>{item.contactName}</p>
+                        <a href={`tel:${item.contactPhone}`} className="text-[11px] font-medium text-teal-600 hover:underline">{item.contactPhone}</a>
+                      </TableCell>
+                      <TableCell className="max-w-[90px] truncate text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '—'}</TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(item.createdAt)}</TableCell>
                       <TableCell>
                         <div className="flex justify-center gap-0.5">{actionButtons(item)}</div>
@@ -450,12 +461,14 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
           {/* Mobile: enriched record cards */}
           <div className="space-y-2 md:hidden">
             {data.map((item, i) => (
-              <Card key={item.id} className="transition-shadow hover:shadow-md">
-                <CardContent className="p-3">
+              <Card key={item.id} className="overflow-hidden border-teal-100/80 transition-shadow hover:shadow-md">
+                {/* slim gradient top edge */}
+                <div className="h-1 bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-500" />
+                <CardContent className="p-3 space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{startIndex + i + 1}.</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-md bg-teal-100 px-1 text-[10px] font-bold text-teal-700">{startIndex + i + 1}</span>
                         <p className="truncate text-sm font-semibold">{item.establishmentName}</p>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -466,52 +479,40 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                     <div className="flex shrink-0 gap-0.5">{actionButtons(item)}</div>
                   </div>
 
-                  {/* Key details grid */}
-                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t pt-2">
-                    <div className="flex items-center gap-1.5">
-                      <FileBadge className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">License</p>
-                        <p className="truncate text-[11px] font-medium">{item.licenseNumber || '—'}</p>
-                      </div>
+                  {/* Stat tiles */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg bg-teal-50 px-2 py-1.5 text-center">
+                      <p className="text-[9px] text-teal-600">Hojjetaa</p>
+                      <p className="text-sm font-bold text-teal-700">{item.employeeCount}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Ownership</p>
-                        <p className="truncate text-[11px] font-medium">{item.ownershipType}</p>
-                      </div>
+                    <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
+                      <p className="text-[9px] text-amber-600">Qabiyyee</p>
+                      <p className="truncate text-[11px] font-semibold text-amber-700 leading-tight mt-0.5" title={item.startupCapital != null ? String(item.startupCapital) : undefined}>{fmtCapital(item.startupCapital)}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Employees</p>
-                        <p className="text-[11px] font-medium">{item.employeeCount}</p>
-                      </div>
+                    <div className="rounded-lg bg-purple-50 px-2 py-1.5 text-center">
+                      <p className="text-[9px] text-purple-600">Abbaa Qabuu</p>
+                      <p className="truncate text-[11px] font-semibold text-purple-700 leading-tight mt-0.5" title={item.ownershipType}>{item.ownershipType}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Coins className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Capital (ETB)</p>
-                        <p className="truncate text-[11px] font-medium">{fmtCapital(item.startupCapital)}</p>
-                      </div>
+                  </div>
+
+                  {/* License + environmental compliance */}
+                  <div className="flex items-center justify-between gap-2 border-t pt-2">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <FileBadge className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      <p className="truncate font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</p>
                     </div>
-                    <div className="col-span-2 flex items-center gap-1.5">
-                      <Leaf className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="text-[9px] uppercase tracking-wide text-muted-foreground">Environment</span>
-                      <span className="ml-auto flex gap-1">
-                        <Badge variant="outline" className={`text-[10px] ${item.hasEia ? 'border-green-200 bg-green-50 text-green-700' : 'bg-muted text-muted-foreground'}`}>EIA {item.hasEia ? 'Yes' : 'No'}</Badge>
-                        <Badge variant="outline" className={`text-[10px] ${item.hasEmp ? 'border-green-200 bg-green-50 text-green-700' : 'bg-muted text-muted-foreground'}`}>EMP {item.hasEmp ? 'Yes' : 'No'}</Badge>
+                    <div className="flex shrink-0 gap-1">
+                      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${item.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                        {item.hasEia ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EIA
                       </span>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Address</p>
-                      <p className="text-[11px] font-medium">{item.specificAddress}</p>
+                      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${item.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                        {item.hasEmp ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EMP
+                      </span>
                     </div>
                   </div>
 
                   {/* Contact row */}
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
+                  <div className="flex items-center justify-between gap-2 border-t pt-2">
                     <div className="min-w-0">
                       <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Contact</p>
                       <p className="truncate text-[11px] font-medium">{item.contactName}</p>
@@ -520,6 +521,11 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                       <Phone className="h-3 w-3" /> {item.contactPhone}
                     </a>
                   </div>
+
+                  <p className="text-[10px] text-muted-foreground/60 text-right">
+                    {item.surveyorName && <span>{item.surveyorName} &middot; </span>}
+                    {fmtDate(item.createdAt)}
+                  </p>
                 </CardContent>
               </Card>
             ))}
@@ -529,51 +535,135 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            <ChevronLeft className="h-4 w-4" /> Prev
+        <div className="flex items-center justify-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-            Next <ChevronRight className="h-4 w-4" />
+          <span className="text-sm text-muted-foreground">Fuula / Page {page} of {totalPages}</span>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       )}
 
       {/* View Dialog */}
       <Dialog open={!!viewItem} onOpenChange={(open) => !open && setViewItem(null)}>
-        <DialogContent className="max-h-[85dvh] max-w-md overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Factory className="h-4 w-4 text-teal-600" />
-              {viewItem?.establishmentName}
-            </DialogTitle>
-            <DialogDescription>{viewItem?.sector}</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg p-0 gap-0">
           {viewItem && (
-            <div className="space-y-1 text-sm">
-              {[
-                ['Sector / Goossa', viewItem.sector],
-                ['Sub-City / Kututtaa Maggalaa', viewItem.subCity],
-                ['Werreda', viewItem.area],
-                ['Specific Address', viewItem.specificAddress],
-                ['License Number', viewItem.licenseNumber || '—'],
-                ['Ownership Type', viewItem.ownershipType],
-                ['EIA (Environmental Impact Assessment)', viewItem.hasEia ? 'Yes / Eyee' : 'No / Lakki'],
-                ['EMP (Environmental Management Plan)', viewItem.hasEmp ? 'Yes / Eyee' : 'No / Lakki'],
-                ['Employee Count', String(viewItem.employeeCount)],
-                ['Startup Capital (ETB)', viewItem.startupCapital != null ? viewItem.startupCapital.toLocaleString() : '—'],
-                ['Contact Person', viewItem.contactName],
-                ['Contact Phone', viewItem.contactPhone],
-                ['Surveyor', viewItem.surveyorName || '—'],
-                ['Collected On', fmtDate(viewItem.createdAt)],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-start justify-between gap-3 border-b py-1.5 last:border-b-0">
-                  <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-                  <span className="text-right text-sm font-medium">{value}</span>
+            <>
+              {/* Gradient header with watermark */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-700 px-5 pt-6 pb-5 rounded-t-lg">
+                <Factory className="absolute -right-3 -top-4 h-28 w-28 rotate-12 text-white/10" />
+                <Factory className="absolute right-16 top-8 h-14 w-14 -rotate-6 text-white/10" />
+                <DialogHeader>
+                  <DialogTitle className="pr-8 text-lg font-bold text-white leading-tight">{viewItem.establishmentName}</DialogTitle>
+                  <DialogDescription className="mt-1.5 flex flex-wrap items-center gap-1.5 text-teal-50 text-xs">
+                    <span className="rounded-full bg-white/15 px-2 py-0.5 backdrop-blur-sm">{viewItem.sector}</span>
+                    <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{viewItem.area} &middot; {viewItem.subCity}</span>
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="px-5 py-4 space-y-4">
+                {/* Stat tiles */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-xl border border-teal-100 bg-teal-50 p-2.5 text-center">
+                    <p className="text-[10px] font-medium text-teal-600">Hojjetaa / Employees</p>
+                    <p className="mt-0.5 text-xl font-bold text-teal-700">{viewItem.employeeCount}</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-center">
+                    <p className="text-[10px] font-medium text-amber-600">Qabiyyee / Capital</p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-amber-700" title={viewItem.startupCapital != null ? String(viewItem.startupCapital) : undefined}>
+                      {viewItem.startupCapital != null ? `${viewItem.startupCapital.toLocaleString()} ETB` : '—'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-2.5 text-center">
+                    <p className="text-[10px] font-medium text-blue-600">Abbaa Qabuu / Ownership</p>
+                    <p className="mt-1 truncate text-xs font-bold text-blue-700 leading-tight" title={viewItem.ownershipType}>{viewItem.ownershipType}</p>
+                  </div>
+                  <div className="rounded-xl border border-purple-100 bg-purple-50 p-2.5 text-center">
+                    <p className="text-[10px] font-medium text-purple-600">Naannoo / Environment</p>
+                    <div className="mt-1.5 flex items-center justify-center gap-1">
+                      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${viewItem.hasEia ? 'bg-green-100 text-green-700' : 'bg-white text-slate-400'}`}>
+                        {viewItem.hasEia ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EIA
+                      </span>
+                      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${viewItem.hasEmp ? 'bg-green-100 text-green-700' : 'bg-white text-slate-400'}`}>
+                        {viewItem.hasEmp ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EMP
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                {/* License */}
+                <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 p-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                    <FileBadge className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium text-muted-foreground">Lakofsaa Eyyeema / License No.</p>
+                    <p className="truncate font-mono text-sm font-semibold">{viewItem.licenseNumber || '—'}</p>
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <div className="h-1 w-1 rounded-full bg-teal-500" />
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-teal-700">Baka Addaa / Address</h4>
+                  </div>
+                  <p className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm leading-relaxed text-foreground/80">{viewItem.specificAddress}</p>
+                </div>
+
+                {/* Environmental compliance detail */}
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <div className="h-1 w-1 rounded-full bg-green-500" />
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-green-700">Eyyaama Naannoo / Environmental Compliance</h4>
+                  </div>
+                  <div className="rounded-lg border space-y-0 divide-y">
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">EIA — Environmental Impact Assessment</span>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${viewItem.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {viewItem.hasEia ? <><Check className="h-3 w-3" /> Yes / Eyee</> : <><X className="h-3 w-3" /> No / Lakki</>}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">EMP — Environmental Management Plan</span>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${viewItem.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {viewItem.hasEmp ? <><Check className="h-3 w-3" /> Yes / Eyee</> : <><X className="h-3 w-3" /> No / Lakki</>}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact */}
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <div className="h-1 w-1 rounded-full bg-blue-500" />
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-blue-700">Odeeffannoo Quunnamtii / Contact</h4>
+                  </div>
+                  <div className="rounded-lg border space-y-0 divide-y">
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">Nama Quunnamtu / Contact Person</span>
+                      <span className="text-sm font-semibold">{viewItem.contactName}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">Bilbila / Phone</span>
+                      <a href={`tel:${viewItem.contactPhone}`} className="inline-flex items-center gap-1 text-sm font-semibold text-teal-600 hover:underline">
+                        <Phone className="h-3 w-3" />{viewItem.contactPhone}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer / Surveyor */}
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
+                  <span className="text-[10px] text-muted-foreground">Sakatta&#39;aa / Surveyor</span>
+                  <span className="text-xs font-medium">{viewItem.surveyorName || '—'}</span>
+                  <span className="text-[10px] text-muted-foreground">{fmtDate(viewItem.createdAt)}</span>
+                </div>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
@@ -589,100 +679,127 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
             <DialogDescription>Update establishment information</DialogDescription>
           </DialogHeader>
           {editForm && (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="edit-name" className="text-xs">Establishment Name</Label>
-                <Input id="edit-name" value={editForm.establishmentName} onChange={(e) => setEditForm({ ...editForm, establishmentName: e.target.value })} className="text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Sector</Label>
-                <Select value={editForm.sector} onValueChange={(v) => setEditForm({ ...editForm, sector: v })}>
-                  <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent className="max-h-64">{sectors.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Sub-City</Label>
-                  <Select value={editForm.subCity} onValueChange={(v) => { setEditForm({ ...editForm, subCity: v, area: '' }); setEditAreas(areasFor(v)); }}>
+            <div className="space-y-4 pt-2">
+              {/* Establishment */}
+              <div className="space-y-3 rounded-lg border p-3">
+                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-teal-700">
+                  <Factory className="h-3.5 w-3.5" /> Odeeffannoo Indastrii / Establishment
+                </h4>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name" className="text-xs">Establishment Name / Maqaa Indastrii <span className="text-red-500">*</span></Label>
+                  <Input id="edit-name" value={editForm.establishmentName} onChange={(e) => setEditForm({ ...editForm, establishmentName: e.target.value })} className="text-sm" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Sector / Goossa <span className="text-red-500">*</span></Label>
+                  <Select value={editForm.sector} onValueChange={(v) => setEditForm({ ...editForm, sector: v })}>
                     <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+                    <SelectContent className="max-h-64">{sectors.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Werreda</Label>
-                  <Select value={editForm.area} onValueChange={(v) => setEditForm({ ...editForm, area: v })}>
-                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>{editAreas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Sub-City / Kututtaa Maggalaa <span className="text-red-500">*</span></Label>
+                    <Select value={editForm.subCity} onValueChange={(v) => { setEditForm({ ...editForm, subCity: v, area: '' }); setEditAreas(areasFor(v)); }}>
+                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Werreda <span className="text-red-500">*</span></Label>
+                    <Select value={editForm.area} onValueChange={(v) => setEditForm({ ...editForm, area: v })}>
+                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{editAreas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-address" className="text-xs">Specific Address / Baka Addaa <span className="text-red-500">*</span></Label>
+                  <Input id="edit-address" value={editForm.specificAddress} onChange={(e) => setEditForm({ ...editForm, specificAddress: e.target.value })} className="text-sm" />
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="edit-address" className="text-xs">Specific Address</Label>
-                <Input id="edit-address" value={editForm.specificAddress} onChange={(e) => setEditForm({ ...editForm, specificAddress: e.target.value })} className="text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-license" className="text-xs">License Number</Label>
-                  <Input id="edit-license" value={editForm.licenseNumber} onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })} className="text-sm" />
+
+              {/* Registration & size */}
+              <div className="space-y-3 rounded-lg border p-3">
+                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-blue-700">
+                  <FileBadge className="h-3.5 w-3.5" /> Galmee fi Safiisaa / Registration &amp; Size
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-license" className="text-xs">License Number</Label>
+                    <Input id="edit-license" value={editForm.licenseNumber} onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Ownership Type <span className="text-red-500">*</span></Label>
+                    <Select value={editForm.ownershipType} onValueChange={(v) => setEditForm({ ...editForm, ownershipType: v })}>
+                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{OWNERSHIP_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Ownership Type</Label>
-                  <Select value={editForm.ownershipType} onValueChange={(v) => setEditForm({ ...editForm, ownershipType: v })}>
-                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>{OWNERSHIP_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">EIA (Environmental Impact Assessment)</Label>
-                  <Select value={editForm.hasEia} onValueChange={(v) => setEditForm({ ...editForm, hasEia: v })}>
-                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="yes">Yes / Eyee</SelectItem>
-                      <SelectItem value="no">No / Lakki</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">EMP (Environmental Management Plan)</Label>
-                  <Select value={editForm.hasEmp} onValueChange={(v) => setEditForm({ ...editForm, hasEmp: v })}>
-                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="yes">Yes / Eyee</SelectItem>
-                      <SelectItem value="no">No / Lakki</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-employees" className="text-xs">Employee Count <span className="text-red-500">*</span></Label>
+                    <Input id="edit-employees" type="number" min="0" value={editForm.employeeCount} onChange={(e) => setEditForm({ ...editForm, employeeCount: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-capital" className="text-xs">Startup Capital (ETB)</Label>
+                    <Input id="edit-capital" type="number" min="0" value={editForm.startupCapital} onChange={(e) => setEditForm({ ...editForm, startupCapital: e.target.value })} className="text-sm" />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-employees" className="text-xs">Employee Count</Label>
-                  <Input id="edit-employees" type="number" min="0" value={editForm.employeeCount} onChange={(e) => setEditForm({ ...editForm, employeeCount: e.target.value })} className="text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit-capital" className="text-xs">Startup Capital (ETB)</Label>
-                  <Input id="edit-capital" type="number" min="0" value={editForm.startupCapital} onChange={(e) => setEditForm({ ...editForm, startupCapital: e.target.value })} className="text-sm" />
+
+              {/* Environment */}
+              <div className="space-y-3 rounded-lg border p-3">
+                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-green-700">
+                  <Leaf className="h-3.5 w-3.5" /> Naannoo / Environment
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">EIA — Impact Assessment</Label>
+                    <Select value={editForm.hasEia} onValueChange={(v) => setEditForm({ ...editForm, hasEia: v })}>
+                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes / Eyee</SelectItem>
+                        <SelectItem value="no">No / Lakki</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">EMP — Management Plan</Label>
+                    <Select value={editForm.hasEmp} onValueChange={(v) => setEditForm({ ...editForm, hasEmp: v })}>
+                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes / Eyee</SelectItem>
+                        <SelectItem value="no">No / Lakki</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-contact" className="text-xs">Contact Person</Label>
-                  <Input id="edit-contact" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} className="text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit-phone" className="text-xs">Contact Phone</Label>
-                  <Input id="edit-phone" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} className="text-sm" />
+
+              {/* Contact */}
+              <div className="space-y-3 rounded-lg border p-3">
+                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-purple-700">
+                  <Phone className="h-3.5 w-3.5" /> Quunnamtii / Contact
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-contact" className="text-xs">Contact Person <span className="text-red-500">*</span></Label>
+                    <Input id="edit-contact" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phone" className="text-xs">Contact Phone <span className="text-red-500">*</span></Label>
+                    <Input id="edit-phone" type="tel" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} className="text-sm" />
+                  </div>
                 </div>
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setEditItem(null)} size="sm">Cancel</Button>
             <Button onClick={handleSaveEdit} disabled={saving} size="sm" className="bg-teal-600 hover:bg-teal-700">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save
+              {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+              {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
