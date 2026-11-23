@@ -16,21 +16,18 @@ import {
   ClipboardList,
   BarChart3,
   Database,
-  Shield,
   LogOut,
   Wifi,
   WifiOff,
   RefreshCw,
   CloudOff,
   Users,
-  Calendar,
   Factory,
   Building2,
   Stethoscope,
   GraduationCap,
   Sprout,
   ChevronDown,
-  Wrench,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import SurveyForm from '@/components/guesthouse/SurveyForm';
@@ -56,6 +53,7 @@ import AgricultureSurveyForm from '@/components/agriculture/AgricultureSurveyFor
 import AgricultureList from '@/components/agriculture/AgricultureList';
 import AgricultureStats from '@/components/agriculture/AgricultureStats';
 import SettingsManager from '@/components/admin/SettingsManager';
+import { ManageMenuDesktop, ManageMenuMobile } from '@/components/admin/ManageMenu';
 import { SettingsProvider } from '@/components/SettingsProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
@@ -77,7 +75,6 @@ export default function Home() {
   const healthTabs = ['healthSurvey', 'healthData', 'healthStats'];
   const educationTabs = ['eduSurvey', 'eduData', 'eduStats'];
   const agricultureTabs = ['agriSurvey', 'agriData', 'agriStats'];
-  const manageTabs = ['meetings', 'settings', 'admin'];
 
   if (status === 'loading') {
     return (
@@ -115,6 +112,7 @@ export default function Home() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            {isAdmin && <ManageMenuMobile activeTab={activeTab} onSelect={setActiveTab} />}
             {pendingCount > 0 && isOnline && (
               <Button
                 variant="outline"
@@ -316,99 +314,8 @@ export default function Home() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Manage ▾ — central hub: manage every module + admin tools */}
-            {isAdmin && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={`${dropTriggerClass} ${manageTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
-                  >
-                    <Wrench className="h-4 w-4" />
-                    <span>Manage</span>
-                    <ChevronDown className="h-3 w-3 opacity-60" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="max-h-[65vh] w-56 overflow-y-auto"
-                >
-                  <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Factory className="h-3.5 w-3.5" /> Industry
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setActiveTab('indData')}>
-                    <Database className="mr-2 h-4 w-4" /> Records
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('indStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Stats
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('attInd')}>
-                    <Users className="mr-2 h-4 w-4" /> Attendance
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Building2 className="h-3.5 w-3.5" /> Hotel
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setActiveTab('hotelData')}>
-                    <Database className="mr-2 h-4 w-4" /> Records
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('hotelStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Stats
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('attHotel')}>
-                    <Users className="mr-2 h-4 w-4" /> Attendance
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Stethoscope className="h-3.5 w-3.5" /> Health
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setActiveTab('healthData')}>
-                    <Database className="mr-2 h-4 w-4" /> Records
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('healthStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Stats
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <GraduationCap className="h-3.5 w-3.5" /> Education
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setActiveTab('eduData')}>
-                    <Database className="mr-2 h-4 w-4" /> Records
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('eduStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Stats
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Sprout className="h-3.5 w-3.5" /> Agriculture
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setActiveTab('agriData')}>
-                    <Database className="mr-2 h-4 w-4" /> Records
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('agriStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Stats
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Wrench className="h-3.5 w-3.5" /> Administration
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setActiveTab('meetings')}>
-                    <Calendar className="mr-2 h-4 w-4" /> Meetings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('settings')}>
-                    <Wrench className="mr-2 h-4 w-4" /> Settings (Locations &amp; Categories)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('admin')}>
-                    <Shield className="mr-2 h-4 w-4" /> Users
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            {/* Manage — vertical accordion hub: desktop popover panel, mobile slide-out drawer */}
+            {isAdmin && <ManageMenuDesktop activeTab={activeTab} onSelect={setActiveTab} />}
           </TabsList>
 
           {/* ============ Industry module ============ */}
