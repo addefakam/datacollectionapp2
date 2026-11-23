@@ -2,32 +2,14 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import {
-  ClipboardList,
-  BarChart3,
-  Database,
   LogOut,
   Wifi,
   WifiOff,
   RefreshCw,
   CloudOff,
-  Users,
-  Factory,
-  Building2,
-  Stethoscope,
-  GraduationCap,
-  Sprout,
-  ChevronDown,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import SurveyForm from '@/components/guesthouse/SurveyForm';
@@ -53,7 +35,7 @@ import AgricultureSurveyForm from '@/components/agriculture/AgricultureSurveyFor
 import AgricultureList from '@/components/agriculture/AgricultureList';
 import AgricultureStats from '@/components/agriculture/AgricultureStats';
 import SettingsManager from '@/components/admin/SettingsManager';
-import { ManageMenuDesktop, ManageMenuMobile } from '@/components/admin/ManageMenu';
+import { AppSidebar, MobileSidebar } from '@/components/admin/ManageSidebar';
 import { SettingsProvider } from '@/components/SettingsProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
@@ -68,13 +50,6 @@ export default function Home() {
   const handleSurveySubmit = () => {
     setRefreshTrigger((t) => t + 1);
   };
-
-  // Tab groups — used to highlight the owning dropdown trigger
-  const industryTabs = ['survey', 'indData', 'indStats', 'attInd'];
-  const hotelTabs = ['hotelSurvey', 'hotelData', 'hotelStats', 'attHotel'];
-  const healthTabs = ['healthSurvey', 'healthData', 'healthStats'];
-  const educationTabs = ['eduSurvey', 'eduData', 'eduStats'];
-  const agricultureTabs = ['agriSurvey', 'agriData', 'agriStats'];
 
   if (status === 'loading') {
     return (
@@ -91,18 +66,28 @@ export default function Home() {
     return <LoginForm />;
   }
 
-  // Shared styles for dropdown triggers (styled like TabsTrigger)
-  const dropTriggerClass = `flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-medium transition-all duration-200 sm:gap-2 sm:px-3.5 sm:py-2.5 sm:text-sm cursor-pointer select-none`;
-  const dropTriggerActive = 'bg-teal-600 text-white shadow-md shadow-teal-600/30';
-  const dropTriggerIdle = 'text-teal-900/70 hover:bg-teal-100/80 hover:text-teal-900 data-[state=open]:bg-teal-100 data-[state=open]:text-teal-900';
-
   return (
     <SettingsProvider>
-      <div className="flex min-h-[100dvh] flex-col bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 shrink-0 border-b bg-white shadow-sm safe-top">
-        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 lg:max-w-5xl xl:max-w-7xl">
+      <div className="flex min-h-[100dvh] bg-gray-50">
+      {/* Desktop (lg+): left sidebar with the full vertical management list */}
+      <AppSidebar
+        activeTab={activeTab}
+        onSelect={setActiveTab}
+        isAdmin={isAdmin}
+        userName={userName}
+        isOnline={isOnline}
+        pendingCount={pendingCount}
+        isSyncing={isSyncing}
+        onSync={() => syncPendingSurveys().then(() => setRefreshTrigger((t) => t + 1))}
+      />
+
+      {/* Main column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+      {/* Header — mobile/tablet only; desktop navigation lives in the left sidebar */}
+      <header className="sticky top-0 z-50 shrink-0 border-b bg-white shadow-sm safe-top lg:hidden">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <MobileSidebar activeTab={activeTab} onSelect={setActiveTab} isAdmin={isAdmin} />
             <img src="/icon.png" alt="Industry Survey" className="h-8 w-8 shrink-0 rounded-lg sm:h-10 sm:w-10 sm:rounded-xl" />
             <div className="min-w-0">
               <h1 className="truncate text-sm font-bold leading-tight sm:text-lg">Qorannoo Indastrii Bishooftuu</h1>
@@ -112,7 +97,6 @@ export default function Home() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {isAdmin && <ManageMenuMobile activeTab={activeTab} onSelect={setActiveTab} />}
             {pendingCount > 0 && isOnline && (
               <Button
                 variant="outline"
@@ -162,161 +146,6 @@ export default function Home() {
       {/* Main Content */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24 lg:max-w-5xl xl:max-w-7xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl h-auto rounded-2xl border border-teal-100 bg-white p-1.5 shadow-sm shadow-teal-900/5 ${isAdmin ? 'grid grid-cols-3 gap-1 sm:grid-cols-6 sm:gap-0.5 lg:gap-1' : 'grid grid-cols-3 gap-1 sm:grid-cols-5 sm:gap-0.5 lg:gap-1'}`}>
-            {/* Industry ▾ — all industry tabs live here */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`${dropTriggerClass} ${industryTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
-                >
-                  <Factory className="h-4 w-4" />
-                  <span>Industry</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                <DropdownMenuItem onClick={() => setActiveTab('survey')}>
-                  <ClipboardList className="mr-2 h-4 w-4" /> Industry Survey
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('indData')}>
-                    <Database className="mr-2 h-4 w-4" /> Industry Records
-                  </DropdownMenuItem>
-                )}
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('indStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Industry Stats
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => setActiveTab('attInd')}>
-                  <Users className="mr-2 h-4 w-4" /> Industry Attendance
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Hotel ▾ — all hotel tabs live here */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`${dropTriggerClass} ${hotelTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
-                >
-                  <Building2 className="h-4 w-4" />
-                  <span>Hotel</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                <DropdownMenuItem onClick={() => setActiveTab('hotelSurvey')}>
-                  <ClipboardList className="mr-2 h-4 w-4" /> Hotel Survey
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('hotelData')}>
-                    <Database className="mr-2 h-4 w-4" /> Hotel Records
-                  </DropdownMenuItem>
-                )}
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('hotelStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Hotel Stats
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => setActiveTab('attHotel')}>
-                  <Users className="mr-2 h-4 w-4" /> Hotel Attendance
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Health ▾ — all health facility tabs live here */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`${dropTriggerClass} ${healthTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
-                >
-                  <Stethoscope className="h-4 w-4" />
-                  <span>Health</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                <DropdownMenuItem onClick={() => setActiveTab('healthSurvey')}>
-                  <ClipboardList className="mr-2 h-4 w-4" /> Health Survey
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('healthData')}>
-                    <Database className="mr-2 h-4 w-4" /> Health Records
-                  </DropdownMenuItem>
-                )}
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('healthStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Health Stats
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Education ▾ — all education tabs live here */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`${dropTriggerClass} ${educationTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
-                >
-                  <GraduationCap className="h-4 w-4" />
-                  <span>Education</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                <DropdownMenuItem onClick={() => setActiveTab('eduSurvey')}>
-                  <ClipboardList className="mr-2 h-4 w-4" /> Education Survey
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('eduData')}>
-                    <Database className="mr-2 h-4 w-4" /> Education Records
-                  </DropdownMenuItem>
-                )}
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('eduStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Education Stats
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Agriculture ▾ — all agriculture tabs live here */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`${dropTriggerClass} ${agricultureTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
-                >
-                  <Sprout className="h-4 w-4" />
-                  <span>Agriculture</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                <DropdownMenuItem onClick={() => setActiveTab('agriSurvey')}>
-                  <ClipboardList className="mr-2 h-4 w-4" /> Agriculture Survey
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('agriData')}>
-                    <Database className="mr-2 h-4 w-4" /> Agriculture Records
-                  </DropdownMenuItem>
-                )}
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => setActiveTab('agriStats')}>
-                    <BarChart3 className="mr-2 h-4 w-4" /> Agriculture Stats
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Manage — vertical accordion hub: desktop popover panel, mobile slide-out drawer */}
-            {isAdmin && <ManageMenuDesktop activeTab={activeTab} onSelect={setActiveTab} />}
-          </TabsList>
 
           {/* ============ Industry module ============ */}
           <TabsContent value="survey" className="mt-2 sm:mt-3">
@@ -466,7 +295,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white safe-bottom">
+      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white safe-bottom lg:left-60">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 lg:max-w-5xl xl:max-w-7xl">
           <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Bishoftu Industry Data Collection</span>
           <span className={`flex shrink-0 items-center gap-1 text-[10px] sm:text-xs ${isOnline ? 'text-teal-600' : 'text-amber-500'}`}>
@@ -475,6 +304,7 @@ export default function Home() {
           </span>
         </div>
       </footer>
+      </div>
       </div>
     </SettingsProvider>
   );
