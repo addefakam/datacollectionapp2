@@ -243,6 +243,22 @@ model SmallEnterprise {
   updatedAt       DateTime @updatedAt
 }
 
+// Official goal/target set on an initiative metric for a weekly, monthly or yearly
+// period — progress is computed live from the recorded survey data.
+model Goal {
+  id          String   @id @default(cuid())
+  module      String   @default("small-enterprise") // which initiative the goal belongs to
+  metric      String   // enterprises | employees | femaleEmployees | capital (see src/lib/goals.ts)
+  periodType  String   // weekly | monthly | yearly
+  periodStart DateTime // inclusive start of the target period
+  periodEnd   DateTime // inclusive end of the target period
+  targetValue Float
+  owner       String?  // responsible office / official
+  status      String   @default("ACTIVE") // ACTIVE | ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // Admin-managed locations (sub-cities + woredas/areas) used across all survey forms
 model SubCity {
   id        String        @id @default(cuid())
