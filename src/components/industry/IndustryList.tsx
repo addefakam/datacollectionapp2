@@ -69,6 +69,7 @@ import {
   X,
 } from 'lucide-react';
 import { OWNERSHIP_TYPES } from '@/lib/location-data';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 import { useSettings } from '@/components/SettingsProvider';
 
 const PAGE_SIZE = 50;
@@ -85,6 +86,8 @@ interface Industry {
   hasEia: boolean;
   hasEmp: boolean;
   employeeCount: number;
+  maleEmployees: number;
+  femaleEmployees: number;
   startupCapital: number | null;
   contactName: string;
   contactPhone: string;
@@ -104,6 +107,8 @@ interface EditForm {
   hasEia: string;
   hasEmp: string;
   employeeCount: string;
+  maleEmployees: string;
+  femaleEmployees: string;
   startupCapital: string;
   contactName: string;
   contactPhone: string;
@@ -206,6 +211,8 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       hasEia: item.hasEia ? 'yes' : 'no',
       hasEmp: item.hasEmp ? 'yes' : 'no',
       employeeCount: String(item.employeeCount),
+      maleEmployees: String(item.maleEmployees || ''),
+      femaleEmployees: String(item.femaleEmployees || ''),
       startupCapital: item.startupCapital != null ? String(item.startupCapital) : '',
       contactName: item.contactName,
       contactPhone: item.contactPhone,
@@ -220,6 +227,8 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       const payload = {
         ...editForm,
         employeeCount: Number(editForm.employeeCount),
+        maleEmployees: editForm.maleEmployees === '' ? 0 : Number(editForm.maleEmployees),
+        femaleEmployees: editForm.femaleEmployees === '' ? 0 : Number(editForm.femaleEmployees),
         startupCapital: editForm.startupCapital === '' ? null : Number(editForm.startupCapital),
         hasEia: editForm.hasEia === 'yes',
         hasEmp: editForm.hasEmp === 'yes',
@@ -440,6 +449,9 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-teal-100 px-1.5 text-xs font-semibold text-teal-700">{item.employeeCount}</span>
+                        {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
+                          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleEmployees}</span> · <span className="font-medium text-pink-600">F {item.femaleEmployees}</span></p>
+                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">{fmtCapital(item.startupCapital)}</TableCell>
                       <TableCell className="whitespace-nowrap">
@@ -484,6 +496,9 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                     <div className="rounded-lg bg-teal-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-teal-600">Hojjetaa</p>
                       <p className="text-sm font-bold text-teal-700">{item.employeeCount}</p>
+                      {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
+                        <p className="text-[9px] leading-tight"><span className="font-medium text-sky-600">M {item.maleEmployees}</span> · <span className="font-medium text-pink-600">F {item.femaleEmployees}</span></p>
+                      )}
                     </div>
                     <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-amber-600">Qabiyyee</p>
@@ -570,6 +585,11 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   <div className="rounded-xl border border-teal-100 bg-teal-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-teal-600">Hojjetaa / Employees</p>
                     <p className="mt-0.5 text-xl font-bold text-teal-700">{viewItem.employeeCount}</p>
+                    {hasSexBreakdown(viewItem.maleEmployees, viewItem.femaleEmployees) ? (
+                      <p className="mt-0.5 text-[11px] font-medium"><span className="text-sky-600">Male {viewItem.maleEmployees}</span> · <span className="text-pink-600">Female {viewItem.femaleEmployees}</span></p>
+                    ) : (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">Sex not recorded</p>
+                    )}
                   </div>
                   <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-amber-600">Qabiyyee / Capital</p>
@@ -744,6 +764,16 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   <div className="space-y-2">
                     <Label htmlFor="edit-capital" className="text-xs">Startup Capital (ETB)</Label>
                     <Input id="edit-capital" type="number" min="0" value={editForm.startupCapital} onChange={(e) => setEditForm({ ...editForm, startupCapital: e.target.value })} className="text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-male-employees" className="text-xs">Male Employees</Label>
+                    <Input id="edit-male-employees" type="number" min="0" value={editForm.maleEmployees} onChange={(e) => setEditForm({ ...editForm, maleEmployees: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-female-employees" className="text-xs">Female Employees</Label>
+                    <Input id="edit-female-employees" type="number" min="0" value={editForm.femaleEmployees} onChange={(e) => setEditForm({ ...editForm, femaleEmployees: e.target.value })} className="text-sm" />
                   </div>
                 </div>
               </div>

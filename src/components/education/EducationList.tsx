@@ -64,6 +64,7 @@ import {
   Utensils,
 } from 'lucide-react';
 import { EDUCATION_INSTITUTION_TYPES, EDUCATION_OWNERSHIP_TYPES, splitInstitutionTypes } from '@/lib/location-data';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 import { useSettings } from '@/components/SettingsProvider';
 import { InstitutionTypeMultiSelect } from './InstitutionTypeMultiSelect';
 
@@ -77,7 +78,11 @@ interface EducationCenter {
   specificAddress: string;
   licenseNumber: string | null;
   studentCount: number;
+  maleStudents: number;
+  femaleStudents: number;
   teacherCount: number;
+  maleTeachers: number;
+  femaleTeachers: number;
   classroomCount: number;
   hasLibrary: boolean;
   hasLaboratory: boolean;
@@ -100,7 +105,11 @@ interface EditForm {
   specificAddress: string;
   licenseNumber: string;
   studentCount: string;
+  maleStudents: string;
+  femaleStudents: string;
   teacherCount: string;
+  maleTeachers: string;
+  femaleTeachers: string;
   classroomCount: string;
   hasLibrary: string;
   hasLaboratory: string;
@@ -226,7 +235,11 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
       specificAddress: item.specificAddress,
       licenseNumber: item.licenseNumber || '',
       studentCount: String(item.studentCount),
+      maleStudents: String(item.maleStudents || ''),
+      femaleStudents: String(item.femaleStudents || ''),
       teacherCount: String(item.teacherCount),
+      maleTeachers: String(item.maleTeachers || ''),
+      femaleTeachers: String(item.femaleTeachers || ''),
       classroomCount: String(item.classroomCount),
       hasLibrary: item.hasLibrary ? 'yes' : 'no',
       hasLaboratory: item.hasLaboratory ? 'yes' : 'no',
@@ -479,9 +492,15 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                       </td>
                       <td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-indigo-100 px-1.5 text-xs font-semibold text-indigo-700">{item.studentCount}</span>
+                        {hasSexBreakdown(item.maleStudents, item.femaleStudents) && (
+                          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleStudents}</span> · <span className="font-medium text-pink-600">F {item.femaleStudents}</span></p>
+                        )}
                       </td>
                       <td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-violet-100 px-1.5 text-xs font-semibold text-violet-700">{item.teacherCount}</span>
+                        {hasSexBreakdown(item.maleTeachers, item.femaleTeachers) && (
+                          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleTeachers}</span> · <span className="font-medium text-pink-600">F {item.femaleTeachers}</span></p>
+                        )}
                       </td>
                       <td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700">{item.classroomCount}</span>
@@ -530,10 +549,16 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                     <div className="rounded-lg bg-indigo-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-indigo-600">Barataa</p>
                       <p className="text-sm font-bold text-indigo-700">{item.studentCount}</p>
+                      {hasSexBreakdown(item.maleStudents, item.femaleStudents) && (
+                        <p className="text-[9px] leading-tight"><span className="font-medium text-sky-600">M {item.maleStudents}</span> · <span className="font-medium text-pink-600">F {item.femaleStudents}</span></p>
+                      )}
                     </div>
                     <div className="rounded-lg bg-violet-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-violet-600">Barsiisaa</p>
                       <p className="text-sm font-bold text-violet-700">{item.teacherCount}</p>
+                      {hasSexBreakdown(item.maleTeachers, item.femaleTeachers) && (
+                        <p className="text-[9px] leading-tight"><span className="font-medium text-sky-600">M {item.maleTeachers}</span> · <span className="font-medium text-pink-600">F {item.femaleTeachers}</span></p>
+                      )}
                     </div>
                     <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-amber-600">Abbaa Qabuu</p>
@@ -629,10 +654,20 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-indigo-600">Barataa / Students</p>
                     <p className="mt-0.5 text-xl font-bold text-indigo-700">{viewItem.studentCount}</p>
+                    {hasSexBreakdown(viewItem.maleStudents, viewItem.femaleStudents) ? (
+                      <p className="mt-0.5 text-[11px] font-medium"><span className="text-sky-600">Male {viewItem.maleStudents}</span> · <span className="text-pink-600">Female {viewItem.femaleStudents}</span></p>
+                    ) : (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">Sex not recorded</p>
+                    )}
                   </div>
                   <div className="rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-violet-600">Barsiisaa / Teachers</p>
                     <p className="mt-0.5 text-xl font-bold text-violet-700">{viewItem.teacherCount}</p>
+                    {hasSexBreakdown(viewItem.maleTeachers, viewItem.femaleTeachers) ? (
+                      <p className="mt-0.5 text-[11px] font-medium"><span className="text-sky-600">Male {viewItem.maleTeachers}</span> · <span className="text-pink-600">Female {viewItem.femaleTeachers}</span></p>
+                    ) : (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">Sex not recorded</p>
+                    )}
                   </div>
                   <div className="rounded-xl border border-blue-100 bg-blue-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-blue-600">Classrooms</p>
@@ -799,6 +834,26 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                   <div className="space-y-2">
                     <Label className="text-xs">Teacher Count <span className="text-red-500">*</span></Label>
                     <Input type="number" min="0" value={editForm.teacherCount} onChange={(e) => setEditForm({ ...editForm, teacherCount: e.target.value })} className="text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Male Students</Label>
+                    <Input type="number" min="0" value={editForm.maleStudents} onChange={(e) => setEditForm({ ...editForm, maleStudents: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Female Students</Label>
+                    <Input type="number" min="0" value={editForm.femaleStudents} onChange={(e) => setEditForm({ ...editForm, femaleStudents: e.target.value })} className="text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Male Teachers</Label>
+                    <Input type="number" min="0" value={editForm.maleTeachers} onChange={(e) => setEditForm({ ...editForm, maleTeachers: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Female Teachers</Label>
+                    <Input type="number" min="0" value={editForm.femaleTeachers} onChange={(e) => setEditForm({ ...editForm, femaleTeachers: e.target.value })} className="text-sm" />
                   </div>
                 </div>
                 <div className="space-y-2">

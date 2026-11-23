@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 // GET /api/agriculturecenters/[id]
 export async function GET(
@@ -49,6 +50,25 @@ export async function PUT(
     if (workers != null && (!Number.isFinite(workers) || workers < 0)) {
       return NextResponse.json({ error: 'Worker count must be a non-negative number' }, { status: 400 });
     }
+
+    // Sex breakdown: fall back to the stored value per side, then validate
+    // against the effective total when the payload mentions either side.
+    const effectiveTotal = workers != null && Number.isFinite(workers) ? Math.round(workers) : existing.workerCount;
+    let maleWorkers = existing.maleWorkers;
+    let femaleWorkers = existing.femaleWorkers;
+    if (body.maleWorkers !== undefined || body.femaleWorkers !== undefined) {
+      const sex = parseSexCounts(
+        body.maleWorkers !== undefined ? body.maleWorkers : existing.maleWorkers,
+        body.femaleWorkers !== undefined ? body.femaleWorkers : existing.femaleWorkers,
+        effectiveTotal,
+        'Worker Count',
+      );
+      if (!sex.ok) {
+        return NextResponse.json({ error: sex.error }, { status: 400 });
+      }
+      maleWorkers = sex.male;
+      femaleWorkers = sex.female;
+    }
     const land = body.landSizeHectares != null ? Number(body.landSizeHectares) : null;
     if (land != null && (!Number.isFinite(land) || land < 0)) {
       return NextResponse.json({ error: 'Land size must be a non-negative number' }, { status: 400 });
@@ -65,6 +85,8 @@ export async function PUT(
         specificAddress: body.specificAddress ?? existing.specificAddress,
         licenseNumber: body.licenseNumber ?? existing.licenseNumber,
         workerCount: workers != null && Number.isFinite(workers) ? Math.round(workers) : existing.workerCount,
+        maleWorkers: maleWorkers,
+        femaleWorkers: femaleWorkers,
         landSizeHectares: land != null && Number.isFinite(land) ? Math.round(land * 100) / 100 : existing.landSizeHectares,
         hasIrrigation: body.hasIrrigation != null
           ? (body.hasIrrigation === true || body.hasIrrigation === 'true' || body.hasIrrigation === 'yes' || body.hasIrrigation === 1)

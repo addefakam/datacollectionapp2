@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 // GET /api/industries/[id]
 export async function GET(
@@ -50,6 +51,25 @@ export async function PUT(
       return NextResponse.json({ error: 'Employee count must be a non-negative number' }, { status: 400 });
     }
 
+    // Sex breakdown: fall back to the stored value per side, then validate
+    // against the effective total when the payload mentions either side.
+    const effectiveTotal = employees != null && Number.isFinite(employees) ? Math.round(employees) : existing.employeeCount;
+    let maleEmployees = existing.maleEmployees;
+    let femaleEmployees = existing.femaleEmployees;
+    if (body.maleEmployees !== undefined || body.femaleEmployees !== undefined) {
+      const sex = parseSexCounts(
+        body.maleEmployees !== undefined ? body.maleEmployees : existing.maleEmployees,
+        body.femaleEmployees !== undefined ? body.femaleEmployees : existing.femaleEmployees,
+        effectiveTotal,
+        'Employee Count',
+      );
+      if (!sex.ok) {
+        return NextResponse.json({ error: sex.error }, { status: 400 });
+      }
+      maleEmployees = sex.male;
+      femaleEmployees = sex.female;
+    }
+
     const capital = body.startupCapital != null && body.startupCapital !== '' ? Number(body.startupCapital) : null;
 
     const updated = await db.industry.update({
@@ -69,6 +89,8 @@ export async function PUT(
           ? (body.hasEmp === true || body.hasEmp === 'true' || body.hasEmp === 'yes' || body.hasEmp === 1)
           : existing.hasEmp,
         employeeCount: employees != null && Number.isFinite(employees) ? Math.round(employees) : existing.employeeCount,
+        maleEmployees: maleEmployees,
+        femaleEmployees: femaleEmployees,
         startupCapital: capital != null && Number.isFinite(capital) ? capital : existing.startupCapital,
         contactName: body.contactName ?? existing.contactName,
         contactPhone: body.contactPhone ?? existing.contactPhone,

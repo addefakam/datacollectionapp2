@@ -64,6 +64,7 @@ import {
   Siren,
 } from 'lucide-react';
 import { HEALTH_FACILITY_TYPES, HEALTH_OWNERSHIP_TYPES } from '@/lib/location-data';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 import { useSettings } from '@/components/SettingsProvider';
 
 interface HealthCenter {
@@ -76,6 +77,8 @@ interface HealthCenter {
   specificAddress: string;
   licenseNumber: string | null;
   staffCount: number;
+  maleStaff: number;
+  femaleStaff: number;
   bedCount: number;
   hasLaboratory: boolean;
   hasPharmacy: boolean;
@@ -98,6 +101,8 @@ interface EditForm {
   specificAddress: string;
   licenseNumber: string;
   staffCount: string;
+  maleStaff: string;
+  femaleStaff: string;
   bedCount: string;
   hasLaboratory: string;
   hasPharmacy: string;
@@ -223,6 +228,8 @@ export default function HealthList({ refreshTrigger }: DataListProps) {
       specificAddress: item.specificAddress,
       licenseNumber: item.licenseNumber || '',
       staffCount: String(item.staffCount),
+      maleStaff: String(item.maleStaff || ''),
+      femaleStaff: String(item.femaleStaff || ''),
       bedCount: String(item.bedCount),
       hasLaboratory: item.hasLaboratory ? 'yes' : 'no',
       hasPharmacy: item.hasPharmacy ? 'yes' : 'no',
@@ -474,6 +481,9 @@ export default function HealthList({ refreshTrigger }: DataListProps) {
                       </td>
                       <td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-sky-100 px-1.5 text-xs font-semibold text-sky-700">{item.staffCount}</span>
+                        {hasSexBreakdown(item.maleStaff, item.femaleStaff) && (
+                          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleStaff}</span> · <span className="font-medium text-pink-600">F {item.femaleStaff}</span></p>
+                        )}
                       </td>
                       <td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-violet-100 px-1.5 text-xs font-semibold text-violet-700">{item.bedCount}</span>
@@ -520,6 +530,9 @@ export default function HealthList({ refreshTrigger }: DataListProps) {
                     <div className="rounded-lg bg-sky-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-sky-600">Hojjetaa</p>
                       <p className="text-sm font-bold text-sky-700">{item.staffCount}</p>
+                      {hasSexBreakdown(item.maleStaff, item.femaleStaff) && (
+                        <p className="text-[9px] leading-tight"><span className="font-medium text-sky-600">M {item.maleStaff}</span> · <span className="font-medium text-pink-600">F {item.femaleStaff}</span></p>
+                      )}
                     </div>
                     <div className="rounded-lg bg-violet-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-violet-600">Siree</p>
@@ -618,6 +631,11 @@ export default function HealthList({ refreshTrigger }: DataListProps) {
                   <div className="rounded-xl border border-sky-100 bg-sky-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-sky-600">Hojjetaa / Staff</p>
                     <p className="mt-0.5 text-xl font-bold text-sky-700">{viewItem.staffCount}</p>
+                    {hasSexBreakdown(viewItem.maleStaff, viewItem.femaleStaff) ? (
+                      <p className="mt-0.5 text-[11px] font-medium"><span className="text-sky-600">Male {viewItem.maleStaff}</span> · <span className="text-pink-600">Female {viewItem.femaleStaff}</span></p>
+                    ) : (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">Sex not recorded</p>
+                    )}
                   </div>
                   <div className="rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-violet-600">Siree / Beds</p>
@@ -787,6 +805,16 @@ export default function HealthList({ refreshTrigger }: DataListProps) {
                   <div className="space-y-2">
                     <Label className="text-xs">Inpatient Beds</Label>
                     <Input type="number" min="0" value={editForm.bedCount} onChange={(e) => setEditForm({ ...editForm, bedCount: e.target.value })} className="text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Male Staff</Label>
+                    <Input type="number" min="0" value={editForm.maleStaff} onChange={(e) => setEditForm({ ...editForm, maleStaff: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Female Staff</Label>
+                    <Input type="number" min="0" value={editForm.femaleStaff} onChange={(e) => setEditForm({ ...editForm, femaleStaff: e.target.value })} className="text-sm" />
                   </div>
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 // GET /api/healthcenters/[id]
 export async function GET(
@@ -49,6 +50,25 @@ export async function PUT(
     if (staff != null && (!Number.isFinite(staff) || staff < 0)) {
       return NextResponse.json({ error: 'Staff count must be a non-negative number' }, { status: 400 });
     }
+
+    // Sex breakdown: fall back to the stored value per side, then validate
+    // against the effective total when the payload mentions either side.
+    const effectiveTotal = staff != null && Number.isFinite(staff) ? Math.round(staff) : existing.staffCount;
+    let maleStaff = existing.maleStaff;
+    let femaleStaff = existing.femaleStaff;
+    if (body.maleStaff !== undefined || body.femaleStaff !== undefined) {
+      const sex = parseSexCounts(
+        body.maleStaff !== undefined ? body.maleStaff : existing.maleStaff,
+        body.femaleStaff !== undefined ? body.femaleStaff : existing.femaleStaff,
+        effectiveTotal,
+        'Staff Count',
+      );
+      if (!sex.ok) {
+        return NextResponse.json({ error: sex.error }, { status: 400 });
+      }
+      maleStaff = sex.male;
+      femaleStaff = sex.female;
+    }
     const beds = body.bedCount != null ? Number(body.bedCount) : null;
     if (beds != null && (!Number.isFinite(beds) || beds < 0)) {
       return NextResponse.json({ error: 'Bed count must be a non-negative number' }, { status: 400 });
@@ -65,6 +85,8 @@ export async function PUT(
         specificAddress: body.specificAddress ?? existing.specificAddress,
         licenseNumber: body.licenseNumber ?? existing.licenseNumber,
         staffCount: staff != null && Number.isFinite(staff) ? Math.round(staff) : existing.staffCount,
+        maleStaff: maleStaff,
+        femaleStaff: femaleStaff,
         bedCount: beds != null && Number.isFinite(beds) ? Math.round(beds) : existing.bedCount,
         hasLaboratory: body.hasLaboratory != null
           ? (body.hasLaboratory === true || body.hasLaboratory === 'true' || body.hasLaboratory === 'yes' || body.hasLaboratory === 1)

@@ -82,6 +82,8 @@ export default function AgricultureSurveyForm({
     licenseNumber: '',
     landSizeHectares: '',
     workerCount: '',
+    maleWorkers: '',
+    femaleWorkers: '',
     hasIrrigation: 'no',
     hasGreenhouse: 'no',
     hasMachinery: 'no',
@@ -107,6 +109,39 @@ export default function AgricultureSurveyForm({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  /**
+   * Sex breakdown inputs: when both male and female are filled and the total
+   * is still empty, auto-fill the total with their sum.
+   */
+  const handleSexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value } as typeof prev;
+      const male = name === 'maleWorkers' ? value : next.maleWorkers;
+      const female = name === 'femaleWorkers' ? value : next.femaleWorkers;
+      if (next.workerCount === '' && male !== '' && female !== '') {
+        const sum = Number(male) + Number(female);
+        if (Number.isFinite(sum) && sum >= 0) return { ...next, workerCount: String(sum) };
+      }
+      return next;
+    });
+  };
+
+  /** Shared step validation for one male/female pair against its total. */
+  const validateSexPair = (maleStr: string, femaleStr: string, totalStr: string, totalLabel: string): boolean => {
+    const male = maleStr === '' ? 0 : Number(maleStr);
+    const female = femaleStr === '' ? 0 : Number(femaleStr);
+    if (!Number.isFinite(male) || male < 0 || !Number.isFinite(female) || female < 0) {
+      toast({ title: 'Invalid Sex Counts / Lakkoofsa Sanyii Dogoggora', description: `Male and female ${totalLabel.toLowerCase()} must be non-negative numbers / Lakkoofsi dhiira fi dubartii lakkoofsa diidaa hin qabaatu`, variant: 'destructive' });
+      return false;
+    }
+    if (male + female > 0 && male + female !== Number(totalStr)) {
+      toast({ title: 'Sex Counts Mismatch / Lakkoofsa Sanyii Hin Wal Qabne', description: `Male + Female (${male + female}) must equal ${totalLabel} (${totalStr}) / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu`, variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -124,6 +159,7 @@ export default function AgricultureSurveyForm({
           toast({ title: 'Invalid Worker Count', description: 'Enter a valid worker count', variant: 'destructive' });
           return false;
         }
+        if (!validateSexPair(formData.maleWorkers, formData.femaleWorkers, formData.workerCount, 'Worker Count')) return false;
         if (!formData.landSizeHectares || Number(formData.landSizeHectares) < 0) {
           toast({ title: 'Invalid Land Size', description: 'Land size cannot be negative', variant: 'destructive' });
           return false;
@@ -171,6 +207,8 @@ export default function AgricultureSurveyForm({
     const payload = {
       ...formData,
       workerCount: Number(formData.workerCount || 0),
+      maleWorkers: formData.maleWorkers === '' ? 0 : Number(formData.maleWorkers),
+      femaleWorkers: formData.femaleWorkers === '' ? 0 : Number(formData.femaleWorkers),
       landSizeHectares: formData.landSizeHectares === '' ? 0 : Number(formData.landSizeHectares),
       hasIrrigation: formData.hasIrrigation === 'yes',
       hasGreenhouse: formData.hasGreenhouse === 'yes',
@@ -214,6 +252,8 @@ export default function AgricultureSurveyForm({
     { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
     { label: 'Land (ha) / Dachaa', value: formData.landSizeHectares === '' ? '0' : formData.landSizeHectares },
     { label: 'Workers / Hojjetaa', value: formData.workerCount },
+    { label: 'Male Workers / Dhiira', value: formData.maleWorkers === '' ? '—' : formData.maleWorkers },
+    { label: 'Female Workers / Dubartii', value: formData.femaleWorkers === '' ? '—' : formData.femaleWorkers },
     { label: 'Irrigation', value: formData.hasIrrigation === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
     { label: 'Greenhouse', value: formData.hasGreenhouse === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
     { label: 'Machinery / Meeshaa Qonnaa', value: formData.hasMachinery === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
@@ -345,6 +385,24 @@ export default function AgricultureSurveyForm({
                     <Label htmlFor="a-workerCount" className="text-xs sm:text-sm">Worker Count<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa</span> <span className="text-red-500">*</span></Label>
                     <Input id="a-workerCount" name="workerCount" type="number" min="0" placeholder="e.g., 15" value={formData.workerCount} onChange={handleChange} required className="text-sm sm:text-base" />
                   </div>
+                </div>
+                {/* Workers by sex (male / female) */}
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs sm:text-sm">Workers by Sex<br /><span className="text-xs font-normal text-muted-foreground">Hojjettoota Dhiira fi Dubartii</span></Label>
+                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-700 sm:text-[10px]">Optional / Filannoo</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="a-maleWorkers" className="text-xs">Male / Dhiira</Label>
+                      <Input id="a-maleWorkers" name="maleWorkers" type="number" min="0" placeholder="e.g., 9" value={formData.maleWorkers} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="a-femaleWorkers" className="text-xs">Female / Dubartii</Label>
+                      <Input id="a-femaleWorkers" name="femaleWorkers" type="number" min="0" placeholder="e.g., 6" value={formData.femaleWorkers} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Worker Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
                 {/* Available infrastructure */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">

@@ -19,7 +19,7 @@ export async function GET() {
     const [total, totalEmployees, sectorStats, subCityStats, woredaStats, withLicense, employeeCounts] =
       await Promise.all([
         db.industry.count(),
-        db.industry.aggregate({ _sum: { employeeCount: true }, _avg: { employeeCount: true } }),
+        db.industry.aggregate({ _sum: { employeeCount: true, maleEmployees: true, femaleEmployees: true }, _avg: { employeeCount: true } }),
         db.industry.groupBy({
           by: ['sector'],
           _count: true,
@@ -99,7 +99,7 @@ export async function GET() {
         employees: r.employees,
         filter:
           r.max === null
-            ? { minEmployees: String(r.min) }
+            ? ({ minEmployees: String(r.min) } as Record<string, string>)
             : { minEmployees: String(r.min), maxEmployees: String(r.max) },
       })),
     };
@@ -107,6 +107,8 @@ export async function GET() {
     return NextResponse.json({
       total,
       totalEmployees: totalEmployees._sum.employeeCount || 0,
+      totalMaleEmployees: totalEmployees._sum.maleEmployees || 0,
+      totalFemaleEmployees: totalEmployees._sum.femaleEmployees || 0,
       avgEmployees: Math.round((totalEmployees._avg.employeeCount || 0) * 10) / 10,
       withLicense,
       sectors: sectorStats.map((s) => ({

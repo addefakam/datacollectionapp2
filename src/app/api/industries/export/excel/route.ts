@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
       { header: 'License Number / Lakofsaa Eyyeema', key: 'licenseNumber', width: 24 },
       { header: 'Ownership Type', key: 'ownershipType', width: 24 },
       { header: 'Employees', key: 'employeeCount', width: 12 },
+      { header: 'Male Employees', key: 'maleEmployees', width: 12 },
+      { header: 'Female Employees', key: 'femaleEmployees', width: 12 },
       { header: 'Startup Capital (ETB)', key: 'startupCapital', width: 20 },
       { header: 'Contact Person', key: 'contactName', width: 28 },
       { header: 'Contact Phone', key: 'contactPhone', width: 18 },
@@ -72,6 +74,8 @@ export async function GET(request: NextRequest) {
         licenseNumber: ind.licenseNumber || '',
         ownershipType: ind.ownershipType,
         employeeCount: ind.employeeCount,
+        maleEmployees: ind.maleEmployees,
+        femaleEmployees: ind.femaleEmployees,
         startupCapital: ind.startupCapital != null ? ind.startupCapital : '',
         contactName: ind.contactName,
         contactPhone: ind.contactPhone,
@@ -98,9 +102,11 @@ export async function GET(request: NextRequest) {
     spacerRow.height = 8;
 
     const totalEmployees = industries.reduce((sum, i) => sum + i.employeeCount, 0);
+    const totalMaleEmployees = industries.reduce((sum, i) => sum + i.maleEmployees, 0);
+    const totalFemaleEmployees = industries.reduce((sum, i) => sum + i.femaleEmployees, 0);
     const totalRow = sheet.addRow({
       row: '',
-      establishmentName: `Total Records: ${industries.length} | Total Employees: ${totalEmployees}`,
+      establishmentName: `Total Records: ${industries.length} | Total Employees: ${totalEmployees} | Male: ${totalMaleEmployees} | Female: ${totalFemaleEmployees}`,
     });
     totalRow.getCell(2).font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF0F766E' } };
 

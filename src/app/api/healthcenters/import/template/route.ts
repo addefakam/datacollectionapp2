@@ -18,6 +18,8 @@ export async function GET() {
       { header: 'Specific Address / Baka Addaa', key: 'specificAddress', width: 30 },
       { header: 'License Number / Lakofsaa Eyyema', key: 'licenseNumber', width: 22 },
       { header: 'Staff Count / Lakkoofsa Hojjetaa', key: 'staffCount', width: 18 },
+      { header: 'Male Staff / Dhiira Hojjetaa', key: 'maleStaff', width: 16 },
+      { header: 'Female Staff / Dubartii Hojjetaa', key: 'femaleStaff', width: 16 },
       { header: 'Bed Count / Lakkoofsa Siree', key: 'bedCount', width: 18 },
       { header: 'Laboratory', key: 'hasLaboratory', width: 12 },
       { header: 'Pharmacy', key: 'hasPharmacy', width: 12 },
@@ -49,6 +51,8 @@ export async function GET() {
       specificAddress: 'Near Main Hospital Road',
       licenseNumber: 'HC-2024-001',
       staffCount: 120,
+      maleStaff: 68,
+      femaleStaff: 52,
       bedCount: 85,
       hasLaboratory: 'Yes',
       hasPharmacy: 'Yes',
@@ -66,6 +70,8 @@ export async function GET() {
       specificAddress: 'Behind Commercial Bank',
       licenseNumber: 'HC-2024-014',
       staffCount: 8,
+      maleStaff: 3,
+      femaleStaff: 5,
       bedCount: 0,
       hasLaboratory: 'Yes',
       hasPharmacy: 'Yes',
@@ -93,6 +99,7 @@ export async function GET() {
     notesSheet.addRow(['Notes / Yaadannoo']).font = { bold: true };
     notesSheet.addRow(['Yes/No columns accept: Yes, Y, True, 1, Eyee (or No/Lakki)']);
     notesSheet.addRow(['Staff Count and Bed Count must be whole numbers (0 or more)']);
+    notesSheet.addRow(['Male Staff + Female Staff must equal Staff Count when filled (optional columns)']);
     notesSheet.addRow(['Bed Count = 0 is valid for outpatient-only facilities (clinics, pharmacies)']);
     notesSheet.addRow(['Contact Phone must be Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX']);
     notesSheet.getColumn(1).font = { size: 10, name: 'Calibri' };

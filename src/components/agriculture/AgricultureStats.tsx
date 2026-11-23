@@ -28,6 +28,7 @@ import {
   Pie,
   Legend,
 } from 'recharts';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 
 interface TypeStat {
   farmType: string;
@@ -60,6 +61,8 @@ interface LandRangeStat {
 interface StatsData {
   total: number;
   totalWorkers: number;
+  totalMaleWorkers?: number;
+  totalFemaleWorkers?: number;
   totalLand: number;
   withLicense: number;
   types: TypeStat[];
@@ -235,6 +238,13 @@ export default function AgricultureStats() {
             <div className="min-w-0">
               <p className="text-lg font-bold leading-tight sm:text-2xl">{stats.totalWorkers.toLocaleString()}</p>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">Workers / Hojjetaa</p>
+              {hasSexBreakdown(stats.totalMaleWorkers, stats.totalFemaleWorkers) && (
+                <p className="mt-0.5 text-[10px] font-medium leading-tight sm:text-[11px]">
+                  <span className="text-sky-600">M {(stats.totalMaleWorkers || 0).toLocaleString()}</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-pink-600">F {(stats.totalFemaleWorkers || 0).toLocaleString()}</span>
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,7 +54,13 @@ export async function POST(request: NextRequest) {
       if (val.includes('land') || val.includes('dachaa') || val.includes('hectare')) {
         headers.landSizeHectares = colNumber;
       }
-      if (val.includes('worker') || val.includes('hojjetaa')) {
+      // Sex breakdown columns must be matched before the generic worker
+      // column ("Female Workers" also contains "worker", "male").
+      if (val.includes('female') || val.includes('dubartii')) {
+        headers.femaleWorkers = colNumber;
+      } else if (val.includes('male') || val.includes('dhiira')) {
+        headers.maleWorkers = colNumber;
+      } else if (val.includes('worker') || val.includes('hojjetaa')) {
         headers.workerCount = colNumber;
       }
       if (val.includes('irrigation')) {
@@ -107,9 +114,11 @@ export async function POST(request: NextRequest) {
       const subCity = getCell(headers.subCity!);
       const area = getCell(headers.area!);
       const specificAddress = getCell(headers.specificAddress!);
-      const licenseNumber = getCell(headers.licenseNumber!);
+      const licenseNumber = headers.licenseNumber ? getCell(headers.licenseNumber) : "";
       const landSizeHectares = getCell(headers.landSizeHectares!);
       const workerCount = getCell(headers.workerCount!);
+      const maleWorkers = headers.maleWorkers ? getCell(headers.maleWorkers) : '';
+      const femaleWorkers = headers.femaleWorkers ? getCell(headers.femaleWorkers) : '';
       const hasIrrigation = headers.hasIrrigation ? parseYesNo(getCell(headers.hasIrrigation)) : false;
       const hasGreenhouse = headers.hasGreenhouse ? parseYesNo(getCell(headers.hasGreenhouse)) : false;
       const hasMachinery = headers.hasMachinery ? parseYesNo(getCell(headers.hasMachinery)) : false;
@@ -128,6 +137,13 @@ export async function POST(request: NextRequest) {
       if (!Number.isFinite(workers) || workers < 0 || !Number.isInteger(workers)) {
         results.failed++;
         results.errors.push(`Row ${rowNum}: Invalid worker count "${workerCount}"`);
+        continue;
+      }
+
+      const sex = parseSexCounts(maleWorkers, femaleWorkers, workers, 'Worker Count');
+      if (!sex.ok) {
+        results.failed++;
+        results.errors.push(`Row ${rowNum}: ${sex.error}`);
         continue;
       }
       const land = Number(landSizeHectares);
@@ -156,6 +172,8 @@ export async function POST(request: NextRequest) {
             licenseNumber: licenseNumber || null,
             landSizeHectares: Math.round(land * 100) / 100,
             workerCount: Math.round(workers),
+            maleWorkers: sex.male,
+            femaleWorkers: sex.female,
             hasIrrigation,
             hasGreenhouse,
             hasMachinery,

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeInstitutionTypes } from '@/lib/location-data';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -20,7 +21,11 @@ export async function POST(request: NextRequest) {
       specificAddress,
       licenseNumber,
       studentCount,
+      maleStudents,
+      femaleStudents,
       teacherCount,
+      maleTeachers,
+      femaleTeachers,
       classroomCount,
       hasLibrary,
       hasLaboratory,
@@ -55,6 +60,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Classroom count must be a non-negative number' }, { status: 400 });
     }
 
+    // Optional sex breakdowns (male/female) — each must add up to its total when given
+    const sexStudents = parseSexCounts(maleStudents, femaleStudents, students, 'Student Count');
+    if (!sexStudents.ok) {
+      return NextResponse.json({ error: sexStudents.error }, { status: 400 });
+    }
+    const sexTeachers = parseSexCounts(maleTeachers, femaleTeachers, teachers, 'Teacher Count');
+    if (!sexTeachers.ok) {
+      return NextResponse.json({ error: sexTeachers.error }, { status: 400 });
+    }
+
     // Validate Ethiopian phone number
     const phoneClean = String(contactPhone).replace(/[\s-]/g, '');
     const ethPhoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
@@ -75,7 +90,11 @@ export async function POST(request: NextRequest) {
         specificAddress: specificAddress || '',
         licenseNumber: licenseNumber || null,
         studentCount: Math.round(students),
+        maleStudents: sexStudents.male,
+        femaleStudents: sexStudents.female,
         teacherCount: Math.round(teachers),
+        maleTeachers: sexTeachers.male,
+        femaleTeachers: sexTeachers.female,
         classroomCount: Math.round(classrooms),
         hasLibrary: toBool(hasLibrary),
         hasLaboratory: toBool(hasLaboratory),

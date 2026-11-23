@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -21,6 +22,8 @@ export async function POST(request: NextRequest) {
       hasEia,
       hasEmp,
       employeeCount,
+      maleEmployees,
+      femaleEmployees,
       startupCapital,
       contactName,
       contactPhone,
@@ -43,6 +46,12 @@ export async function POST(request: NextRequest) {
         { error: 'Employee count must be a non-negative number' },
         { status: 400 }
       );
+    }
+
+    // Optional sex breakdown (male/female) — must add up to the total when given
+    const sex = parseSexCounts(maleEmployees, femaleEmployees, employees, 'Employee Count');
+    if (!sex.ok) {
+      return NextResponse.json({ error: sex.error }, { status: 400 });
     }
 
     // Validate Ethiopian phone number
@@ -69,6 +78,8 @@ export async function POST(request: NextRequest) {
         hasEia: toBool(hasEia),
         hasEmp: toBool(hasEmp),
         employeeCount: Math.round(employees),
+        maleEmployees: sex.male,
+        femaleEmployees: sex.female,
         startupCapital: capital != null && Number.isFinite(capital) ? capital : null,
         contactName,
         contactPhone,

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
       licenseNumber,
       landSizeHectares,
       workerCount,
+      maleWorkers,
+      femaleWorkers,
       hasIrrigation,
       hasGreenhouse,
       hasMachinery,
@@ -43,6 +46,12 @@ export async function POST(request: NextRequest) {
     const land = Number(landSizeHectares ?? 0);
     if (!Number.isFinite(workers) || workers < 0) {
       return NextResponse.json({ error: 'Worker count must be a non-negative number' }, { status: 400 });
+    }
+
+    // Optional sex breakdown (male/female) — must add up to the total when given
+    const sex = parseSexCounts(maleWorkers, femaleWorkers, workers, 'Worker Count');
+    if (!sex.ok) {
+      return NextResponse.json({ error: sex.error }, { status: 400 });
     }
     if (!Number.isFinite(land) || land < 0) {
       return NextResponse.json({ error: 'Land size must be a non-negative number' }, { status: 400 });
@@ -69,6 +78,8 @@ export async function POST(request: NextRequest) {
         licenseNumber: licenseNumber || null,
         landSizeHectares: Math.round(land * 100) / 100,
         workerCount: Math.round(workers),
+        maleWorkers: sex.male,
+        femaleWorkers: sex.female,
         hasIrrigation: toBool(hasIrrigation),
         hasGreenhouse: toBool(hasGreenhouse),
         hasMachinery: toBool(hasMachinery),

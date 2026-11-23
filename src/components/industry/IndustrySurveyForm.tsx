@@ -76,6 +76,8 @@ export default function IndustrySurveyForm({
     hasEia: 'no',
     hasEmp: 'no',
     employeeCount: '',
+    maleEmployees: '',
+    femaleEmployees: '',
     startupCapital: '',
     contactName: '',
     contactPhone: '',
@@ -98,6 +100,39 @@ export default function IndustrySurveyForm({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  /**
+   * Sex breakdown inputs: when both male and female are filled and the total
+   * is still empty, auto-fill the total with their sum.
+   */
+  const handleSexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value } as typeof prev;
+      const male = name === 'maleEmployees' ? value : next.maleEmployees;
+      const female = name === 'femaleEmployees' ? value : next.femaleEmployees;
+      if (next.employeeCount === '' && male !== '' && female !== '') {
+        const sum = Number(male) + Number(female);
+        if (Number.isFinite(sum) && sum >= 0) return { ...next, employeeCount: String(sum) };
+      }
+      return next;
+    });
+  };
+
+  /** Shared step validation for one male/female pair against its total. */
+  const validateSexPair = (maleStr: string, femaleStr: string, totalStr: string, totalLabel: string): boolean => {
+    const male = maleStr === '' ? 0 : Number(maleStr);
+    const female = femaleStr === '' ? 0 : Number(femaleStr);
+    if (!Number.isFinite(male) || male < 0 || !Number.isFinite(female) || female < 0) {
+      toast({ title: 'Invalid Sex Counts / Lakkoofsa Sanyii Dogoggora', description: `Male and female ${totalLabel.toLowerCase()} must be non-negative numbers / Lakkoofsi dhiira fi dubartii lakkoofsa diidaa hin qabaatu`, variant: 'destructive' });
+      return false;
+    }
+    if (male + female > 0 && male + female !== Number(totalStr)) {
+      toast({ title: 'Sex Counts Mismatch / Lakkoofsa Sanyii Hin Wal Qabne', description: `Male + Female (${male + female}) must equal ${totalLabel} (${totalStr}) / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu`, variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -115,6 +150,7 @@ export default function IndustrySurveyForm({
           toast({ title: 'Invalid Employees / Lakkoofsa Hojjetaa Dogoggora', description: 'Enter a valid employee count / Lakkoofsa hojjetaa sirrii galchi', variant: 'destructive' });
           return false;
         }
+        if (!validateSexPair(formData.maleEmployees, formData.femaleEmployees, formData.employeeCount, 'Employee Count')) return false;
         return true;
       case 3:
         if (!formData.contactName || !formData.contactPhone) {
@@ -158,6 +194,8 @@ export default function IndustrySurveyForm({
     const payload = {
       ...formData,
       employeeCount: Number(formData.employeeCount),
+      maleEmployees: formData.maleEmployees === '' ? 0 : Number(formData.maleEmployees),
+      femaleEmployees: formData.femaleEmployees === '' ? 0 : Number(formData.femaleEmployees),
       startupCapital: formData.startupCapital === '' ? null : Number(formData.startupCapital),
       hasEia: formData.hasEia === 'yes',
       hasEmp: formData.hasEmp === 'yes',
@@ -200,6 +238,8 @@ export default function IndustrySurveyForm({
     { label: 'EIA (Environmental Impact Assessment)', value: formData.hasEia === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
     { label: 'EMP (Environmental Management Plan)', value: formData.hasEmp === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
     { label: 'Employees / Hojjetaa', value: formData.employeeCount },
+    { label: 'Male Employees / Dhiira', value: formData.maleEmployees === '' ? '—' : formData.maleEmployees },
+    { label: 'Female Employees / Dubartii', value: formData.femaleEmployees === '' ? '—' : formData.femaleEmployees },
     { label: 'Startup Capital / Qabiyyee Jalqabaa', value: formData.startupCapital ? `${formData.startupCapital} ETB` : '—' },
     { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
   ];
@@ -328,6 +368,24 @@ export default function IndustrySurveyForm({
                     <Label htmlFor="startupCapital" className="text-xs sm:text-sm">Startup Capital (ETB)<br /><span className="text-xs font-normal text-muted-foreground">Qabiyyee Jalqabaa</span></Label>
                     <Input id="startupCapital" name="startupCapital" type="number" min="0" placeholder="e.g., 500000" value={formData.startupCapital} onChange={handleChange} className="text-sm sm:text-base" />
                   </div>
+                </div>
+                {/* Employees by sex (male / female) */}
+                <div className="rounded-lg border border-teal-100 bg-teal-50/50 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs sm:text-sm">Employees by Sex<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa Dhiira fi Dubartii</span></Label>
+                    <span className="shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-[9px] font-medium text-teal-700 sm:text-[10px]">Optional / Filannoo</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="maleEmployees" className="text-xs">Male / Dhiira</Label>
+                      <Input id="maleEmployees" name="maleEmployees" type="number" min="0" placeholder="e.g., 12" value={formData.maleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="femaleEmployees" className="text-xs">Female / Dubartii</Label>
+                      <Input id="femaleEmployees" name="femaleEmployees" type="number" min="0" placeholder="e.g., 13" value={formData.femaleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Employee Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
                 {/* Environmental compliance */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">

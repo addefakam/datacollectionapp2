@@ -111,6 +111,8 @@ model Industry {
   hasEia            Boolean  @default(false) // Environmental Impact Assessment done
   hasEmp            Boolean  @default(false) // Environmental Management Plan prepared
   employeeCount     Int      @default(0)
+  maleEmployees     Int      @default(0) // employees by sex: male
+  femaleEmployees   Int      @default(0) // employees by sex: female
   startupCapital    Float?
   contactName       String
   contactPhone      String
@@ -147,6 +149,8 @@ model HealthCenter {
   specificAddress String
   licenseNumber   String?
   staffCount      Int      @default(0) // health professionals & support staff
+  maleStaff       Int      @default(0) // staff by sex: male
+  femaleStaff     Int      @default(0) // staff by sex: female
   bedCount        Int      @default(0) // inpatient beds (0 for outpatient-only)
   hasLaboratory   Boolean  @default(false) // on-site laboratory service
   hasPharmacy     Boolean  @default(false) // on-site pharmacy service
@@ -171,7 +175,11 @@ model EducationCenter {
   specificAddress   String
   licenseNumber     String?
   studentCount      Int      @default(0) // total enrolled students
+  maleStudents      Int      @default(0) // students by sex: male
+  femaleStudents    Int      @default(0) // students by sex: female
   teacherCount      Int      @default(0) // teaching staff
+  maleTeachers      Int      @default(0) // teachers by sex: male
+  femaleTeachers    Int      @default(0) // teachers by sex: female
   classroomCount    Int      @default(0)
   hasLibrary        Boolean  @default(false) // library / reading room
   hasLaboratory     Boolean  @default(false) // science laboratory
@@ -197,6 +205,8 @@ model AgricultureCenter {
   licenseNumber   String?
   landSizeHectares Float  @default(0) // total land in hectares
   workerCount     Int      @default(0) // permanent + temporary workers
+  maleWorkers     Int      @default(0) // workers by sex: male
+  femaleWorkers   Int      @default(0) // workers by sex: female
   hasIrrigation   Boolean  @default(false) // irrigation system
   hasGreenhouse   Boolean  @default(false) // greenhouse / protected farming
   hasMachinery    Boolean  @default(false) // tractors & farm machinery

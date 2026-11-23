@@ -19,6 +19,8 @@ export async function GET() {
       { header: 'License Number / Lakofsaa Eyyeema', key: 'licenseNumber', width: 22 },
       { header: 'Land Size (ha) / Dachaa', key: 'landSizeHectares', width: 18 },
       { header: 'Worker Count / Lakkoofsa Hojjetaa', key: 'workerCount', width: 18 },
+      { header: 'Male Workers / Dhiira Hojjetaa', key: 'maleWorkers', width: 16 },
+      { header: 'Female Workers / Dubartii Hojjetaa', key: 'femaleWorkers', width: 16 },
       { header: 'Irrigation', key: 'hasIrrigation', width: 12 },
       { header: 'Greenhouse', key: 'hasGreenhouse', width: 12 },
       { header: 'Machinery', key: 'hasMachinery', width: 12 },
@@ -50,6 +52,8 @@ export async function GET() {
       licenseNumber: 'AG-2024-007',
       landSizeHectares: 12.5,
       workerCount: 15,
+      maleWorkers: 9,
+      femaleWorkers: 6,
       hasIrrigation: 'Yes',
       hasGreenhouse: 'No',
       hasMachinery: 'Yes',
@@ -67,6 +71,8 @@ export async function GET() {
       licenseNumber: 'AG-2024-021',
       landSizeHectares: 45,
       workerCount: 30,
+      maleWorkers: 18,
+      femaleWorkers: 12,
       hasIrrigation: 'Yes',
       hasGreenhouse: 'Yes',
       hasMachinery: 'Yes',
@@ -93,6 +99,7 @@ export async function GET() {
     notesSheet.addRow(['Notes / Yaadannoo']).font = { bold: true };
     notesSheet.addRow(['Yes/No columns accept: Yes, Y, True, 1, Eyee (or No/Lakki)']);
     notesSheet.addRow(['Worker Count must be a whole number (0 or more)']);
+    notesSheet.addRow(['Male Workers + Female Workers must equal Worker Count when filled (optional columns)']);
     notesSheet.addRow(['Land Size is in hectares — decimals allowed, e.g. 12.5']);
     notesSheet.addRow(['Contact Phone must be Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX']);
     notesSheet.getColumn(1).font = { size: 10, name: 'Calibri' };

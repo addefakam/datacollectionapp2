@@ -28,6 +28,7 @@ import {
   Pie,
   Legend,
 } from 'recharts';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 
 interface TypeStat {
   facilityType: string;
@@ -52,6 +53,8 @@ interface WoredaStat {
 interface StatsData {
   total: number;
   totalStaff: number;
+  totalMaleStaff?: number;
+  totalFemaleStaff?: number;
   totalBeds: number;
   withLicense: number;
   types: TypeStat[];
@@ -225,6 +228,13 @@ export default function HealthStats() {
             <div className="min-w-0">
               <p className="text-lg font-bold leading-tight sm:text-2xl">{stats.totalStaff.toLocaleString()}</p>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">Staff / Hojjetaa</p>
+              {hasSexBreakdown(stats.totalMaleStaff, stats.totalFemaleStaff) && (
+                <p className="mt-0.5 text-[10px] font-medium leading-tight sm:text-[11px]">
+                  <span className="text-sky-600">M {(stats.totalMaleStaff || 0).toLocaleString()}</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-pink-600">F {(stats.totalFemaleStaff || 0).toLocaleString()}</span>
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

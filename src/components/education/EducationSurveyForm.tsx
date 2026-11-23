@@ -82,7 +82,11 @@ export default function EducationSurveyForm({
     specificAddress: '',
     licenseNumber: '',
     studentCount: '',
+    maleStudents: '',
+    femaleStudents: '',
     teacherCount: '',
+    maleTeachers: '',
+    femaleTeachers: '',
     classroomCount: '',
     hasLibrary: 'no',
     hasLaboratory: 'no',
@@ -107,6 +111,49 @@ export default function EducationSurveyForm({
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  /**
+   * Sex breakdown inputs: when both male and female are filled and the total
+   * is still empty, auto-fill the total with their sum (students and teachers).
+   */
+  const handleSexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value } as typeof prev;
+      if (name === 'maleStudents' || name === 'femaleStudents') {
+        const male = name === 'maleStudents' ? value : next.maleStudents;
+        const female = name === 'femaleStudents' ? value : next.femaleStudents;
+        if (next.studentCount === '' && male !== '' && female !== '') {
+          const sum = Number(male) + Number(female);
+          if (Number.isFinite(sum) && sum >= 0) return { ...next, studentCount: String(sum) };
+        }
+      }
+      if (name === 'maleTeachers' || name === 'femaleTeachers') {
+        const male = name === 'maleTeachers' ? value : next.maleTeachers;
+        const female = name === 'femaleTeachers' ? value : next.femaleTeachers;
+        if (next.teacherCount === '' && male !== '' && female !== '') {
+          const sum = Number(male) + Number(female);
+          if (Number.isFinite(sum) && sum >= 0) return { ...next, teacherCount: String(sum) };
+        }
+      }
+      return next;
+    });
+  };
+
+  /** Shared step validation for one male/female pair against its total. */
+  const validateSexPair = (maleStr: string, femaleStr: string, totalStr: string, totalLabel: string): boolean => {
+    const male = maleStr === '' ? 0 : Number(maleStr);
+    const female = femaleStr === '' ? 0 : Number(femaleStr);
+    if (!Number.isFinite(male) || male < 0 || !Number.isFinite(female) || female < 0) {
+      toast({ title: 'Invalid Sex Counts / Lakkoofsa Sanyii Dogoggora', description: `Male and female ${totalLabel.toLowerCase()} must be non-negative numbers / Lakkoofsi dhiira fi dubartii lakkoofsa diidaa hin qabaatu`, variant: 'destructive' });
+      return false;
+    }
+    if (male + female > 0 && male + female !== Number(totalStr)) {
+      toast({ title: 'Sex Counts Mismatch / Lakkoofsa Sanyii Hin Wal Qabne', description: `Male + Female (${male + female}) must equal ${totalLabel} (${totalStr}) / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu`, variant: 'destructive' });
+      return false;
+    }
+    return true;
   };
 
   const validateStep = (step: number): boolean => {
@@ -134,6 +181,8 @@ export default function EducationSurveyForm({
           toast({ title: 'Invalid Classroom Count', description: 'Enter a valid classroom count (0 or more)', variant: 'destructive' });
           return false;
         }
+        if (!validateSexPair(formData.maleStudents, formData.femaleStudents, formData.studentCount, 'Student Count')) return false;
+        if (!validateSexPair(formData.maleTeachers, formData.femaleTeachers, formData.teacherCount, 'Teacher Count')) return false;
         return true;
       case 3:
         if (!formData.contactName || !formData.contactPhone) {
@@ -178,7 +227,11 @@ export default function EducationSurveyForm({
       ...formData,
       institutionType: normalizeInstitutionTypes(formData.institutionTypes),
       studentCount: Number(formData.studentCount || 0),
+      maleStudents: formData.maleStudents === '' ? 0 : Number(formData.maleStudents),
+      femaleStudents: formData.femaleStudents === '' ? 0 : Number(formData.femaleStudents),
       teacherCount: Number(formData.teacherCount || 0),
+      maleTeachers: formData.maleTeachers === '' ? 0 : Number(formData.maleTeachers),
+      femaleTeachers: formData.femaleTeachers === '' ? 0 : Number(formData.femaleTeachers),
       classroomCount: Number(formData.classroomCount || 0),
       hasLibrary: formData.hasLibrary === 'yes',
       hasLaboratory: formData.hasLaboratory === 'yes',
@@ -221,7 +274,11 @@ export default function EducationSurveyForm({
     { label: 'Address / Baka Addaa', value: formData.specificAddress },
     { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
     { label: 'Students / Barataa', value: formData.studentCount },
+    { label: 'Male Students / Barataa Dhiiraa', value: formData.maleStudents === '' ? '—' : formData.maleStudents },
+    { label: 'Female Students / Barattii Dubartii', value: formData.femaleStudents === '' ? '—' : formData.femaleStudents },
     { label: 'Teachers / Barsiisaa', value: formData.teacherCount },
+    { label: 'Male Teachers / Barsiisaa Dhiiraa', value: formData.maleTeachers === '' ? '—' : formData.maleTeachers },
+    { label: 'Female Teachers / Dubartii Barsiisaa', value: formData.femaleTeachers === '' ? '—' : formData.femaleTeachers },
     { label: 'Classrooms', value: formData.classroomCount === '' ? '0' : formData.classroomCount },
     { label: 'Library', value: formData.hasLibrary === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
     { label: 'Laboratory', value: formData.hasLaboratory === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
@@ -359,6 +416,42 @@ export default function EducationSurveyForm({
                     <Label htmlFor="e-teacherCount" className="text-xs sm:text-sm">Teacher Count<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Barsiisaa</span> <span className="text-red-500">*</span></Label>
                     <Input id="e-teacherCount" name="teacherCount" type="number" min="0" placeholder="e.g., 24" value={formData.teacherCount} onChange={handleChange} required className="text-sm sm:text-base" />
                   </div>
+                </div>
+                {/* Students by sex (male / female) */}
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs sm:text-sm">Students by Sex<br /><span className="text-xs font-normal text-muted-foreground">Barattoota Dhiira fi Dubartii</span></Label>
+                    <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-medium text-indigo-700 sm:text-[10px]">Optional / Filannoo</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="e-maleStudents" className="text-xs">Male / Dhiiraa</Label>
+                      <Input id="e-maleStudents" name="maleStudents" type="number" min="0" placeholder="e.g., 430" value={formData.maleStudents} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="e-femaleStudents" className="text-xs">Female / Dubartii</Label>
+                      <Input id="e-femaleStudents" name="femaleStudents" type="number" min="0" placeholder="e.g., 420" value={formData.femaleStudents} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Student Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
+                </div>
+                {/* Teachers by sex (male / female) */}
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs sm:text-sm">Teachers by Sex<br /><span className="text-xs font-normal text-muted-foreground">Barsiisota Dhiira fi Dubartii</span></Label>
+                    <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-medium text-indigo-700 sm:text-[10px]">Optional / Filannoo</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="e-maleTeachers" className="text-xs">Male / Dhiiraa</Label>
+                      <Input id="e-maleTeachers" name="maleTeachers" type="number" min="0" placeholder="e.g., 11" value={formData.maleTeachers} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="e-femaleTeachers" className="text-xs">Female / Dubartii</Label>
+                      <Input id="e-femaleTeachers" name="femaleTeachers" type="number" min="0" placeholder="e.g., 13" value={formData.femaleTeachers} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Teacher Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
                   <Label htmlFor="e-classroomCount" className="text-xs sm:text-sm">Classroom Count <span className="text-red-500">*</span></Label>

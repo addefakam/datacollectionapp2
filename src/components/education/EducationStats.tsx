@@ -28,6 +28,7 @@ import {
   Pie,
   Legend,
 } from 'recharts';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 
 interface TypeStat {
   institutionType: string;
@@ -52,7 +53,11 @@ interface WoredaStat {
 interface StatsData {
   total: number;
   totalStudents: number;
+  totalMaleStudents?: number;
+  totalFemaleStudents?: number;
   totalTeachers: number;
+  totalMaleTeachers?: number;
+  totalFemaleTeachers?: number;
   totalClassrooms: number;
   withLicense: number;
   types: TypeStat[];
@@ -226,6 +231,13 @@ export default function EducationStats() {
             <div className="min-w-0">
               <p className="text-lg font-bold leading-tight sm:text-2xl">{stats.totalStudents.toLocaleString()}</p>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">Students / Barataa</p>
+              {hasSexBreakdown(stats.totalMaleStudents, stats.totalFemaleStudents) && (
+                <p className="mt-0.5 text-[10px] font-medium leading-tight sm:text-[11px]">
+                  <span className="text-sky-600">M {(stats.totalMaleStudents || 0).toLocaleString()}</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-pink-600">F {(stats.totalFemaleStudents || 0).toLocaleString()}</span>
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -237,6 +249,13 @@ export default function EducationStats() {
             <div className="min-w-0">
               <p className="text-lg font-bold leading-tight sm:text-2xl">{stats.totalTeachers.toLocaleString()}</p>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">Teachers / Barsiisaa</p>
+              {hasSexBreakdown(stats.totalMaleTeachers, stats.totalFemaleTeachers) && (
+                <p className="mt-0.5 text-[10px] font-medium leading-tight sm:text-[11px]">
+                  <span className="text-sky-600">M {(stats.totalMaleTeachers || 0).toLocaleString()}</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-pink-600">F {(stats.totalFemaleTeachers || 0).toLocaleString()}</span>
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

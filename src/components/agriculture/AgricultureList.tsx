@@ -64,6 +64,7 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { AGRICULTURE_FARM_TYPES, AGRICULTURE_OWNERSHIP_TYPES } from '@/lib/location-data';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 import { useSettings } from '@/components/SettingsProvider';
 
 interface AgricultureCenter {
@@ -77,6 +78,8 @@ interface AgricultureCenter {
   licenseNumber: string | null;
   landSizeHectares: number;
   workerCount: number;
+  maleWorkers: number;
+  femaleWorkers: number;
   hasIrrigation: boolean;
   hasGreenhouse: boolean;
   hasMachinery: boolean;
@@ -99,6 +102,8 @@ interface EditForm {
   licenseNumber: string;
   landSizeHectares: string;
   workerCount: string;
+  maleWorkers: string;
+  femaleWorkers: string;
   hasIrrigation: string;
   hasGreenhouse: string;
   hasMachinery: string;
@@ -224,6 +229,8 @@ export default function AgricultureList({ refreshTrigger }: DataListProps) {
       licenseNumber: item.licenseNumber || '',
       landSizeHectares: String(item.landSizeHectares),
       workerCount: String(item.workerCount),
+      maleWorkers: String(item.maleWorkers || ''),
+      femaleWorkers: String(item.femaleWorkers || ''),
       hasIrrigation: item.hasIrrigation ? 'yes' : 'no',
       hasGreenhouse: item.hasGreenhouse ? 'yes' : 'no',
       hasMachinery: item.hasMachinery ? 'yes' : 'no',
@@ -474,6 +481,9 @@ export default function AgricultureList({ refreshTrigger }: DataListProps) {
                       </td>
                       <td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-emerald-100 px-1.5 text-xs font-semibold text-emerald-700">{item.workerCount}</span>
+                        {hasSexBreakdown(item.maleWorkers, item.femaleWorkers) && (
+                          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleWorkers}</span> · <span className="font-medium text-pink-600">F {item.femaleWorkers}</span></p>
+                        )}
                       </td>
                       <td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[34px] items-center justify-center rounded-full bg-violet-100 px-1.5 text-xs font-semibold text-violet-700">{item.landSizeHectares} ha</span>
@@ -524,6 +534,9 @@ export default function AgricultureList({ refreshTrigger }: DataListProps) {
                     <div className="rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-emerald-600">Hojjetaa</p>
                       <p className="text-sm font-bold text-emerald-700">{item.workerCount}</p>
+                      {hasSexBreakdown(item.maleWorkers, item.femaleWorkers) && (
+                        <p className="text-[9px] leading-tight"><span className="font-medium text-sky-600">M {item.maleWorkers}</span> · <span className="font-medium text-pink-600">F {item.femaleWorkers}</span></p>
+                      )}
                     </div>
                     <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
                       <p className="text-[9px] text-amber-600">Abbaa Qabuu</p>
@@ -618,6 +631,11 @@ export default function AgricultureList({ refreshTrigger }: DataListProps) {
                   <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-emerald-600">Hojjetaa / Workers</p>
                     <p className="mt-0.5 text-xl font-bold text-emerald-700">{viewItem.workerCount}</p>
+                    {hasSexBreakdown(viewItem.maleWorkers, viewItem.femaleWorkers) ? (
+                      <p className="mt-0.5 text-[11px] font-medium"><span className="text-sky-600">Male {viewItem.maleWorkers}</span> · <span className="text-pink-600">Female {viewItem.femaleWorkers}</span></p>
+                    ) : (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">Sex not recorded</p>
+                    )}
                   </div>
                   <div className="rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-center">
                     <p className="text-[10px] font-medium text-violet-600">Dachaa / Land (ha)</p>
@@ -787,6 +805,16 @@ export default function AgricultureList({ refreshTrigger }: DataListProps) {
                   <div className="space-y-2">
                     <Label className="text-xs">Worker Count <span className="text-red-500">*</span></Label>
                     <Input type="number" min="0" value={editForm.workerCount} onChange={(e) => setEditForm({ ...editForm, workerCount: e.target.value })} className="text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Male Workers</Label>
+                    <Input type="number" min="0" value={editForm.maleWorkers} onChange={(e) => setEditForm({ ...editForm, maleWorkers: e.target.value })} className="text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Female Workers</Label>
+                    <Input type="number" min="0" value={editForm.femaleWorkers} onChange={(e) => setEditForm({ ...editForm, femaleWorkers: e.target.value })} className="text-sm" />
                   </div>
                 </div>
               </div>

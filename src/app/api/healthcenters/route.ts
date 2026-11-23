@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -19,6 +20,8 @@ export async function POST(request: NextRequest) {
       specificAddress,
       licenseNumber,
       staffCount,
+      maleStaff,
+      femaleStaff,
       bedCount,
       hasLaboratory,
       hasPharmacy,
@@ -44,6 +47,12 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(staff) || staff < 0) {
       return NextResponse.json({ error: 'Staff count must be a non-negative number' }, { status: 400 });
     }
+
+    // Optional sex breakdown (male/female) — must add up to the total when given
+    const sex = parseSexCounts(maleStaff, femaleStaff, staff, 'Staff Count');
+    if (!sex.ok) {
+      return NextResponse.json({ error: sex.error }, { status: 400 });
+    }
     if (!Number.isFinite(beds) || beds < 0) {
       return NextResponse.json({ error: 'Bed count must be a non-negative number' }, { status: 400 });
     }
@@ -68,6 +77,8 @@ export async function POST(request: NextRequest) {
         specificAddress: specificAddress || '',
         licenseNumber: licenseNumber || null,
         staffCount: Math.round(staff),
+        maleStaff: sex.male,
+        femaleStaff: sex.female,
         bedCount: Math.round(beds),
         hasLaboratory: toBool(hasLaboratory),
         hasPharmacy: toBool(hasPharmacy),

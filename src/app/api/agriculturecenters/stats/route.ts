@@ -19,7 +19,7 @@ export async function GET() {
     const [total, workersAgg, landAgg, typeStats, subCityStats, woredaStats, withLicense, landRows] =
       await Promise.all([
         db.agricultureCenter.count(),
-        db.agricultureCenter.aggregate({ _sum: { workerCount: true } }),
+        db.agricultureCenter.aggregate({ _sum: { workerCount: true, maleWorkers: true, femaleWorkers: true } }),
         db.agricultureCenter.aggregate({ _sum: { landSizeHectares: true } }),
         db.agricultureCenter.groupBy({
           by: ['farmType'],
@@ -114,6 +114,8 @@ export async function GET() {
     return NextResponse.json({
       total,
       totalWorkers: workersAgg._sum.workerCount || 0,
+      totalMaleWorkers: workersAgg._sum.maleWorkers || 0,
+      totalFemaleWorkers: workersAgg._sum.femaleWorkers || 0,
       totalLand: landAgg._sum.landSizeHectares || 0,
       withLicense,
       types: typeStats.map((t) => ({

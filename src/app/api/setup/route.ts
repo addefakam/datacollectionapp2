@@ -96,6 +96,14 @@ async function ensureTables(prisma: PrismaClient) {
     );
   `);
 
+  // Repair older deployments whose Industry table predates the sex breakdown columns
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Industry" ADD COLUMN IF NOT EXISTS "maleEmployees" INTEGER NOT NULL DEFAULT 0;
+  `);
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Industry" ADD COLUMN IF NOT EXISTS "femaleEmployees" INTEGER NOT NULL DEFAULT 0;
+  `);
+
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "IndustryAttendance" (
       "id" TEXT NOT NULL PRIMARY KEY,

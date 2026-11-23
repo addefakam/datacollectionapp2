@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeInstitutionTypes } from '@/lib/location-data';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 // GET /api/educationcenters/[id]
 export async function GET(
@@ -59,6 +60,41 @@ export async function PUT(
       return NextResponse.json({ error: 'Classroom count must be a non-negative number' }, { status: 400 });
     }
 
+    // Sex breakdowns: fall back to the stored value per side, then validate
+    // against the effective total when the payload mentions either side.
+    const effectiveStudents = students != null && Number.isFinite(students) ? Math.round(students) : existing.studentCount;
+    let maleStudents = existing.maleStudents;
+    let femaleStudents = existing.femaleStudents;
+    if (body.maleStudents !== undefined || body.femaleStudents !== undefined) {
+      const sex = parseSexCounts(
+        body.maleStudents !== undefined ? body.maleStudents : existing.maleStudents,
+        body.femaleStudents !== undefined ? body.femaleStudents : existing.femaleStudents,
+        effectiveStudents,
+        'Student Count',
+      );
+      if (!sex.ok) {
+        return NextResponse.json({ error: sex.error }, { status: 400 });
+      }
+      maleStudents = sex.male;
+      femaleStudents = sex.female;
+    }
+    const effectiveTeachers = teachers != null && Number.isFinite(teachers) ? Math.round(teachers) : existing.teacherCount;
+    let maleTeachers = existing.maleTeachers;
+    let femaleTeachers = existing.femaleTeachers;
+    if (body.maleTeachers !== undefined || body.femaleTeachers !== undefined) {
+      const sex = parseSexCounts(
+        body.maleTeachers !== undefined ? body.maleTeachers : existing.maleTeachers,
+        body.femaleTeachers !== undefined ? body.femaleTeachers : existing.femaleTeachers,
+        effectiveTeachers,
+        'Teacher Count',
+      );
+      if (!sex.ok) {
+        return NextResponse.json({ error: sex.error }, { status: 400 });
+      }
+      maleTeachers = sex.male;
+      femaleTeachers = sex.female;
+    }
+
     const updated = await db.educationCenter.update({
       where: { id },
       data: {
@@ -72,7 +108,11 @@ export async function PUT(
         specificAddress: body.specificAddress ?? existing.specificAddress,
         licenseNumber: body.licenseNumber ?? existing.licenseNumber,
         studentCount: students != null && Number.isFinite(students) ? Math.round(students) : existing.studentCount,
+        maleStudents: maleStudents,
+        femaleStudents: femaleStudents,
         teacherCount: teachers != null && Number.isFinite(teachers) ? Math.round(teachers) : existing.teacherCount,
+        maleTeachers: maleTeachers,
+        femaleTeachers: femaleTeachers,
         classroomCount: classrooms != null && Number.isFinite(classrooms) ? Math.round(classrooms) : existing.classroomCount,
         hasLibrary: body.hasLibrary != null
           ? (body.hasLibrary === true || body.hasLibrary === 'true' || body.hasLibrary === 'yes' || body.hasLibrary === 1)

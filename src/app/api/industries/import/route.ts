@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,8 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    // ExcelJS's typings expect its own augmented Buffer interface, so cast the Node buffer
+    await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
 
     const sheet = workbook.worksheets[0];
     if (!sheet) {
@@ -57,7 +59,13 @@ export async function POST(request: NextRequest) {
       if (/(^|\W)emp(\W|$)/.test(val) || val.includes('management plan')) {
         headers.hasEmp = colNumber;
       }
-      if (val.includes('employee') || val.includes('hojjetaa')) {
+      // Sex breakdown columns must be matched before the generic employee
+      // column ("Female Employees" also contains "employee", "male").
+      if (val.includes('female') || val.includes('dubartii')) {
+        headers.femaleEmployees = colNumber;
+      } else if (val.includes('male') || val.includes('dhiira')) {
+        headers.maleEmployees = colNumber;
+      } else if (val.includes('employee') || val.includes('hojjetaa')) {
         headers.employeeCount = colNumber;
       }
       if (val.includes('capital') || val.includes('jalqabaa')) {
@@ -101,11 +109,13 @@ export async function POST(request: NextRequest) {
       const subCity = getCell(headers.subCity!);
       const area = getCell(headers.area!);
       const specificAddress = getCell(headers.specificAddress!);
-      const licenseNumber = getCell(headers.licenseNumber!);
+      const licenseNumber = headers.licenseNumber ? getCell(headers.licenseNumber) : "";
       const ownershipType = getCell(headers.ownershipType!);
       const hasEia = headers.hasEia ? parseYesNo(getCell(headers.hasEia)) : false;
       const hasEmp = headers.hasEmp ? parseYesNo(getCell(headers.hasEmp)) : false;
       const employeeCount = getCell(headers.employeeCount!);
+      const maleEmployees = headers.maleEmployees ? getCell(headers.maleEmployees) : '';
+      const femaleEmployees = headers.femaleEmployees ? getCell(headers.femaleEmployees) : '';
       const startupCapital = headers.startupCapital ? getCell(headers.startupCapital) : '';
       const contactName = getCell(headers.contactName!);
       const contactPhone = getCell(headers.contactPhone!);
@@ -121,6 +131,13 @@ export async function POST(request: NextRequest) {
       if (!Number.isFinite(employees) || employees < 0) {
         results.failed++;
         results.errors.push(`Row ${rowNum}: Invalid employee count "${employeeCount}"`);
+        continue;
+      }
+
+      const sex = parseSexCounts(maleEmployees, femaleEmployees, employees, 'Employee Count');
+      if (!sex.ok) {
+        results.failed++;
+        results.errors.push(`Row ${rowNum}: ${sex.error}`);
         continue;
       }
 
@@ -146,6 +163,8 @@ export async function POST(request: NextRequest) {
             hasEia,
             hasEmp,
             employeeCount: Math.round(employees),
+            maleEmployees: sex.male,
+            femaleEmployees: sex.female,
             startupCapital: capital != null && Number.isFinite(capital) ? capital : null,
             contactName,
             contactPhone,

@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
       { header: 'Specific Address', key: 'specificAddress', width: 30 },
       { header: 'License Number / Lakofsaa Eyyeema', key: 'licenseNumber', width: 24 },
       { header: 'Staff Count / Hojjetaa', key: 'staffCount', width: 12 },
+      { header: 'Male Staff', key: 'maleStaff', width: 12 },
+      { header: 'Female Staff', key: 'femaleStaff', width: 12 },
       { header: 'Bed Count / Siree', key: 'bedCount', width: 12 },
       { header: 'Laboratory', key: 'hasLaboratory', width: 12 },
       { header: 'Pharmacy', key: 'hasPharmacy', width: 12 },
@@ -76,6 +78,8 @@ export async function GET(request: NextRequest) {
         specificAddress: hc.specificAddress,
         licenseNumber: hc.licenseNumber || '',
         staffCount: hc.staffCount,
+        maleStaff: hc.maleStaff,
+        femaleStaff: hc.femaleStaff,
         bedCount: hc.bedCount,
         hasLaboratory: hc.hasLaboratory ? 'Yes' : 'No',
         hasPharmacy: hc.hasPharmacy ? 'Yes' : 'No',
@@ -106,10 +110,12 @@ export async function GET(request: NextRequest) {
     spacerRow.height = 8;
 
     const totalStaff = healthCenters.reduce((sum, h) => sum + h.staffCount, 0);
+    const totalMaleStaff = healthCenters.reduce((sum, h) => sum + h.maleStaff, 0);
+    const totalFemaleStaff = healthCenters.reduce((sum, h) => sum + h.femaleStaff, 0);
     const totalBeds = healthCenters.reduce((sum, h) => sum + h.bedCount, 0);
     const totalRow = sheet.addRow({
       row: '',
-      facilityName: `Total Records: ${healthCenters.length} | Total Staff: ${totalStaff} | Total Beds: ${totalBeds}`,
+      facilityName: `Total Records: ${healthCenters.length} | Total Staff: ${totalStaff} (M ${totalMaleStaff} / F ${totalFemaleStaff}) | Total Beds: ${totalBeds}`,
     });
     totalRow.getCell(2).font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF0369A1' } };
 

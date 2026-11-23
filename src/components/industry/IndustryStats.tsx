@@ -29,6 +29,7 @@ import {
   Legend,
 } from 'recharts';
 import { STATS_ATTRIBUTES, statsAttributeDef } from '@/lib/stats-attributes';
+import { hasSexBreakdown } from '@/lib/sex-counts';
 
 interface SectorStat {
   sector: string;
@@ -61,6 +62,8 @@ interface EmployeeRangeStat {
 interface StatsData {
   total: number;
   totalEmployees: number;
+  totalMaleEmployees?: number;
+  totalFemaleEmployees?: number;
   avgEmployees: number;
   withLicense: number;
   sectors: SectorStat[];
@@ -261,6 +264,13 @@ export default function IndustryStats() {
             <div className="min-w-0">
               <p className="text-lg font-bold leading-tight sm:text-2xl">{stats.totalEmployees.toLocaleString()}</p>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">Employees / Hojjetaa</p>
+              {hasSexBreakdown(stats.totalMaleEmployees, stats.totalFemaleEmployees) && (
+                <p className="mt-0.5 text-[10px] font-medium leading-tight sm:text-[11px]">
+                  <span className="text-sky-600">M {(stats.totalMaleEmployees || 0).toLocaleString()}</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-pink-600">F {(stats.totalFemaleEmployees || 0).toLocaleString()}</span>
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

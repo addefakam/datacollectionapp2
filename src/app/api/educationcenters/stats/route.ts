@@ -20,8 +20,8 @@ export async function GET() {
     const [total, studentAgg, teacherAgg, classroomAgg, subCityStats, woredaStats, withLicense, typeRows] =
       await Promise.all([
         db.educationCenter.count(),
-        db.educationCenter.aggregate({ _sum: { studentCount: true } }),
-        db.educationCenter.aggregate({ _sum: { teacherCount: true } }),
+        db.educationCenter.aggregate({ _sum: { studentCount: true, maleStudents: true, femaleStudents: true } }),
+        db.educationCenter.aggregate({ _sum: { teacherCount: true, maleTeachers: true, femaleTeachers: true } }),
         db.educationCenter.aggregate({ _sum: { classroomCount: true } }),
         db.educationCenter.groupBy({
           by: ['subCity'],
@@ -121,7 +121,11 @@ export async function GET() {
     return NextResponse.json({
       total,
       totalStudents: studentAgg._sum.studentCount || 0,
+      totalMaleStudents: studentAgg._sum.maleStudents || 0,
+      totalFemaleStudents: studentAgg._sum.femaleStudents || 0,
       totalTeachers: teacherAgg._sum.teacherCount || 0,
+      totalMaleTeachers: teacherAgg._sum.maleTeachers || 0,
+      totalFemaleTeachers: teacherAgg._sum.femaleTeachers || 0,
       totalClassrooms: classroomAgg._sum.classroomCount || 0,
       withLicense,
       types: typeStats.map((t) => ({

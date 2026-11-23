@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,7 +51,13 @@ export async function POST(request: NextRequest) {
       if (val.includes('license no') || val.includes('license number') || val.includes('lakofsaa')) {
         headers.licenseNumber = colNumber;
       }
-      if (val.includes('staff') || val.includes('hojjetaa')) {
+      // Sex breakdown columns must be matched before the generic staff
+      // column ("Female Staff" also contains "staff", "male").
+      if (val.includes('female') || val.includes('dubartii')) {
+        headers.femaleStaff = colNumber;
+      } else if (val.includes('male') || val.includes('dhiira')) {
+        headers.maleStaff = colNumber;
+      } else if (val.includes('staff') || val.includes('hojjetaa')) {
         headers.staffCount = colNumber;
       }
       if (val.includes('bed') || val.includes('siree')) {
@@ -107,8 +114,10 @@ export async function POST(request: NextRequest) {
       const subCity = getCell(headers.subCity!);
       const area = getCell(headers.area!);
       const specificAddress = getCell(headers.specificAddress!);
-      const licenseNumber = getCell(headers.licenseNumber!);
+      const licenseNumber = headers.licenseNumber ? getCell(headers.licenseNumber) : "";
       const staffCount = getCell(headers.staffCount!);
+      const maleStaff = headers.maleStaff ? getCell(headers.maleStaff) : '';
+      const femaleStaff = headers.femaleStaff ? getCell(headers.femaleStaff) : '';
       const bedCount = headers.bedCount ? getCell(headers.bedCount) : '0';
       const hasLaboratory = headers.hasLaboratory ? parseYesNo(getCell(headers.hasLaboratory)) : false;
       const hasPharmacy = headers.hasPharmacy ? parseYesNo(getCell(headers.hasPharmacy)) : false;
@@ -137,6 +146,13 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      const sex = parseSexCounts(maleStaff, femaleStaff, staff, 'Staff Count');
+      if (!sex.ok) {
+        results.failed++;
+        results.errors.push(`Row ${rowNum}: ${sex.error}`);
+        continue;
+      }
+
       const phoneClean = contactPhone.replace(/[\s-]/g, '');
       if (!phoneRegex.test(phoneClean)) {
         results.failed++;
@@ -155,6 +171,8 @@ export async function POST(request: NextRequest) {
             specificAddress,
             licenseNumber: licenseNumber || null,
             staffCount: Math.round(staff),
+            maleStaff: sex.male,
+            femaleStaff: sex.female,
             bedCount: Math.round(beds),
             hasLaboratory,
             hasPharmacy,

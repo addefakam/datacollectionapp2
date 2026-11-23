@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import { normalizeInstitutionTypes } from '@/lib/location-data';
+import { parseSexCounts } from '@/lib/sex-counts';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,10 +53,23 @@ export async function POST(request: NextRequest) {
       if (val.includes('license no') || val.includes('license number') || val.includes('lakofsaa')) {
         headers.licenseNumber = colNumber;
       }
-      if (val.includes('student') || val.includes('barataa')) {
+      // Sex breakdown columns must be matched before the generic student/teacher
+      // columns ("Female Students" also contains "student", "male").
+      if (val.includes('female') || val.includes('dubartii')) {
+        if (val.includes('teacher') || val.includes('barsiisaa')) {
+          headers.femaleTeachers = colNumber;
+        } else if (val.includes('student') || val.includes('barataa') || val.includes('barattii')) {
+          headers.femaleStudents = colNumber;
+        }
+      } else if (val.includes('male') || val.includes('dhiira')) {
+        if (val.includes('teacher') || val.includes('barsiisaa')) {
+          headers.maleTeachers = colNumber;
+        } else if (val.includes('student') || val.includes('barataa') || val.includes('barattii')) {
+          headers.maleStudents = colNumber;
+        }
+      } else if (val.includes('student') || val.includes('barataa')) {
         headers.studentCount = colNumber;
-      }
-      if (val.includes('teacher') || val.includes('barsiisaa')) {
+      } else if (val.includes('teacher') || val.includes('barsiisaa')) {
         headers.teacherCount = colNumber;
       }
       if (val.includes('classroom') || val.includes('kutaa')) {
@@ -112,9 +126,13 @@ export async function POST(request: NextRequest) {
       const subCity = getCell(headers.subCity!);
       const area = getCell(headers.area!);
       const specificAddress = getCell(headers.specificAddress!);
-      const licenseNumber = getCell(headers.licenseNumber!);
+      const licenseNumber = headers.licenseNumber ? getCell(headers.licenseNumber) : "";
       const studentCount = getCell(headers.studentCount!);
+      const maleStudents = headers.maleStudents ? getCell(headers.maleStudents) : '';
+      const femaleStudents = headers.femaleStudents ? getCell(headers.femaleStudents) : '';
       const teacherCount = getCell(headers.teacherCount!);
+      const maleTeachers = headers.maleTeachers ? getCell(headers.maleTeachers) : '';
+      const femaleTeachers = headers.femaleTeachers ? getCell(headers.femaleTeachers) : '';
       const classroomCount = getCell(headers.classroomCount!);
       const hasLibrary = headers.hasLibrary ? parseYesNo(getCell(headers.hasLibrary)) : false;
       const hasLaboratory = headers.hasLaboratory ? parseYesNo(getCell(headers.hasLaboratory)) : false;
@@ -149,6 +167,19 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      const sexStudents = parseSexCounts(maleStudents, femaleStudents, students, 'Student Count');
+      if (!sexStudents.ok) {
+        results.failed++;
+        results.errors.push(`Row ${rowNum}: ${sexStudents.error}`);
+        continue;
+      }
+      const sexTeachers = parseSexCounts(maleTeachers, femaleTeachers, teachers, 'Teacher Count');
+      if (!sexTeachers.ok) {
+        results.failed++;
+        results.errors.push(`Row ${rowNum}: ${sexTeachers.error}`);
+        continue;
+      }
+
       const phoneClean = contactPhone.replace(/[\s-]/g, '');
       if (!phoneRegex.test(phoneClean)) {
         results.failed++;
@@ -168,7 +199,11 @@ export async function POST(request: NextRequest) {
             specificAddress,
             licenseNumber: licenseNumber || null,
             studentCount: Math.round(students),
+            maleStudents: sexStudents.male,
+            femaleStudents: sexStudents.female,
             teacherCount: Math.round(teachers),
+            maleTeachers: sexTeachers.male,
+            femaleTeachers: sexTeachers.female,
             classroomCount: Math.round(classrooms),
             hasLibrary,
             hasLaboratory,

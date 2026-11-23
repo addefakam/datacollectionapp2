@@ -81,6 +81,8 @@ export default function HealthSurveyForm({
     specificAddress: '',
     licenseNumber: '',
     staffCount: '',
+    maleStaff: '',
+    femaleStaff: '',
     bedCount: '',
     hasLaboratory: 'no',
     hasPharmacy: 'no',
@@ -107,6 +109,39 @@ export default function HealthSurveyForm({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  /**
+   * Sex breakdown inputs: when both male and female are filled and the total
+   * is still empty, auto-fill the total with their sum.
+   */
+  const handleSexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value } as typeof prev;
+      const male = name === 'maleStaff' ? value : next.maleStaff;
+      const female = name === 'femaleStaff' ? value : next.femaleStaff;
+      if (next.staffCount === '' && male !== '' && female !== '') {
+        const sum = Number(male) + Number(female);
+        if (Number.isFinite(sum) && sum >= 0) return { ...next, staffCount: String(sum) };
+      }
+      return next;
+    });
+  };
+
+  /** Shared step validation for one male/female pair against its total. */
+  const validateSexPair = (maleStr: string, femaleStr: string, totalStr: string, totalLabel: string): boolean => {
+    const male = maleStr === '' ? 0 : Number(maleStr);
+    const female = femaleStr === '' ? 0 : Number(femaleStr);
+    if (!Number.isFinite(male) || male < 0 || !Number.isFinite(female) || female < 0) {
+      toast({ title: 'Invalid Sex Counts / Lakkoofsa Sanyii Dogoggora', description: `Male and female ${totalLabel.toLowerCase()} must be non-negative numbers / Lakkoofsi dhiira fi dubartii lakkoofsa diidaa hin qabaatu`, variant: 'destructive' });
+      return false;
+    }
+    if (male + female > 0 && male + female !== Number(totalStr)) {
+      toast({ title: 'Sex Counts Mismatch / Lakkoofsa Sanyii Hin Wal Qabne', description: `Male + Female (${male + female}) must equal ${totalLabel} (${totalStr}) / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu`, variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -124,6 +159,7 @@ export default function HealthSurveyForm({
           toast({ title: 'Invalid Staff Count / Lakkoofsa Hojjetaa Dogoggora', description: 'Enter a valid staff count / Lakkoofsa hojjetaa sirrii galchi', variant: 'destructive' });
           return false;
         }
+        if (!validateSexPair(formData.maleStaff, formData.femaleStaff, formData.staffCount, 'Staff Count')) return false;
         if (formData.bedCount !== '' && Number(formData.bedCount) < 0) {
           toast({ title: 'Invalid Beds / Lakkoofsa Siree Dogoggora', description: 'Bed count cannot be negative / Lakkoofsa siree diidaa hin qabaatu', variant: 'destructive' });
           return false;
@@ -171,6 +207,8 @@ export default function HealthSurveyForm({
     const payload = {
       ...formData,
       staffCount: Number(formData.staffCount || 0),
+      maleStaff: formData.maleStaff === '' ? 0 : Number(formData.maleStaff),
+      femaleStaff: formData.femaleStaff === '' ? 0 : Number(formData.femaleStaff),
       bedCount: formData.bedCount === '' ? 0 : Number(formData.bedCount),
       hasLaboratory: formData.hasLaboratory === 'yes',
       hasPharmacy: formData.hasPharmacy === 'yes',
@@ -213,6 +251,8 @@ export default function HealthSurveyForm({
     { label: 'Address / Baka Addaa', value: formData.specificAddress },
     { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
     { label: 'Staff / Hojjetaa', value: formData.staffCount },
+    { label: 'Male Staff / Dhiira', value: formData.maleStaff === '' ? '—' : formData.maleStaff },
+    { label: 'Female Staff / Dubartii', value: formData.femaleStaff === '' ? '—' : formData.femaleStaff },
     { label: 'Beds / Siree', value: formData.bedCount === '' ? '0' : formData.bedCount },
     { label: 'Laboratory', value: formData.hasLaboratory === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
     { label: 'Pharmacy', value: formData.hasPharmacy === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
@@ -345,6 +385,24 @@ export default function HealthSurveyForm({
                     <Label htmlFor="bedCount" className="text-xs sm:text-sm">Inpatient Beds<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Siree</span></Label>
                     <Input id="bedCount" name="bedCount" type="number" min="0" placeholder="0 if outpatient only" value={formData.bedCount} onChange={handleChange} className="text-sm sm:text-base" />
                   </div>
+                </div>
+                {/* Staff by sex (male / female) */}
+                <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs sm:text-sm">Staff by Sex<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa Dhiira fi Dubartii</span></Label>
+                    <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[9px] font-medium text-sky-700 sm:text-[10px]">Optional / Filannoo</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="maleStaff" className="text-xs">Male / Dhiira</Label>
+                      <Input id="maleStaff" name="maleStaff" type="number" min="0" placeholder="e.g., 12" value={formData.maleStaff} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="femaleStaff" className="text-xs">Female / Dubartii</Label>
+                      <Input id="femaleStaff" name="femaleStaff" type="number" min="0" placeholder="e.g., 13" value={formData.femaleStaff} onChange={handleSexChange} className="text-sm sm:text-base" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Staff Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
                 {/* Available services */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">

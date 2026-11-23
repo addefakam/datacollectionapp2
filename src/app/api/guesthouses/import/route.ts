@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    // ExcelJS's typings expect its own augmented Buffer interface, so cast the Node buffer
+    await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
 
     const sheet = workbook.worksheets[0];
     if (!sheet) {
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
       const numberOfRooms = getCell(headers.numberOfRooms!);
       const licenseType = getCell(headers.licenseType!);
       const licenseLevel = getCell(headers.licenseLevel!);
-      const licenseNumber = getCell(headers.licenseNumber!);
+      const licenseNumber = headers.licenseNumber ? getCell(headers.licenseNumber) : "";
       const ownerName = getCell(headers.ownerName!);
       const contactName = getCell(headers.contactName!);
       const contactPhone = getCell(headers.contactPhone!);

@@ -18,7 +18,11 @@ export async function GET() {
       { header: 'Specific Address / Baka Addaa', key: 'specificAddress', width: 30 },
       { header: 'License Number / Lakofsaa Eyyeema', key: 'licenseNumber', width: 22 },
       { header: 'Student Count / Lakkoofsa Barataa', key: 'studentCount', width: 18 },
+      { header: 'Male Students / Barataa Dhiiraa', key: 'maleStudents', width: 16 },
+      { header: 'Female Students / Barattii Dubartii', key: 'femaleStudents', width: 16 },
       { header: 'Teacher Count / Lakkoofsa Barsiisaa', key: 'teacherCount', width: 18 },
+      { header: 'Male Teachers / Barsiisaa Dhiiraa', key: 'maleTeachers', width: 16 },
+      { header: 'Female Teachers / Dubartii Barsiisaa', key: 'femaleTeachers', width: 16 },
       { header: 'Classroom Count', key: 'classroomCount', width: 16 },
       { header: 'Library', key: 'hasLibrary', width: 12 },
       { header: 'Laboratory', key: 'hasLaboratory', width: 12 },
@@ -50,7 +54,11 @@ export async function GET() {
       specificAddress: 'Near Main Market',
       licenseNumber: 'ED-2024-001',
       studentCount: 850,
+      maleStudents: 430,
+      femaleStudents: 420,
       teacherCount: 24,
+      maleTeachers: 11,
+      femaleTeachers: 13,
       classroomCount: 18,
       hasLibrary: 'Yes',
       hasLaboratory: 'No',
@@ -68,7 +76,11 @@ export async function GET() {
       specificAddress: 'Behind Commercial Bank',
       licenseNumber: 'ED-2024-014',
       studentCount: 120,
+      maleStudents: 58,
+      femaleStudents: 62,
       teacherCount: 9,
+      maleTeachers: 3,
+      femaleTeachers: 6,
       classroomCount: 6,
       hasLibrary: 'No',
       hasLaboratory: 'No',
@@ -98,6 +110,7 @@ export async function GET() {
     notesSheet.addRow(['Institution Type: use values from the Institution Types sheet. For multiple types, separate with commas, e.g. "Kindergarten, Primary School (1-4)"']);
     notesSheet.addRow(['Yes/No columns accept: Yes, Y, True, 1, Eyee (or No/Lakki)']);
     notesSheet.addRow(['Student Count, Teacher Count and Classroom Count must be whole numbers (0 or more)']);
+    notesSheet.addRow(['Male + Female Students must equal Student Count when filled; same for Teachers (optional columns)']);
     notesSheet.addRow(['Contact Phone must be Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX']);
     notesSheet.getColumn(1).font = { size: 10, name: 'Calibri' };
 

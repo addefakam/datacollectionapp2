@@ -19,7 +19,7 @@ export async function GET() {
     const [total, staffAgg, bedAgg, typeStats, subCityStats, woredaStats, withLicense, staffCounts] =
       await Promise.all([
         db.healthCenter.count(),
-        db.healthCenter.aggregate({ _sum: { staffCount: true } }),
+        db.healthCenter.aggregate({ _sum: { staffCount: true, maleStaff: true, femaleStaff: true } }),
         db.healthCenter.aggregate({ _sum: { bedCount: true } }),
         db.healthCenter.groupBy({
           by: ['facilityType'],
@@ -111,6 +111,8 @@ export async function GET() {
     return NextResponse.json({
       total,
       totalStaff: staffAgg._sum.staffCount || 0,
+      totalMaleStaff: staffAgg._sum.maleStaff || 0,
+      totalFemaleStaff: staffAgg._sum.femaleStaff || 0,
       totalBeds: bedAgg._sum.bedCount || 0,
       withLicense,
       types: typeStats.map((t) => ({

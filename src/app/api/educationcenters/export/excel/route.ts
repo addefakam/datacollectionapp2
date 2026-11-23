@@ -40,7 +40,11 @@ export async function GET(request: NextRequest) {
       { header: 'Specific Address', key: 'specificAddress', width: 30 },
       { header: 'License Number / Lakofsaa Eyyeema', key: 'licenseNumber', width: 24 },
       { header: 'Student Count / Lakkoofsa Barataa', key: 'studentCount', width: 14 },
+      { header: 'Male Students', key: 'maleStudents', width: 12 },
+      { header: 'Female Students', key: 'femaleStudents', width: 12 },
       { header: 'Teacher Count / Lakkoofsa Barsiisaa', key: 'teacherCount', width: 14 },
+      { header: 'Male Teachers', key: 'maleTeachers', width: 12 },
+      { header: 'Female Teachers', key: 'femaleTeachers', width: 12 },
       { header: 'Classroom Count', key: 'classroomCount', width: 14 },
       { header: 'Library', key: 'hasLibrary', width: 12 },
       { header: 'Laboratory', key: 'hasLaboratory', width: 12 },
@@ -77,7 +81,11 @@ export async function GET(request: NextRequest) {
         specificAddress: ec.specificAddress,
         licenseNumber: ec.licenseNumber || '',
         studentCount: ec.studentCount,
+        maleStudents: ec.maleStudents,
+        femaleStudents: ec.femaleStudents,
         teacherCount: ec.teacherCount,
+        maleTeachers: ec.maleTeachers,
+        femaleTeachers: ec.femaleTeachers,
         classroomCount: ec.classroomCount,
         hasLibrary: ec.hasLibrary ? 'Yes' : 'No',
         hasLaboratory: ec.hasLaboratory ? 'Yes' : 'No',
@@ -108,10 +116,14 @@ export async function GET(request: NextRequest) {
     spacerRow.height = 8;
 
     const totalStudents = educationCenters.reduce((sum, e) => sum + e.studentCount, 0);
+    const totalMaleStudents = educationCenters.reduce((sum, e) => sum + e.maleStudents, 0);
+    const totalFemaleStudents = educationCenters.reduce((sum, e) => sum + e.femaleStudents, 0);
     const totalTeachers = educationCenters.reduce((sum, e) => sum + e.teacherCount, 0);
+    const totalMaleTeachers = educationCenters.reduce((sum, e) => sum + e.maleTeachers, 0);
+    const totalFemaleTeachers = educationCenters.reduce((sum, e) => sum + e.femaleTeachers, 0);
     const totalRow = sheet.addRow({
       row: '',
-      institutionName: `Total Records: ${educationCenters.length} | Total Students: ${totalStudents} | Total Teachers: ${totalTeachers}`,
+      institutionName: `Total Records: ${educationCenters.length} | Total Students: ${totalStudents} (M ${totalMaleStudents} / F ${totalFemaleStudents}) | Total Teachers: ${totalTeachers} (M ${totalMaleTeachers} / F ${totalFemaleTeachers})`,
     });
     totalRow.getCell(2).font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF4338CA' } };
 

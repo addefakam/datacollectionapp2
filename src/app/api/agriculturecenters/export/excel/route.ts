@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
       { header: 'License Number / Lakofsaa Eyyeema', key: 'licenseNumber', width: 24 },
       { header: 'Land Size (ha) / Dachaa', key: 'landSizeHectares', width: 14 },
       { header: 'Worker Count / Lakkoofsa Hojjetaa', key: 'workerCount', width: 12 },
+      { header: 'Male Workers', key: 'maleWorkers', width: 12 },
+      { header: 'Female Workers', key: 'femaleWorkers', width: 12 },
       { header: 'Irrigation', key: 'hasIrrigation', width: 12 },
       { header: 'Greenhouse', key: 'hasGreenhouse', width: 12 },
       { header: 'Machinery', key: 'hasMachinery', width: 12 },
@@ -77,6 +79,8 @@ export async function GET(request: NextRequest) {
         licenseNumber: ac.licenseNumber || '',
         landSizeHectares: ac.landSizeHectares,
         workerCount: ac.workerCount,
+        maleWorkers: ac.maleWorkers,
+        femaleWorkers: ac.femaleWorkers,
         hasIrrigation: ac.hasIrrigation ? 'Yes' : 'No',
         hasGreenhouse: ac.hasGreenhouse ? 'Yes' : 'No',
         hasMachinery: ac.hasMachinery ? 'Yes' : 'No',
@@ -106,10 +110,12 @@ export async function GET(request: NextRequest) {
     spacerRow.height = 8;
 
     const totalWorkers = agricultureCenters.reduce((sum, a) => sum + a.workerCount, 0);
+    const totalMaleWorkers = agricultureCenters.reduce((sum, a) => sum + a.maleWorkers, 0);
+    const totalFemaleWorkers = agricultureCenters.reduce((sum, a) => sum + a.femaleWorkers, 0);
     const totalLand = agricultureCenters.reduce((sum, a) => sum + a.landSizeHectares, 0);
     const totalRow = sheet.addRow({
       row: '',
-      farmName: `Total Records: ${agricultureCenters.length} | Total Workers: ${totalWorkers} | Total Land: ${Math.round(totalLand * 10) / 10} ha`,
+      farmName: `Total Records: ${agricultureCenters.length} | Total Workers: ${totalWorkers} (M ${totalMaleWorkers} / F ${totalFemaleWorkers}) | Total Land: ${Math.round(totalLand * 10) / 10} ha`,
     });
     totalRow.getCell(2).font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF047857' } };
 
