@@ -88,8 +88,8 @@ export default function Home() {
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
       {/* Header — mobile/tablet only; desktop navigation lives in the left sidebar */}
-      <header className="sticky top-0 z-50 shrink-0 border-b bg-white shadow-sm safe-top lg:hidden">
-        <div className="h-0.5 w-full bg-gradient-to-r from-teal-600 via-emerald-500 to-amber-400" />
+      <header className="sticky top-0 z-50 shrink-0 border-b border-emerald-900/10 bg-white/85 shadow-sm backdrop-blur-xl safe-top lg:hidden">
+        <div className="h-0.5 w-full bg-gradient-to-r from-emerald-600 via-teal-500 to-amber-400" />
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <MobileSidebar activeTab={activeTab} onSelect={setActiveTab} isAdmin={isAdmin} />
@@ -332,9 +332,9 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white safe-bottom lg:left-60">
+      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t border-emerald-900/10 bg-white/90 backdrop-blur-xl safe-bottom lg:left-60">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 lg:max-w-5xl xl:max-w-7xl">
-          <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Dhibayyuu Sub-City Data Collection</span>
+          <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Dhibayyuu Sub-City · Bishoftu City Administration</span>
           <span className={`flex shrink-0 items-center gap-1 text-[10px] sm:text-xs ${isOnline ? 'text-teal-600' : 'text-amber-500'}`}>
             {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {isOnline ? 'Online' : 'Offline'}

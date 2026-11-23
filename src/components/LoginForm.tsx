@@ -43,20 +43,20 @@ export default function LoginForm() {
           <div className="bg-brand-gradient mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-xl shadow-teal-900/30 ring-1 ring-white/20">
             <MapPin className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-2xl font-extrabold tracking-tight">
             <span className="text-brand-gradient">Qorannoo Dhibayyuu</span>
           </h1>
-          <p className="mt-1 text-sm font-medium text-teal-900/70">
+          <p className="mt-1 text-sm font-medium text-emerald-950/70">
             Dhibayyuu Sub-City Data Collection Platform
           </p>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-teal-900/45">
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-emerald-900/45">
             <BarChart3 className="h-3.5 w-3.5" />
             Industry · Hotel · Health · Education · Agriculture
           </p>
         </div>
 
         {/* Login card */}
-        <div className="rounded-3xl border border-teal-100 bg-white/85 p-6 shadow-xl shadow-teal-900/10 backdrop-blur-sm sm:p-7">
+        <div className="rounded-3xl border border-emerald-900/10 bg-white/90 p-6 shadow-2xl shadow-emerald-900/10 ring-1 ring-white/60 backdrop-blur-md sm:p-7">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -106,8 +106,8 @@ export default function LoginForm() {
             </Button>
           </form>
 
-          <div className="mt-5 flex items-start gap-2 rounded-xl border border-teal-100 bg-teal-50/60 p-3 text-[11px] leading-relaxed text-teal-900/70">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-emerald-900/10 bg-emerald-50/70 p-3 text-[11px] leading-relaxed text-emerald-950/70">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
             <p>
               Authorized survey staff only. Contact the Dhibayyuu Sub-City
               administration office for an account.
@@ -115,7 +115,7 @@ export default function LoginForm() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-teal-900/40">
+        <p className="mt-6 text-center text-[11px] text-emerald-950/40">
           Dhibayyuu Sub-City · Bishoftu City Administration
         </p>
       </div>
