@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Sprout,
   Star,
+  Store,
   Stethoscope,
   Tractor,
   Users,
@@ -66,11 +67,16 @@ interface Overview {
     landHectares: number;
     rooms: number;
     classrooms: number;
+    mseEmployees: number;
+    mseMaleEmployees: number;
+    mseFemaleEmployees: number;
+    mseCapital: number;
   };
   people: { male: number; female: number; total: number };
   industrySectors: { label: string; count: number }[];
   educationTypes: { label: string; count: number; students: number }[];
   agricultureTypes: { label: string; count: number }[];
+  smallEnterpriseTypes: { label: string; count: number }[];
   hotelLicenseLevels: { label: string; count: number }[];
   healthFacilityTypes: { label: string; count: number }[];
   hotelAmenities: { label: string; count: number; total: number }[];
@@ -84,9 +90,10 @@ interface Overview {
     Health: number;
     Education: number;
     Agriculture: number;
+    'Small Enterprise': number;
     total: number;
   }[];
-  monthly: { month: string; Industry: number; Hotel: number; Health: number; Education: number; Agriculture: number }[];
+  monthly: { month: string; Industry: number; Hotel: number; Health: number; Education: number; Agriculture: number; 'Small Enterprise': number }[];
   meetings: number;
   collectors: number;
   avgHotelRating: number;
@@ -98,6 +105,7 @@ const MODULE_COLORS: Record<string, string> = {
   Health: '#f59e0b',
   Education: '#0f766e',
   Agriculture: '#f97316',
+  'Small Enterprise': '#7c3aed',
 };
 const MALE_COLOR = '#0d9488';
 const FEMALE_COLOR = '#f59e0b';
@@ -108,6 +116,7 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   health: Stethoscope,
   education: GraduationCap,
   agriculture: Sprout,
+  'small-enterprise': Store,
 };
 
 const fmt = (n: number) => n.toLocaleString('en');
@@ -253,6 +262,7 @@ export default function AnalyticsDashboard() {
   // People-by-group stacked bar data
   const peopleGroups = [
     { group: 'Employees', Male: data.totals.maleEmployees, Female: data.totals.femaleEmployees },
+    { group: 'MSE Employees', Male: data.totals.mseMaleEmployees, Female: data.totals.mseFemaleEmployees },
     { group: 'Students', Male: data.totals.maleStudents, Female: data.totals.femaleStudents },
     { group: 'Teachers', Male: data.totals.maleTeachers, Female: data.totals.femaleTeachers },
     { group: 'Health Staff', Male: data.totals.maleStaff, Female: data.totals.femaleStaff },
@@ -281,11 +291,11 @@ export default function AnalyticsDashboard() {
             Data Insights &amp; Analytics
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-teal-100/75">
-            What the collected survey data tells us — people, establishments, services and coverage across all five modules.
+            What the collected survey data tells us — people, establishments, services and coverage across all modules.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
-              {fmt(data.totalRecords)} records · 5 modules
+              {fmt(data.totalRecords)} records · {data.modules.length} modules
             </span>
             <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
               {fmt(data.people.total)} people counted
@@ -408,12 +418,12 @@ export default function AnalyticsDashboard() {
                     <p className="text-[10px] uppercase tracking-wide text-teal-900/55">Employees</p>
                   </div>
                   <div className="rounded-xl bg-teal-50 p-2">
-                    <p className="text-sm font-bold text-teal-900">{fmt(data.totals.students)}</p>
-                    <p className="text-[10px] uppercase tracking-wide text-teal-900/55">Students</p>
+                    <p className="text-sm font-bold text-teal-900">{fmt(data.totals.mseEmployees)}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-teal-900/55">MSE jobs</p>
                   </div>
                   <div className="rounded-xl bg-teal-50 p-2">
-                    <p className="text-sm font-bold text-teal-900">{fmt(data.totals.teachers)}</p>
-                    <p className="text-[10px] uppercase tracking-wide text-teal-900/55">Teachers</p>
+                    <p className="text-sm font-bold text-teal-900">{fmt(data.totals.students)}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-teal-900/55">Students</p>
                   </div>
                 </div>
               </CardContent>
@@ -468,6 +478,12 @@ export default function AnalyticsDashboard() {
             />
 
             <CountList title="Farms by Type" icon={Tractor} rows={data.agricultureTypes} />
+
+            <CountList
+              title="Small Enterprises by Type"
+              icon={Store}
+              rows={data.smallEnterpriseTypes}
+            />
 
             <CountList title="Hotels by License Level" icon={Building2} rows={data.hotelLicenseLevels} />
 
@@ -566,7 +582,8 @@ export default function AnalyticsDashboard() {
                     <Bar dataKey="Hotel" stackId="cov" fill={MODULE_COLORS.Hotel} />
                     <Bar dataKey="Health" stackId="cov" fill={MODULE_COLORS.Health} />
                     <Bar dataKey="Education" stackId="cov" fill={MODULE_COLORS.Education} />
-                    <Bar dataKey="Agriculture" stackId="cov" fill={MODULE_COLORS.Agriculture} radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Agriculture" stackId="cov" fill={MODULE_COLORS.Agriculture} />
+                    <Bar dataKey="Small Enterprise" stackId="cov" fill={MODULE_COLORS['Small Enterprise']} radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

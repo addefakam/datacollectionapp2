@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Shield,
   Sprout,
+  Store,
   Stethoscope,
   Users,
   Wrench,
@@ -97,6 +98,16 @@ const NAV_GROUPS: NavGroup[] = [
       { tab: 'agriSurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'agriData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'agriStats', label: 'Stats', icon: BarChart3, adminOnly: true },
+    ],
+  },
+  {
+    key: 'small-enterprise',
+    label: 'Small Enterprise',
+    icon: Store,
+    items: [
+      { tab: 'mseSurvey', label: 'Survey', icon: ClipboardList },
+      { tab: 'mseData', label: 'Records', icon: Database, adminOnly: true },
+      { tab: 'mseStats', label: 'Stats', icon: BarChart3, adminOnly: true },
     ],
   },
   {

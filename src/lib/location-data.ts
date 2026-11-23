@@ -110,6 +110,30 @@ export const HEALTH_OWNERSHIP_TYPES = [
   'Public-Private Partnership',
 ];
 
+// Small enterprise (MSE initiative) data classification — Dhibayyuu survey
+export const SMALL_ENTERPRISE_TYPES = [
+  'Manufacturing',
+  'Construction',
+  'Retail Trade',
+  'Wholesale Trade',
+  'Transport & Logistics',
+  'Hospitality & Tourism',
+  'Repair & Maintenance',
+  'Beauty & Personal Care',
+  'Food Processing',
+  'ICT & Digital Services',
+  'Urban Agriculture',
+  'Other Services',
+];
+
+export const SMALL_ENTERPRISE_OWNERSHIP_TYPES = [
+  'Private',
+  'Cooperative',
+  'Government / Public',
+  'NGO',
+  'Faith-Based',
+];
+
 // Educational institution (Mana Barumsaa) data classification — Bishoftu education survey
 export const EDUCATION_INSTITUTION_TYPES = [
   'Kindergarten',

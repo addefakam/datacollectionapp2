@@ -34,6 +34,9 @@ import EducationStats from '@/components/education/EducationStats';
 import AgricultureSurveyForm from '@/components/agriculture/AgricultureSurveyForm';
 import AgricultureList from '@/components/agriculture/AgricultureList';
 import AgricultureStats from '@/components/agriculture/AgricultureStats';
+import SmallEnterpriseSurveyForm from '@/components/smallenterprise/SmallEnterpriseSurveyForm';
+import SmallEnterpriseList from '@/components/smallenterprise/SmallEnterpriseList';
+import SmallEnterpriseStats from '@/components/smallenterprise/SmallEnterpriseStats';
 import SettingsManager from '@/components/admin/SettingsManager';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import { AppSidebar, MobileSidebar } from '@/components/admin/ManageSidebar';
@@ -263,6 +266,29 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="agriStats" className="mt-2 sm:mt-3">
               <AgricultureStats />
+            </TabsContent>
+          )}
+
+          {/* ============ Small Enterprise module (MSE initiative) ============ */}
+          <TabsContent value="mseSurvey" className="mt-2 sm:mt-3">
+            <SmallEnterpriseSurveyForm
+              onSubmit={handleSurveySubmit}
+              surveyorName={userName || ''}
+              surveyorId={userId || ''}
+              isOnline={isOnline}
+              onOfflineSave={(data) => saveOffline(data, 'small-enterprise')}
+            />
+          </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="mseData" className="mt-2 sm:mt-3">
+              <SmallEnterpriseList refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="mseStats" className="mt-2 sm:mt-3">
+              <SmallEnterpriseStats />
             </TabsContent>
           )}
 

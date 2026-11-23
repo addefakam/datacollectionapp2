@@ -219,6 +219,30 @@ model AgricultureCenter {
   updatedAt       DateTime @updatedAt
 }
 
+// Small enterprise (MSE — Micro & Small Enterprise) — Dhibayyuu initiative survey
+model SmallEnterprise {
+  id              String   @id @default(cuid())
+  enterpriseName  String
+  enterpriseType  String   // Manufacturing, Construction, Retail Trade, Services, ...
+  ownershipType   String   // Private, Cooperative, Government / Public, NGO, ...
+  subCity         String
+  area            String
+  specificAddress String
+  licenseNumber   String?
+  employeeCount   Int      @default(0) // total employees
+  maleEmployees   Int      @default(0) // employees by sex: male
+  femaleEmployees Int      @default(0) // employees by sex: female
+  startupCapital  Float?   // start-up / working capital in ETB
+  hasPremises     Boolean  @default(false) // has own working premises / space
+  hasTraining     Boolean  @default(false) // received MSE training or business support
+  contactName     String
+  contactPhone    String
+  surveyorName    String?
+  surveyorId      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 // Admin-managed locations (sub-cities + woredas/areas) used across all survey forms
 model SubCity {
   id        String        @id @default(cuid())

@@ -8,7 +8,7 @@ import { splitInstitutionTypes } from '@/lib/location-data';
 // can be split and grouped freely.
 export async function GET() {
   try {
-    const [industries, guestHouses, healthFacilities, educationCenters, farms, meetingCount, collectorCount] =
+    const [industries, guestHouses, healthFacilities, educationCenters, farms, smallEnterprises, meetingCount, collectorCount] =
       await Promise.all([
         db.industry.findMany({
           select: {
@@ -81,6 +81,17 @@ export async function GET() {
             createdAt: true,
           },
         }),
+        db.smallEnterprise.findMany({
+          select: {
+            subCity: true,
+            enterpriseType: true,
+            employeeCount: true,
+            maleEmployees: true,
+            femaleEmployees: true,
+            startupCapital: true,
+            createdAt: true,
+          },
+        }),
         db.meeting.count(),
         db.user.count({ where: { role: 'COLLECTOR' } }),
       ]);
@@ -108,6 +119,7 @@ export async function GET() {
       { key: 'health', label: 'Health', count: healthFacilities.length },
       { key: 'education', label: 'Education', count: educationCenters.length },
       { key: 'agriculture', label: 'Agriculture', count: farms.length },
+      { key: 'small-enterprise', label: 'Small Enterprise', count: smallEnterprises.length },
     ];
     const totalRecords = modules.reduce((acc, m) => acc + m.count, 0);
 
@@ -132,13 +144,19 @@ export async function GET() {
       landHectares: Math.round(sumBy(farms, 'landSizeHectares') * 100) / 100,
       rooms: sumBy(guestHouses, 'numberOfRooms'),
       classrooms: sumBy(educationCenters, 'classroomCount'),
+      mseEmployees: sumBy(smallEnterprises, 'employeeCount'),
+      mseMaleEmployees: sumBy(smallEnterprises, 'maleEmployees'),
+      mseFemaleEmployees: sumBy(smallEnterprises, 'femaleEmployees'),
+      mseCapital: Math.round(sumBy(smallEnterprises, 'startupCapital')),
     };
 
     // --- people counted, by sex (employees + students + staff + workers) ----
     const male =
-      totals.maleEmployees + totals.maleStudents + totals.maleTeachers + totals.maleStaff + totals.maleWorkers;
+      totals.maleEmployees + totals.maleStudents + totals.maleTeachers + totals.maleStaff + totals.maleWorkers +
+      totals.mseMaleEmployees;
     const female =
-      totals.femaleEmployees + totals.femaleStudents + totals.femaleTeachers + totals.femaleStaff + totals.femaleWorkers;
+      totals.femaleEmployees + totals.femaleStudents + totals.femaleTeachers + totals.femaleStaff + totals.femaleWorkers +
+      totals.mseFemaleEmployees;
     const people = { male, female, total: male + female };
 
     // --- distributions -------------------------------------------------------
@@ -146,6 +164,7 @@ export async function GET() {
     const agricultureTypes = groupCount(farms, 'farmType');
     const hotelLicenseLevels = groupCount(guestHouses, 'licenseLevel');
     const healthFacilityTypes = groupCount(healthFacilities, 'facilityType');
+    const smallEnterpriseTypes = groupCount(smallEnterprises, 'enterpriseType');
 
     // Education institution types — comma-separated multi-values, split in memory
     const eduTypeMap: Record<string, { count: number; students: number }> = {};
@@ -189,7 +208,7 @@ export async function GET() {
 
     // --- geographic coverage -------------------------------------------------
     const subCitySet = new Set<string>(
-      [...industries, ...guestHouses, ...healthFacilities, ...educationCenters, ...farms].map((r) => r.subCity)
+      [...industries, ...guestHouses, ...healthFacilities, ...educationCenters, ...farms, ...smallEnterprises].map((r) => r.subCity)
     );
     const subCityCoverage = Array.from(subCitySet)
       .sort()
@@ -201,8 +220,12 @@ export async function GET() {
           Health: healthFacilities.filter((r) => r.subCity === subCity).length,
           Education: educationCenters.filter((r) => r.subCity === subCity).length,
           Agriculture: farms.filter((r) => r.subCity === subCity).length,
+          'Small Enterprise': smallEnterprises.filter((r) => r.subCity === subCity).length,
         };
-        return { ...row, total: row.Industry + row.Hotel + row.Health + row.Education + row.Agriculture };
+        return {
+          ...row,
+          total: row.Industry + row.Hotel + row.Health + row.Education + row.Agriculture + row['Small Enterprise'],
+        };
       })
       .sort((a, b) => b.total - a.total);
 
@@ -230,6 +253,7 @@ export async function GET() {
     const healthM = bucketByMonth(healthFacilities);
     const eduM = bucketByMonth(educationCenters);
     const agriM = bucketByMonth(farms);
+    const mseM = bucketByMonth(smallEnterprises);
     const monthly = lastMonths.map((m) => ({
       month: m.label,
       Industry: indM[m.key] || 0,
@@ -237,6 +261,7 @@ export async function GET() {
       Health: healthM[m.key] || 0,
       Education: eduM[m.key] || 0,
       Agriculture: agriM[m.key] || 0,
+      'Small Enterprise': mseM[m.key] || 0,
     }));
 
     // --- misc ----------------------------------------------------------------
@@ -253,6 +278,7 @@ export async function GET() {
       industrySectors,
       educationTypes,
       agricultureTypes,
+      smallEnterpriseTypes,
       hotelLicenseLevels,
       healthFacilityTypes,
       hotelAmenities,

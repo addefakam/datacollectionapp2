@@ -55,6 +55,7 @@ export function useOfflineSync() {
             : record.kind === 'health' ? '/api/healthcenters'
             : record.kind === 'education' ? '/api/educationcenters'
             : record.kind === 'agriculture' ? '/api/agriculturecenters'
+            : record.kind === 'small-enterprise' ? '/api/smallenterprises'
             : '/api/guesthouses';
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -89,7 +90,7 @@ export function useOfflineSync() {
 
   const saveOffline = useCallback(async (
     data: Record<string, unknown>,
-    kind: 'guesthouse' | 'industry' | 'health' | 'education' | 'agriculture' = 'guesthouse'
+    kind: 'guesthouse' | 'industry' | 'health' | 'education' | 'agriculture' | 'small-enterprise' = 'guesthouse'
   ) => {
     try {
       await savePendingSurvey(data, kind);
