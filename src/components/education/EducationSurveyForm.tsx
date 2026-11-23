@@ -32,8 +32,9 @@ import {
   Eye,
 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { EDUCATION_INSTITUTION_TYPES, EDUCATION_OWNERSHIP_TYPES } from '@/lib/location-data';
+import { EDUCATION_INSTITUTION_TYPES, EDUCATION_OWNERSHIP_TYPES, normalizeInstitutionTypes } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+import { InstitutionTypeMultiSelect } from './InstitutionTypeMultiSelect';
 
 interface EducationSurveyFormProps {
   onSubmit: () => void;
@@ -74,7 +75,7 @@ export default function EducationSurveyForm({
 
   const emptyForm = {
     institutionName: '',
-    institutionType: '',
+    institutionTypes: [] as string[],
     ownershipType: '',
     subCity: '',
     area: '',
@@ -111,7 +112,7 @@ export default function EducationSurveyForm({
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        if (!formData.institutionName || !formData.institutionType || !formData.subCity || !formData.area || !formData.specificAddress) {
+        if (!formData.institutionName || formData.institutionTypes.length === 0 || !formData.subCity || !formData.area || !formData.specificAddress) {
           toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
           return false;
         }
@@ -175,6 +176,7 @@ export default function EducationSurveyForm({
     if (!validateStep(currentStep)) return;
     const payload = {
       ...formData,
+      institutionType: normalizeInstitutionTypes(formData.institutionTypes),
       studentCount: Number(formData.studentCount || 0),
       teacherCount: Number(formData.teacherCount || 0),
       classroomCount: Number(formData.classroomCount || 0),
@@ -212,7 +214,7 @@ export default function EducationSurveyForm({
 
   const reviewItems = [
     { label: 'Institution / Mana Barumsaa', value: formData.institutionName },
-    { label: 'Institution Type / Gosa', value: formData.institutionType },
+    { label: 'Institution Type / Gosa', value: formData.institutionTypes.join(', ') },
     { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
     { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
     { label: 'Werreda', value: formData.area },
@@ -287,11 +289,16 @@ export default function EducationSurveyForm({
                   <Input id="e-institutionName" name="institutionName" placeholder="e.g., BISHOFTU PRIMARY SCHOOL" value={formData.institutionName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-institutionType" className="text-xs sm:text-sm">Institution Type / Gosa Mana Barumsaa <span className="text-red-500">*</span></Label>
-                  <Select value={formData.institutionType} onValueChange={(v) => handleSelectChange('institutionType', v)}>
-                    <SelectTrigger id="e-institutionType" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
-                    <SelectContent className="max-h-64">{EDUCATION_INSTITUTION_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
-                  </Select>
+                  <Label htmlFor="e-institutionType" className="text-xs sm:text-sm">
+                    Institution Type / Gosa Mana Barumsaa <span className="text-red-500">*</span>
+                    <span className="block text-[10px] font-normal text-muted-foreground sm:text-xs">Select all that apply — an institution may run several levels / Filachuuf ni dandeessu</span>
+                  </Label>
+                  <InstitutionTypeMultiSelect
+                    id="e-institutionType"
+                    selected={formData.institutionTypes}
+                    onChange={(types) => setFormData((prev) => ({ ...prev, institutionTypes: types }))}
+                    options={EDUCATION_INSTITUTION_TYPES}
+                  />
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
@@ -362,7 +369,7 @@ export default function EducationSurveyForm({
                   {SERVICE_FIELDS.map((svc) => (
                     <div key={svc.name} className="space-y-1.5 sm:space-y-2">
                       <Label className="text-xs sm:text-sm">{svc.label}<br /><span className="text-xs font-normal text-muted-foreground">{svc.labelOr} — {svc.hint}</span></Label>
-                      <RadioGroup value={formData[svc.name as keyof typeof formData]} onValueChange={(v) => handleSelectChange(svc.name, v)} className="flex gap-4">
+                      <RadioGroup value={formData[svc.name as keyof typeof formData] as string} onValueChange={(v) => handleSelectChange(svc.name, v)} className="flex gap-4">
                         <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-indigo-500 has-data-[state=checked]:bg-indigo-50">
                           <RadioGroupItem value="yes" id={`e-${svc.name}-yes`} />
                           <Label htmlFor={`e-${svc.name}-yes`} className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>

@@ -132,6 +132,29 @@ export const EDUCATION_OWNERSHIP_TYPES = [
   'Community',
 ];
 
+// An institution can serve more than one level (e.g. Kindergarten + Primary School),
+// so institutionType is stored as a comma-separated list "Type A, Type B".
+// None of the EDUCATION_INSTITUTION_TYPES values contain commas, so splitting on "," is safe.
+
+/** Split a stored institutionType value ("A, B") into its individual types. */
+export function splitInstitutionTypes(value: string | null | undefined): string[] {
+  return (value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Normalize multi-select input (comma-separated string or array) into the canonical "A, B" storage format. */
+export function normalizeInstitutionTypes(value: string | string[] | null | undefined): string {
+  const list = Array.isArray(value) ? value : splitInstitutionTypes(value);
+  const unique: string[] = [];
+  for (const raw of list) {
+    const t = raw.trim();
+    if (t && !unique.includes(t)) unique.push(t);
+  }
+  return unique.join(', ');
+}
+
 // Agricultural establishment (Mana Qonnaa) data classification — Bishoftu agriculture survey
 export const AGRICULTURE_FARM_TYPES = [
   'Crop Production',

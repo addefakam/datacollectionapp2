@@ -63,8 +63,9 @@ import {
   Monitor,
   Utensils,
 } from 'lucide-react';
-import { EDUCATION_INSTITUTION_TYPES, EDUCATION_OWNERSHIP_TYPES } from '@/lib/location-data';
+import { EDUCATION_INSTITUTION_TYPES, EDUCATION_OWNERSHIP_TYPES, splitInstitutionTypes } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+import { InstitutionTypeMultiSelect } from './InstitutionTypeMultiSelect';
 
 interface EducationCenter {
   id: string;
@@ -515,7 +516,9 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                         <p className="truncate text-sm font-semibold">{item.institutionName}</p>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <Badge variant="outline" className="bg-indigo-50 text-[10px] text-indigo-700">{item.institutionType}</Badge>
+                        {splitInstitutionTypes(item.institutionType).map((t) => (
+                          <Badge key={t} variant="outline" className="bg-indigo-50 text-[10px] text-indigo-700">{t}</Badge>
+                        ))}
                         <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{item.subCity} — {item.area}</span>
                       </div>
                     </div>
@@ -742,10 +745,11 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Institution Type / Gosa <span className="text-red-500">*</span></Label>
-                  <Select value={editForm.institutionType} onValueChange={(v) => setEditForm({ ...editForm, institutionType: v })}>
-                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent className="max-h-64">{EDUCATION_INSTITUTION_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
-                  </Select>
+                  <InstitutionTypeMultiSelect
+                    selected={splitInstitutionTypes(editForm.institutionType)}
+                    onChange={(types) => setEditForm({ ...editForm, institutionType: types.join(', ') })}
+                    options={EDUCATION_INSTITUTION_TYPES}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">

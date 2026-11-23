@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeInstitutionTypes } from '@/lib/location-data';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -31,10 +32,11 @@ export async function POST(request: NextRequest) {
       surveyorId,
     } = body;
 
-    // Validate required fields
-    if (!institutionName || !institutionType || !ownershipType || !subCity || !area || !specificAddress || !contactName || !contactPhone) {
+    // Validate required fields (institutionType accepts a string or array of types)
+    const normalizedInstitutionType = normalizeInstitutionTypes(institutionType);
+    if (!institutionName || !normalizedInstitutionType || !ownershipType || !subCity || !area || !specificAddress || !contactName || !contactPhone) {
       return NextResponse.json(
-        { error: 'Missing required fields', missing: { institutionName: !institutionName, institutionType: !institutionType, ownershipType: !ownershipType, subCity: !subCity, area: !area, specificAddress: !specificAddress, contactName: !contactName, contactPhone: !contactPhone } },
+        { error: 'Missing required fields', missing: { institutionName: !institutionName, institutionType: !normalizedInstitutionType, ownershipType: !ownershipType, subCity: !subCity, area: !area, specificAddress: !specificAddress, contactName: !contactName, contactPhone: !contactPhone } },
         { status: 400 }
       );
     }
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     const educationCenter = await db.educationCenter.create({
       data: {
         institutionName,
-        institutionType,
+        institutionType: normalizedInstitutionType,
         ownershipType,
         subCity,
         area,
@@ -114,7 +116,8 @@ export async function GET(request: NextRequest) {
 
     if (subCity) where.subCity = subCity;
     if (area) where.area = area;
-    if (institutionType) where.institutionType = institutionType;
+    // institutionType may hold several comma-separated types — match records containing the selected type
+    if (institutionType) where.institutionType = { contains: institutionType };
     // Click-through filters for the chart's Ownership / Institution type dimensions
     if (ownershipType) where.ownershipType = ownershipType;
     if (minStudents !== null && minStudents !== '') {

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeInstitutionTypes } from '@/lib/location-data';
 
 // GET /api/educationcenters/[id]
 export async function GET(
@@ -62,7 +63,9 @@ export async function PUT(
       where: { id },
       data: {
         institutionName: body.institutionName ?? existing.institutionName,
-        institutionType: body.institutionType ?? existing.institutionType,
+        institutionType: body.institutionType != null && body.institutionType !== ''
+          ? normalizeInstitutionTypes(body.institutionType)
+          : existing.institutionType,
         ownershipType: body.ownershipType ?? existing.ownershipType,
         subCity: body.subCity ?? existing.subCity,
         area: body.area ?? existing.area,

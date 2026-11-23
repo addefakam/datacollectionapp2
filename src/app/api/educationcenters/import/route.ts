@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { normalizeInstitutionTypes } from '@/lib/location-data';
 
 export async function POST(request: NextRequest) {
   try {
@@ -159,7 +160,8 @@ export async function POST(request: NextRequest) {
         await db.educationCenter.create({
           data: {
             institutionName,
-            institutionType,
+            // cell may list several types, e.g. "Kindergarten, Primary School (1-4)"
+            institutionType: normalizeInstitutionTypes(institutionType),
             ownershipType,
             subCity,
             area,

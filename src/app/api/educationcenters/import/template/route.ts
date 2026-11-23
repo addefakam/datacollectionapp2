@@ -82,6 +82,7 @@ export async function GET() {
     const typesSheet = workbook.addWorksheet('Institution Types');
     typesSheet.columns = [{ key: 'type', width: 30 }];
     typesSheet.addRow(['Allowed Institution Types']).font = { bold: true };
+    typesSheet.addRow(['(an institution may combine several types — separate them with commas)']).font = { italic: true, size: 9 };
     EDUCATION_INSTITUTION_TYPES.forEach((t) => typesSheet.addRow([t]));
     typesSheet.getColumn(1).font = { size: 10, name: 'Calibri' };
 
@@ -94,6 +95,7 @@ export async function GET() {
     const notesSheet = workbook.addWorksheet('Notes');
     notesSheet.columns = [{ key: 'note', width: 70 }];
     notesSheet.addRow(['Notes / Yaadannoo']).font = { bold: true };
+    notesSheet.addRow(['Institution Type: use values from the Institution Types sheet. For multiple types, separate with commas, e.g. "Kindergarten, Primary School (1-4)"']);
     notesSheet.addRow(['Yes/No columns accept: Yes, Y, True, 1, Eyee (or No/Lakki)']);
     notesSheet.addRow(['Student Count, Teacher Count and Classroom Count must be whole numbers (0 or more)']);
     notesSheet.addRow(['Contact Phone must be Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX']);

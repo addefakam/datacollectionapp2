@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { splitInstitutionTypes } from '@/lib/location-data';
 
 // Student enrollment buckets used by the "Student Ranges" grouping.
 // max: null means open-ended (e.g. "2000+").
@@ -16,18 +17,12 @@ const STUDENT_BUCKETS: { label: string; min: number; max: number | null }[] = [
 // GET /api/educationcenters/stats — aggregate statistics for the education dashboard
 export async function GET() {
   try {
-    const [total, studentAgg, teacherAgg, classroomAgg, typeStats, subCityStats, woredaStats, withLicense, studentCounts] =
+    const [total, studentAgg, teacherAgg, classroomAgg, subCityStats, woredaStats, withLicense, typeRows] =
       await Promise.all([
         db.educationCenter.count(),
         db.educationCenter.aggregate({ _sum: { studentCount: true } }),
         db.educationCenter.aggregate({ _sum: { teacherCount: true } }),
         db.educationCenter.aggregate({ _sum: { classroomCount: true } }),
-        db.educationCenter.groupBy({
-          by: ['institutionType'],
-          _count: true,
-          _sum: { studentCount: true },
-          orderBy: { institutionType: 'asc' },
-        }),
         db.educationCenter.groupBy({
           by: ['subCity'],
           _count: true,
@@ -41,13 +36,27 @@ export async function GET() {
           orderBy: { subCity: 'asc' },
         }),
         db.educationCenter.count({ where: { licenseNumber: { not: null } } }),
-        // Only fetch student counts (small payload) to bucket in memory
-        db.educationCenter.findMany({ select: { studentCount: true } }),
+        // institutionType + studentCount per record — split in memory so a record
+        // with several types ("A, B") counts toward every listed type
+        db.educationCenter.findMany({ select: { institutionType: true, studentCount: true } }),
       ]);
+
+    // Per-type aggregation: split comma-separated multi-type values
+    const typeMap: Record<string, { count: number; students: number }> = {};
+    for (const row of typeRows) {
+      for (const t of splitInstitutionTypes(row.institutionType)) {
+        const bucket = (typeMap[t] ??= { count: 0, students: 0 });
+        bucket.count += 1;
+        bucket.students += row.studentCount;
+      }
+    }
+    const typeStats = Object.entries(typeMap)
+      .map(([institutionType, v]) => ({ institutionType, _count: v.count, _sum: { studentCount: v.students } }))
+      .sort((a, b) => a.institutionType.localeCompare(b.institutionType));
 
     // Student-enrollment buckets (count of institutions + students per range)
     const studentRanges = STUDENT_BUCKETS.map((b) => {
-      const rows = studentCounts.filter(
+      const rows = typeRows.filter(
         (r) => r.studentCount >= b.min && (b.max === null || r.studentCount <= b.max)
       );
       return {
