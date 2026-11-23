@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bgh-survey-v1';
+const CACHE_NAME = 'dhibayyuu-v2';
 
 const PRECACHE_URLS = [
   '/',
@@ -33,19 +33,39 @@ self.addEventListener('fetch', (event) => {
 
   if (request.url.includes('/api/')) return;
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetchPromise = fetch(request)
-        .then((response) => {
-          if (response && response.status === 200 && response.type === 'basic') {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
+  // Immutable, content-hashed build assets and icons — safe to serve
+  // cache-first (a new deployment always produces new hashed URLs).
+  if (request.url.includes('/_next/static/') || request.url.includes('/icon')) {
+    event.respondWith(
+      caches.match(request).then(
+        (cached) =>
+          cached ||
+          fetch(request).then((response) => {
+            if (response && response.status === 200) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            }
+            return response;
+          })
+      )
+    );
+    return;
+  }
 
-      return cached || fetchPromise;
-    })
+  // Everything else (pages, RSC payloads, sw.js, manifest) — network-first so
+  // a new deployment takes effect immediately. Falls back to the cache only
+  // when offline, and finally to the cached shell.
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(() =>
+        caches.match(request).then((cached) => cached || caches.match('/'))
+      )
   );
 });
