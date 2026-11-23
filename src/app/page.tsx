@@ -35,6 +35,7 @@ import AgricultureSurveyForm from '@/components/agriculture/AgricultureSurveyFor
 import AgricultureList from '@/components/agriculture/AgricultureList';
 import AgricultureStats from '@/components/agriculture/AgricultureStats';
 import SettingsManager from '@/components/admin/SettingsManager';
+import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import { AppSidebar, MobileSidebar } from '@/components/admin/ManageSidebar';
 import { SettingsProvider } from '@/components/SettingsProvider';
 import { useAuth } from '@/components/AuthProvider';
@@ -53,7 +54,7 @@ export default function Home() {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-gray-50">
+      <div className="app-canvas flex min-h-[100dvh] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-teal-600 border-t-transparent" />
           <p className="text-sm text-muted-foreground">Loading...</p>
@@ -68,7 +69,7 @@ export default function Home() {
 
   return (
     <SettingsProvider>
-      <div className="flex min-h-[100dvh] bg-gray-50">
+      <div className="app-canvas flex min-h-[100dvh]">
       {/* Desktop (lg+): left sidebar with the full vertical management list */}
       <AppSidebar
         activeTab={activeTab}
@@ -85,12 +86,15 @@ export default function Home() {
       <div className="flex min-w-0 flex-1 flex-col">
       {/* Header — mobile/tablet only; desktop navigation lives in the left sidebar */}
       <header className="sticky top-0 z-50 shrink-0 border-b bg-white shadow-sm safe-top lg:hidden">
+        <div className="h-0.5 w-full bg-gradient-to-r from-teal-600 via-emerald-500 to-amber-400" />
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <MobileSidebar activeTab={activeTab} onSelect={setActiveTab} isAdmin={isAdmin} />
             <img src="/icon.png" alt="Industry Survey" className="h-8 w-8 shrink-0 rounded-lg sm:h-10 sm:w-10 sm:rounded-xl" />
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-bold leading-tight sm:text-lg">Qorannoo Indastrii Bishooftuu</h1>
+              <h1 className="truncate text-sm font-bold leading-tight sm:text-lg">
+                Qorannoo <span className="text-brand-gradient">Dhibayyuu</span>
+              </h1>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
                 {isAdmin ? 'Admin' : 'Data Collector'}: {userName}
               </p>
@@ -262,6 +266,13 @@ export default function Home() {
             </TabsContent>
           )}
 
+          {/* ============ Analytics — cross-module insights (admin) ============ */}
+          {isAdmin && (
+            <TabsContent value="analytics" className="mt-2 sm:mt-3">
+              <AnalyticsDashboard />
+            </TabsContent>
+          )}
+
           {/* ============ Meetings (shared) ============ */}
           {isAdmin && (
             <TabsContent value="meetings" className="mt-2 sm:mt-3">
@@ -297,7 +308,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white safe-bottom lg:left-60">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 lg:max-w-5xl xl:max-w-7xl">
-          <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Bishoftu Industry Data Collection</span>
+          <span className="truncate text-[10px] text-muted-foreground sm:text-xs">Dhibayyuu Sub-City Data Collection</span>
           <span className={`flex shrink-0 items-center gap-1 text-[10px] sm:text-xs ${isOnline ? 'text-teal-600' : 'text-amber-500'}`}>
             {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {isOnline ? 'Online' : 'Offline'}
