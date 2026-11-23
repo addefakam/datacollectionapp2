@@ -25,6 +25,8 @@ import {
   Factory,
   Building2,
   Stethoscope,
+  GraduationCap,
+  Sprout,
   ChevronDown,
   Wrench,
 } from 'lucide-react';
@@ -45,6 +47,12 @@ import IndustryAttendanceDashboard from '@/components/industry/IndustryAttendanc
 import HealthSurveyForm from '@/components/health/HealthSurveyForm';
 import HealthList from '@/components/health/HealthList';
 import HealthStats from '@/components/health/HealthStats';
+import EducationSurveyForm from '@/components/education/EducationSurveyForm';
+import EducationList from '@/components/education/EducationList';
+import EducationStats from '@/components/education/EducationStats';
+import AgricultureSurveyForm from '@/components/agriculture/AgricultureSurveyForm';
+import AgricultureList from '@/components/agriculture/AgricultureList';
+import AgricultureStats from '@/components/agriculture/AgricultureStats';
 import SettingsManager from '@/components/admin/SettingsManager';
 import { SettingsProvider } from '@/components/SettingsProvider';
 import { useAuth } from '@/components/AuthProvider';
@@ -65,6 +73,8 @@ export default function Home() {
   const industryTabs = ['survey', 'indData', 'indStats', 'attInd'];
   const hotelTabs = ['hotelSurvey', 'hotelData', 'hotelStats', 'attHotel'];
   const healthTabs = ['healthSurvey', 'healthData', 'healthStats'];
+  const educationTabs = ['eduSurvey', 'eduData', 'eduStats'];
+  const agricultureTabs = ['agriSurvey', 'agriData', 'agriStats'];
   const manageTabs = ['meetings', 'settings', 'admin'];
 
   if (status === 'loading') {
@@ -152,7 +162,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-3 pb-20 sm:px-4 sm:py-4 sm:pb-24 lg:max-w-5xl xl:max-w-7xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl h-auto rounded-2xl border border-teal-100 bg-white p-1.5 shadow-sm shadow-teal-900/5 ${isAdmin ? 'grid grid-cols-4 gap-0.5 sm:gap-1' : 'grid grid-cols-3 gap-0.5 sm:gap-1'}`}>
+          <TabsList className={`mb-3 w-full sm:mb-4 mx-auto max-w-2xl h-auto rounded-2xl border border-teal-100 bg-white p-1.5 shadow-sm shadow-teal-900/5 ${isAdmin ? 'grid grid-cols-3 gap-1 sm:grid-cols-6 sm:gap-0.5 lg:gap-1' : 'grid grid-cols-3 gap-1 sm:grid-cols-5 sm:gap-0.5 lg:gap-1'}`}>
             {/* Industry ▾ — all industry tabs live here */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -241,6 +251,64 @@ export default function Home() {
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => setActiveTab('healthStats')}>
                     <BarChart3 className="mr-2 h-4 w-4" /> Health Stats
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Education ▾ — all education tabs live here */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${dropTriggerClass} ${educationTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Education</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuItem onClick={() => setActiveTab('eduSurvey')}>
+                  <ClipboardList className="mr-2 h-4 w-4" /> Education Survey
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('eduData')}>
+                    <Database className="mr-2 h-4 w-4" /> Education Records
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('eduStats')}>
+                    <BarChart3 className="mr-2 h-4 w-4" /> Education Stats
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Agriculture ▾ — all agriculture tabs live here */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${dropTriggerClass} ${agricultureTabs.includes(activeTab) ? dropTriggerActive : dropTriggerIdle}`}
+                >
+                  <Sprout className="h-4 w-4" />
+                  <span>Agriculture</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuItem onClick={() => setActiveTab('agriSurvey')}>
+                  <ClipboardList className="mr-2 h-4 w-4" /> Agriculture Survey
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('agriData')}>
+                    <Database className="mr-2 h-4 w-4" /> Agriculture Records
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => setActiveTab('agriStats')}>
+                    <BarChart3 className="mr-2 h-4 w-4" /> Agriculture Stats
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -340,6 +408,52 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="healthStats" className="mt-2 sm:mt-3">
               <HealthStats />
+            </TabsContent>
+          )}
+
+          {/* ============ Education module ============ */}
+          <TabsContent value="eduSurvey" className="mt-2 sm:mt-3">
+            <EducationSurveyForm
+              onSubmit={handleSurveySubmit}
+              surveyorName={userName || ''}
+              surveyorId={userId || ''}
+              isOnline={isOnline}
+              onOfflineSave={(data) => saveOffline(data, 'education')}
+            />
+          </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="eduData" className="mt-2 sm:mt-3">
+              <EducationList refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="eduStats" className="mt-2 sm:mt-3">
+              <EducationStats />
+            </TabsContent>
+          )}
+
+          {/* ============ Agriculture module ============ */}
+          <TabsContent value="agriSurvey" className="mt-2 sm:mt-3">
+            <AgricultureSurveyForm
+              onSubmit={handleSurveySubmit}
+              surveyorName={userName || ''}
+              surveyorId={userId || ''}
+              isOnline={isOnline}
+              onOfflineSave={(data) => saveOffline(data, 'agriculture')}
+            />
+          </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="agriData" className="mt-2 sm:mt-3">
+              <AgricultureList refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="agriStats" className="mt-2 sm:mt-3">
+              <AgricultureStats />
             </TabsContent>
           )}
 

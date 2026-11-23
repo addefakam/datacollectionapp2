@@ -94,15 +94,18 @@ export async function GET() {
         staff: w._sum.staffCount || 0,
         filter: { subCity: w.subCity, area: w.area },
       })),
-      staff: staffRanges.map((r) => ({
-        label: r.label,
-        count: r.count,
-        staff: r.staff,
-        filter:
+      staff: staffRanges.map((r) => {
+        const filter: Record<string, string> =
           r.max === null
             ? { minStaff: String(r.min) }
-            : { minStaff: String(r.min), maxStaff: String(r.max) },
-      })),
+            : { minStaff: String(r.min), maxStaff: String(r.max) };
+        return {
+          label: r.label,
+          count: r.count,
+          staff: r.staff,
+          filter,
+        };
+      }),
     };
 
     return NextResponse.json({

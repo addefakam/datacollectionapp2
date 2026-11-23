@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
 
     const sheet = workbook.worksheets[0];
     if (!sheet) {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const headers: Record<string, number> = {};
     headerRow.eachCell((cell, colNumber) => {
       const val = String(cell.value || '').trim().toLowerCase();
-      if (val.includes('facility') || val.includes('maqaa manaa') || (val.includes('name') && !val.includes('owner') && !val.includes('contact') && !val.includes('surveyor'))) {
+      if ((val.includes('facility') && !val.includes('type')) || val.includes('maqaa manaa') || (val.includes('name') && !val.includes('owner') && !val.includes('contact') && !val.includes('surveyor'))) {
         headers.facilityName = colNumber;
       }
       if (val.includes('facility type') || val.includes('gosa manaa') || (val.includes('type') && !val.includes('ownership'))) {

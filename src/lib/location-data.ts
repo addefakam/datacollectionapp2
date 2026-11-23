@@ -109,3 +109,47 @@ export const HEALTH_OWNERSHIP_TYPES = [
   'Faith-Based',
   'Public-Private Partnership',
 ];
+
+// Educational institution (Mana Barumsaa) data classification — Bishoftu education survey
+export const EDUCATION_INSTITUTION_TYPES = [
+  'Kindergarten',
+  'Primary School (1-4)',
+  'Middle School (5-8)',
+  'Secondary School (9-10)',
+  'Preparatory School (11-12)',
+  'TVET College',
+  'Private College',
+  'University',
+  'Special Needs Center',
+  'Adult Education Center',
+];
+
+export const EDUCATION_OWNERSHIP_TYPES = [
+  'Government / Public',
+  'Private',
+  'Faith-Based',
+  'NGO',
+  'Community',
+];
+
+// Agricultural establishment (Mana Qonnaa) data classification — Bishoftu agriculture survey
+export const AGRICULTURE_FARM_TYPES = [
+  'Crop Production',
+  'Livestock Rearing',
+  'Dairy Farming',
+  'Poultry Farming',
+  'Fishery / Aquaculture',
+  'Apiculture (Honey)',
+  'Horticulture & Floriculture',
+  'Agro-Input Supplier',
+  'Agricultural Cooperative',
+  'Veterinary & AI Service',
+];
+
+export const AGRICULTURE_OWNERSHIP_TYPES = [
+  'Private',
+  'Cooperative',
+  'Government / Public',
+  'NGO',
+  'Commercial (Foreign Investment)',
+];

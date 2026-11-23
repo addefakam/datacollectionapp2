@@ -160,6 +160,55 @@ model HealthCenter {
   updatedAt       DateTime @updatedAt
 }
 
+// Educational institution (Mana Barumsaa) — Bishoftu education survey
+model EducationCenter {
+  id                String   @id @default(cuid())
+  institutionName   String
+  institutionType   String // Kindergarten, Primary School, TVET College, ...
+  ownershipType     String // Government / Public, Private, Faith-Based, ...
+  subCity           String
+  area              String
+  specificAddress   String
+  licenseNumber     String?
+  studentCount      Int      @default(0) // total enrolled students
+  teacherCount      Int      @default(0) // teaching staff
+  classroomCount    Int      @default(0)
+  hasLibrary        Boolean  @default(false) // library / reading room
+  hasLaboratory     Boolean  @default(false) // science laboratory
+  hasComputerLab    Boolean  @default(false) // computer / ICT lab
+  hasFeedingProgram Boolean  @default(false) // school feeding program
+  contactName       String
+  contactPhone      String
+  surveyorName      String?
+  surveyorId        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Agricultural establishment (Mana Qonnaa) — Bishoftu agriculture survey
+model AgricultureCenter {
+  id              String   @id @default(cuid())
+  farmName        String
+  farmType        String // Crop Production, Dairy Farming, Poultry, ...
+  ownershipType   String // Private, Cooperative, Government / Public, ...
+  subCity         String
+  area            String
+  specificAddress String
+  licenseNumber   String?
+  landSizeHectares Float  @default(0) // total land in hectares
+  workerCount     Int      @default(0) // permanent + temporary workers
+  hasIrrigation   Boolean  @default(false) // irrigation system
+  hasGreenhouse   Boolean  @default(false) // greenhouse / protected farming
+  hasMachinery    Boolean  @default(false) // tractors & farm machinery
+  hasStorage      Boolean  @default(false) // on-site storage facility
+  contactName     String
+  contactPhone    String
+  surveyorName    String?
+  surveyorId      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 // Admin-managed locations (sub-cities + woredas/areas) used across all survey forms
 model SubCity {
   id        String        @id @default(cuid())

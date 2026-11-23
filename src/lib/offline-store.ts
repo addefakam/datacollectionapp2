@@ -4,7 +4,7 @@ const STORE_NAME = 'pending_surveys';
 
 export interface PendingSurvey {
   id?: number;
-  kind?: 'guesthouse' | 'industry' | 'health'; // which module this record belongs to
+  kind?: 'guesthouse' | 'industry' | 'health' | 'education' | 'agriculture'; // which module this record belongs to
   data: Record<string, unknown>;
   createdAt: string;
   retryCount: number;
@@ -30,7 +30,7 @@ function openDB(): Promise<IDBDatabase> {
 
 export async function savePendingSurvey(
   data: Record<string, unknown>,
-  kind: 'guesthouse' | 'industry' | 'health' = 'guesthouse'
+  kind: 'guesthouse' | 'industry' | 'health' | 'education' | 'agriculture' = 'guesthouse'
 ): Promise<number> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
