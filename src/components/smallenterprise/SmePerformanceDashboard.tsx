@@ -15,10 +15,13 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Download,
   Eye,
+  FileText,
   Gauge,
   Loader2,
   MapPin,
+  Printer,
   RefreshCw,
   Store,
   Target,
@@ -129,6 +132,33 @@ const chartTooltipStyle = {
   fontSize: 12,
 };
 
+// --- custom report builder (pure client-side, built from the loaded performance data) ---
+
+type ReportGroup = 'unit' | 'type' | 'status';
+type ReportColumnKey = 'registered' | 'target' | 'achievement' | 'pending' | 'stages' | 'members';
+
+/** Toggleable metric columns of the custom report ("stages" expands to the 4 standing columns + total). */
+const REPORT_COL_META: { key: ReportColumnKey; label: string }[] = [
+  { key: 'registered', label: 'Registered (period)' },
+  { key: 'target', label: 'Target' },
+  { key: 'achievement', label: 'Achievement %' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'stages', label: 'Stage breakdown' },
+  { key: 'members', label: 'Members' },
+];
+
+const REPORT_COLS_BY_GROUP: Record<ReportGroup, ReportColumnKey[]> = {
+  unit: ['registered', 'target', 'achievement', 'pending', 'stages', 'members'],
+  type: ['registered', 'stages', 'members'],
+  status: [],
+};
+
+const REPORT_TITLES: Record<ReportGroup, string> = {
+  unit: 'Standing by administrative unit',
+  type: 'Standing by enterprise type',
+  status: 'Standing by stage',
+};
+
 export default function SmePerformanceDashboard() {
   const { toast } = useToast();
   const { subCities } = useSettings();
@@ -162,6 +192,10 @@ export default function SmePerformanceDashboard() {
 
   // Record list opened by clicking a row of the By Enterprise Type report
   const [typeDetail, setTypeDetail] = React.useState<{ type: string; smes: SmeRecord[] | null; loading: boolean } | null>(null);
+
+  // Custom report builder (grouping + selected metric columns)
+  const [reportGroup, setReportGroup] = React.useState<ReportGroup>('unit');
+  const [reportCols, setReportCols] = React.useState<ReportColumnKey[]>(REPORT_COLS_BY_GROUP.unit);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -311,6 +345,142 @@ export default function SmePerformanceDashboard() {
     'Awaiting Operation': t.standing.AWAITING_OPERATION,
     Operational: t.standing.OPERATIONAL,
   }));
+
+  // --- custom report builder -------------------------------------------------
+
+  const changeReportGroup = (g: ReportGroup) => {
+    setReportGroup(g);
+    setReportCols(REPORT_COLS_BY_GROUP[g]);
+  };
+
+  const toggleReportCol = (k: ReportColumnKey) => {
+    setReportCols((prev) => (prev.includes(k) ? prev.filter((c) => c !== k) : [...prev, k]));
+  };
+
+  // Recomputed per render as plain code (cheap at dashboard scale; a hook here would sit below the loading early-returns).
+  const report = (() => {
+    if (!data) return null;
+    const scopeLabel = data.scope.level === 'city' ? 'City-wide' : `Sub-city: ${data.scope.subCity}`;
+    const subtitle = `${data.period.label} · ${scopeLabel}`;
+    const statusKeys: SmeStatus[] = ['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'];
+    const col = (k: ReportColumnKey) => reportCols.includes(k);
+    const sumAt = (rows: (string | number)[][], i: number) => rows.reduce((s, row) => s + (typeof row[i] === 'number' ? (row[i] as number) : 0), 0);
+
+    if (reportGroup === 'status') {
+      const total = data.totals.standingTotal;
+      const rows = statusKeys.map((s) => [
+        SME_STATUS_META[s].label,
+        data.totals.byStatus[s],
+        total > 0 ? `${((data.totals.byStatus[s] / total) * 100).toFixed(1)}%` : '0.0%',
+      ]);
+      return {
+        title: REPORT_TITLES.status,
+        subtitle,
+        cols: ['Stage', 'Enterprises', 'Share of standing'],
+        rows,
+        totals: ['Total standing', total, total > 0 ? '100%' : '0.0%'],
+      };
+    }
+
+    const cols: string[] = [reportGroup === 'unit' ? 'Administrative unit' : 'Enterprise Type'];
+    if (col('registered')) cols.push('Registered (period)');
+    if (col('target')) cols.push('Target');
+    if (col('achievement')) cols.push('Achievement %');
+    if (col('pending')) cols.push('Pending');
+    if (col('stages')) cols.push('Registered', 'Legalized', 'Awaiting', 'Operational', 'Standing total');
+    if (col('members')) cols.push('Members', 'Female members');
+
+    let rows: (string | number)[][];
+    const totals: (string | number)[] = [reportGroup === 'unit' ? 'All units in scope' : 'All types'];
+
+    if (reportGroup === 'unit') {
+      rows = data.rows.map((r) => {
+        const row: (string | number)[] = [r.label];
+        if (col('registered')) row.push(r.actual);
+        if (col('target')) row.push(r.target);
+        if (col('achievement')) row.push(r.target > 0 ? `${r.achievementPct}%` : '—');
+        if (col('pending')) row.push(r.pending);
+        if (col('stages')) row.push(r.standing.REGISTERED, r.standing.FULLY_LEGALIZED, r.standing.AWAITING_OPERATION, r.standing.OPERATIONAL, r.standingTotal);
+        if (col('members')) row.push(r.members, r.femaleMembers);
+        return row;
+      });
+      let ci = 1;
+      if (col('registered')) { totals.push(sumAt(rows, ci)); ci += 1; }
+      if (col('target')) { totals.push(sumAt(rows, ci)); ci += 1; }
+      if (col('achievement')) { totals.push(`${data.kpis.achievementPct}%`); ci += 1; }
+      if (col('pending')) { totals.push(sumAt(rows, ci)); ci += 1; }
+      if (col('stages')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1), sumAt(rows, ci + 2), sumAt(rows, ci + 3), sumAt(rows, ci + 4)); ci += 5; }
+      if (col('members')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1)); }
+    } else {
+      rows = (data.byType ?? []).map((t) => {
+        const row: (string | number)[] = [t.type];
+        if (col('registered')) row.push(t.registeredInPeriod);
+        if (col('stages')) row.push(t.standing.REGISTERED, t.standing.FULLY_LEGALIZED, t.standing.AWAITING_OPERATION, t.standing.OPERATIONAL, t.standingTotal);
+        if (col('members')) row.push(t.members, t.femaleMembers);
+        return row;
+      });
+      let ci = 1;
+      if (col('registered')) { totals.push(sumAt(rows, ci)); ci += 1; }
+      if (col('stages')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1), sumAt(rows, ci + 2), sumAt(rows, ci + 3), sumAt(rows, ci + 4)); ci += 5; }
+      if (col('members')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1)); }
+    }
+
+    return { title: REPORT_TITLES[reportGroup], subtitle, cols, rows, totals };
+  })();
+
+  const exportReportCsv = () => {
+    if (!report || report.rows.length === 0) return;
+    const cell = (v: string | number) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines: (string | number)[][] = [report.cols, ...report.rows];
+    if (report.totals) lines.push(report.totals);
+    const csv = lines.map((row) => row.map(cell).join(',')).join('\r\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sme-custom-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Report Exported', description: 'CSV downloaded — it opens cleanly in Excel.' });
+  };
+
+  const printReport = () => {
+    if (!report) return;
+    const esc = (v: string | number) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const th = report.cols
+      .map((c, i) => `<th style="padding:6px 10px;border-bottom:2px solid #0d9488;text-align:${i === 0 ? 'left' : 'right'};font-size:11px;text-transform:uppercase;color:#134e4a">${esc(c)}</th>`)
+      .join('');
+    const trs = report.rows
+      .map((r) => `<tr>${r.map((c, i) => `<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:${i === 0 ? 'left' : 'right'};font-weight:${i === 0 ? 600 : 400}">${esc(c)}</td>`).join('')}</tr>`)
+      .join('');
+    const totalsHtml = report.totals
+      ? `<tr style="background:#f0fdfa;font-weight:700">${report.totals.map((c, i) => `<td style="padding:6px 10px;border-top:2px solid #0d9488;text-align:${i === 0 ? 'left' : 'right'}">${esc(c)}</td>`).join('')}</tr>`
+      : '';
+    const html = [
+      '<!doctype html><html><head><meta charset="utf-8" />',
+      `<title>${esc(report.title)} — SME Performance</title>`,
+      '<style>body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:24px}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 16px;font-size:12px;color:#64748b}table{border-collapse:collapse;width:100%;font-size:12px}</style>',
+      '</head><body>',
+      `<h1>${esc(report.title)} — SME Performance</h1>`,
+      `<p>${esc(report.subtitle)} · generated ${new Date().toLocaleString('en-GB')}</p>`,
+      `<table><thead><tr>${th}</tr></thead><tbody>${trs}${totalsHtml}</tbody></table>`,
+      '</body></html>',
+    ].join('');
+    const w = window.open('', '_blank');
+    if (!w) {
+      toast({ title: 'Popup Blocked', description: 'Allow pop-ups for this site to print the report.', variant: 'destructive' });
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  };
 
   /** Open the record list behind a KPI card below the KPI grid. */
   const openKpiPanel = (kind: 'registered' | 'achievement' | 'pending' | 'operational') => {
@@ -719,6 +889,111 @@ export default function SmePerformanceDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* ============ Custom report builder ============ */}
+          <Card className="rounded-2xl border-teal-100">
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-1.5 text-base">
+                    <FileText className="h-4 w-4 text-teal-700" />
+                    Custom Report
+                  </CardTitle>
+                  <CardDescription>
+                    Pick a grouping and only the metrics you need — the table updates live and totals itself.
+                    Export to CSV for Excel or print a clean copy.
+                  </CardDescription>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={exportReportCsv} disabled={!report || report.rows.length === 0}>
+                    <Download className="mr-1 h-3.5 w-3.5" /> CSV
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={printReport} disabled={!report || report.rows.length === 0}>
+                    <Printer className="mr-1 h-3.5 w-3.5" /> Print
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {([['unit', 'By administrative unit'], ['type', 'By enterprise type'], ['status', 'By stage (standing today)']] as [ReportGroup, string][]).map(([g, lbl]) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => changeReportGroup(g)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                      reportGroup === g ? 'border-teal-700 bg-teal-700 text-white' : 'border-teal-200 bg-white text-teal-800 hover:bg-teal-50'
+                    )}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+
+              {reportGroup !== 'status' && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">Columns:</span>
+                  {REPORT_COL_META.filter((k) => REPORT_COLS_BY_GROUP[reportGroup].includes(k.key)).map((k) => (
+                    <label
+                      key={k.key}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-teal-200 bg-white px-2.5 py-1 text-xs text-teal-900 transition-colors hover:bg-teal-50"
+                    >
+                      <input type="checkbox" className="h-3 w-3 accent-teal-700" checked={reportCols.includes(k.key)} onChange={() => toggleReportCol(k.key)} />
+                      {k.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {report && report.rows.length > 0 ? (
+                <div className="overflow-hidden rounded-xl border border-teal-100">
+                  <div className="border-b border-teal-100 bg-teal-50/60 px-3 py-2">
+                    <p className="text-xs font-semibold text-teal-950">{report.title}</p>
+                    <p className="text-[10px] text-muted-foreground">{report.subtitle} · generated {new Date().toLocaleString('en-GB')}</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="border-b border-teal-100 bg-white text-[10px] uppercase tracking-wide text-teal-900/60">
+                          {report.cols.map((c, i) => (
+                            <th key={c} className={cn('whitespace-nowrap px-3 py-2 font-semibold', i > 0 && 'text-right')}>{c}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.rows.map((r, ri) => (
+                          <tr key={ri} className="border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60">
+                            {r.map((cell, ci) => (
+                              <td
+                                key={ci}
+                                className={cn('whitespace-nowrap px-3 py-2', ci === 0 ? 'font-semibold text-teal-950' : 'text-right text-slate-600')}
+                              >
+                                {typeof cell === 'number' ? fmt(cell) : cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        {report.totals && (
+                          <tr className="border-t-2 border-teal-200 bg-teal-50/50 font-semibold">
+                            {report.totals.map((cell, ci) => (
+                              <td key={ci} className={cn('whitespace-nowrap px-3 py-2 text-teal-900', ci > 0 && 'text-right')}>
+                                {typeof cell === 'number' ? fmt(cell) : cell}
+                              </td>
+                            ))}
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No data for this grouping in the selected scope and period.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* ============ Accountability table (click a row for details) ============ */}
           <Card className="rounded-2xl border-teal-100">
