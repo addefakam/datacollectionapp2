@@ -1,0 +1,855 @@
+     1→'use client';
+     2→
+     3→import * as React from 'react';
+     4→import {
+     5→  ArrowDownRight,
+     6→  ArrowUpRight,
+     7→  CalendarDays,
+     8→  Coins,
+     9→  Gauge,
+    10→  Loader2,
+    11→  Pencil,
+    12→  Plus,
+    13→  RefreshCw,
+    14→  Store,
+    15→  Target,
+    16→  Trash2,
+    17→  TrendingUp,
+    18→  UserRound,
+    19→  Users,
+    20→} from 'lucide-react';
+    21→import { Button } from '@/components/ui/button';
+    22→import {
+    23→  AlertDialog,
+    24→  AlertDialogAction,
+    25→  AlertDialogCancel,
+    26→  AlertDialogContent,
+    27→  AlertDialogDescription,
+    28→  AlertDialogFooter,
+    29→  AlertDialogHeader,
+    30→  AlertDialogTitle,
+    31→} from '@/components/ui/alert-dialog';
+    32→import {
+    33→  Dialog,
+    34→  DialogContent,
+    35→  DialogDescription,
+    36→  DialogFooter,
+    37→  DialogHeader,
+    38→  DialogTitle,
+    39→} from '@/components/ui/dialog';
+    40→import { Card, CardContent } from '@/components/ui/card';
+    41→import { Input } from '@/components/ui/input';
+    42→import { Label } from '@/components/ui/label';
+    43→import {
+    44→  Select,
+    45→  SelectContent,
+    46→  SelectItem,
+    47→  SelectTrigger,
+    48→  SelectValue,
+    49→} from '@/components/ui/select';
+    50→import { useToast } from '@/hooks/use-toast';
+    51→import { cn } from '@/lib/utils';
+    52→
+    53→// ---------------------------------------------------------------------------
+    54→// Types & client-side metric metadata (mirrors src/lib/goals.ts)
+    55→// ---------------------------------------------------------------------------
+    56→
+    57→interface GoalProgress {
+    58→  actual: number;
+    59→  achievementPct: number;
+    60→  remaining: number;
+    61→  pacePct: number;
+    62→  expectedByNow: number;
+    63→  paceDelta: number;
+    64→  status: 'upcoming' | 'onTrack' | 'behind' | 'achieved' | 'missed';
+    65→  daysLeft: number;
+    66→  prevActual: number | null;
+    67→  trendPct: number | null;
+    68→  label: string;
+    69→}
+    70→
+    71→interface Goal {
+    72→  id: string;
+    73→  module: string;
+    74→  metric: string;
+    75→  periodType: 'weekly' | 'monthly' | 'yearly';
+    76→  periodStart: string;
+    77→  periodEnd: string;
+    78→  targetValue: number;
+    79→  owner: string | null;
+    80→  status: string;
+    81→  progress: GoalProgress;
+    82→}
+    83→
+    84→/** Per-initiative metric metadata (mirrors src/lib/goals.ts GOAL_METRICS). */
+    85→export interface MetricMeta {
+    86→  label: string;
+    87→  unit: 'enterprises' | 'jobs' | 'ETB';
+    88→  icon: React.ComponentType<{ className?: string }>;
+    89→}
+    90→
+    91→interface InitiativeGoals {
+    92→  label: string;
+    93→  heroLabel: string;
+    94→  emptyText: string;
+    95→  metrics: Record<string, MetricMeta>;
+    96→}
+    97→
+    98→const MODULE_METRICS: Record<string, InitiativeGoals> = {
+    99→  'small-enterprise': {
+   100→    label: 'Small Enterprise',
+   101→    heroLabel: 'Small Enterprise Initiative · Dhibayyuu Sub-City',
+   102→    emptyText:
+   103→      'Officials can set weekly, monthly or yearly targets for the Small Enterprise initiative — progress against each target is then tracked automatically from the survey data.',
+   104→    metrics: {
+   105→      enterprises: { label: 'New Enterprises Registered', unit: 'enterprises', icon: Store },
+   106→      employees: { label: 'Jobs Created', unit: 'jobs', icon: Users },
+   107→      femaleEmployees: { label: 'Jobs Created for Women', unit: 'jobs', icon: UserRound },
+   108→      capital: { label: 'Start-up Capital Mobilized', unit: 'ETB', icon: Coins },
+   109→    },
+   110→  },
+   111→};
+   112→
+   113→type MetricKey = string;
+   114→
+   115→const PERIOD_BADGE: Record<Goal['periodType'], string> = {
+   116→  weekly: 'bg-sky-100 text-sky-800 ring-sky-600/20',
+   117→  monthly: 'bg-emerald-100 text-emerald-800 ring-emerald-600/20',
+   118→  yearly: 'bg-violet-100 text-violet-800 ring-violet-600/20',
+   119→};
+   120→
+   121→const STATUS_CONFIG: Record<
+   122→  GoalProgress['status'],
+   123→  { label: string; chip: string; bar: string; pct: string }
+   124→> = {
+   125→  achieved: {
+   126→    label: 'Achieved',
+   127→    chip: 'bg-emerald-100 text-emerald-800 ring-emerald-600/25',
+   128→    bar: 'bg-brand-gradient',
+   129→    pct: 'text-emerald-700',
+   130→  },
+   131→  onTrack: {
+   132→    label: 'On Track',
+   133→    chip: 'bg-teal-100 text-teal-800 ring-teal-600/25',
+   134→    bar: 'bg-teal-500',
+   135→    pct: 'text-teal-700',
+   136→  },
+   137→  behind: {
+   138→    label: 'Behind Pace',
+   139→    chip: 'bg-amber-100 text-amber-800 ring-amber-600/25',
+   140→    bar: 'bg-amber-500',
+   141→    pct: 'text-amber-700',
+   142→  },
+   143→  missed: {
+   144→    label: 'Missed',
+   145→    chip: 'bg-red-100 text-red-700 ring-red-600/25',
+   146→    bar: 'bg-red-500',
+   147→    pct: 'text-red-600',
+   148→  },
+   149→  upcoming: {
+   150→    label: 'Upcoming',
+   151→    chip: 'bg-sky-100 text-sky-700 ring-sky-600/25',
+   152→    bar: 'bg-sky-400',
+   153→    pct: 'text-sky-700',
+   154→  },
+   155→};
+   156→
+   157→const PERIOD_ORDER: Goal['periodType'][] = ['weekly', 'monthly', 'yearly'];
+   158→const PERIOD_SECTION_LABEL: Record<Goal['periodType'], string> = {
+   159→  weekly: 'Weekly Goals',
+   160→  monthly: 'Monthly Goals',
+   161→  yearly: 'Yearly Goals',
+   162→};
+   163→
+   164→function formatValue(unit: string, v: number): string {
+   165→  if (unit === 'ETB') return `ETB ${Math.round(v).toLocaleString()}`;
+   166→  const n = Math.round(v);
+   167→  const word =
+   168→    unit === 'enterprises' ? (n === 1 ? 'enterprise' : 'enterprises')
+   169→    : unit === 'jobs' ? (n === 1 ? 'job' : 'jobs')
+   170→    : unit;
+   171→  return `${n.toLocaleString()} ${word}`;
+   172→}
+   173→
+   174→/** Build the refDate payload for the API from the form's period-type inputs. */
+   175→function refDateFrom(periodType: string, value: string): string {
+   176→  if (periodType === 'weekly') return `${value}T12:00:00`;
+   177→  if (periodType === 'monthly') {
+   178→    const [y, m] = value.split('-').map(Number);
+   179→    return new Date(y, m - 1, 15).toISOString();
+   180→  }
+   181→  return new Date(Number(value), 6, 1).toISOString(); // mid-year for yearly
+   182→}
+   183→
+   184→function todayString(): string {
+   185→  const d = new Date();
+   186→  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+   187→}
+   188→
+   189→function currentMonthString(): string {
+   190→  return todayString().slice(0, 7);
+   191→}
+   192→
+   193→/** Derive the form's reference value from a stored periodStart (for editing). */
+   194→function refValueFrom(goal: Goal): string {
+   195→  const d = new Date(goal.periodStart);
+   196→  if (goal.periodType === 'weekly') {
+   197→    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+   198→  }
+   199→  if (goal.periodType === 'monthly') {
+   200→    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+   201→  }
+   202→  return String(d.getFullYear());
+   203→}
+   204→
+   205→// ---------------------------------------------------------------------------
+   206→// Goal form dialog
+   207→// ---------------------------------------------------------------------------
+   208→
+   209→interface GoalFormProps {
+   210→  open: boolean;
+   211→  onOpenChange: (v: boolean) => void;
+   212→  onSaved: () => void;
+   213→  editing: Goal | null;
+   214→  /** Initiative the goal belongs to — drives the metric picker. */
+   215→  module: string;
+   216→  metricDefs: InitiativeGoals;
+   217→}
+   218→
+   219→function GoalForm({ open, onOpenChange, onSaved, editing, module, metricDefs }: GoalFormProps) {
+   220→  const { toast } = useToast();
+   221→  const metricKeys = Object.keys(metricDefs.metrics);
+   222→  const [metric, setMetric] = React.useState<MetricKey>(metricKeys[0]);
+   223→  const [periodType, setPeriodType] = React.useState<Goal['periodType']>('monthly');
+   224→  const [refValue, setRefValue] = React.useState(currentMonthString());
+   225→  const [target, setTarget] = React.useState('');
+   226→  const [owner, setOwner] = React.useState('');
+   227→  const [saving, setSaving] = React.useState(false);
+   228→
+   229→  React.useEffect(() => {
+   230→    if (open) {
+   231→      if (editing) {
+   232→        setMetric(editing.metric as MetricKey);
+   233→        setPeriodType(editing.periodType);
+   234→        setRefValue(refValueFrom(editing));
+   235→        setTarget(String(editing.targetValue));
+   236→        setOwner(editing.owner ?? '');
+   237→      } else {
+   238→        setMetric(metricKeys[0]);
+   239→        setPeriodType('monthly');
+   240→        setRefValue(currentMonthString());
+   241→        setTarget('');
+   242→        setOwner('');
+   243→      }
+   244→    }
+   245→  }, [open, editing]);
+   246→
+   247→  const years = React.useMemo(() => {
+   248→    const y = new Date().getFullYear();
+   249→    return [y - 1, y, y + 1, y + 2];
+   250→  }, []);
+   251→
+   252→  const submit = async (e: React.FormEvent) => {
+   253→    e.preventDefault();
+   254→    const targetNum = Number(target);
+   255→    if (!Number.isFinite(targetNum) || targetNum <= 0) {
+   256→      toast({ title: 'Invalid target', description: 'Enter a positive target value.', variant: 'destructive' });
+   257→      return;
+   258→    }
+   259→    setSaving(true);
+   260→    try {
+   261→      const res = await fetch(editing ? `/api/goals/${editing.id}` : '/api/goals', {
+   262→        method: editing ? 'PUT' : 'POST',
+   263→        headers: { 'Content-Type': 'application/json' },
+   264→        body: JSON.stringify(
+   265→          editing
+   266→            ? { targetValue: targetNum, owner }
+   267→            : { module, metric, periodType, refDate: refDateFrom(periodType, refValue), targetValue: targetNum, owner }
+   268→        ),
+   269→      });
+   270→      const data = await res.json();
+   271→      if (!res.ok) throw new Error(data.error || 'Failed to save goal');
+   272→      toast({
+   273→        title: editing ? 'Goal updated' : 'Goal set',
+   274→        description: editing
+   275→          ? 'The target was updated — progress recalculated.'
+   276→          : `${metricDefs.metrics[metric]?.label ?? metric} · ${periodType} target of ${targetNum.toLocaleString()}.`,
+   277→      });
+   278→      onOpenChange(false);
+   279→      onSaved();
+   280→    } catch (err) {
+   281→      toast({
+   282→        title: 'Could not save goal',
+   283→        description: err instanceof Error ? err.message : 'Please try again.',
+   284→        variant: 'destructive',
+   285→      });
+   286→    } finally {
+   287→      setSaving(false);
+   288→    }
+   289→  };
+   290→
+   291→  return (
+   292→    <Dialog open={open} onOpenChange={onOpenChange}>
+   293→      <DialogContent className="sm:max-w-md">
+   294→        <DialogHeader>
+   295→          <DialogTitle className="font-display flex items-center gap-2">
+   296→            <Target className="h-5 w-5 text-emerald-700" />
+   297→            {editing ? 'Adjust Goal' : 'Set a New Goal'}
+   298→          </DialogTitle>
+   299→          <DialogDescription>
+   300→            {editing
+   301→              ? 'Update the target value or the responsible office — progress recalculates instantly.'
+   302→              : 'Choose the initiative metric, the period and the target the sub-city aims to reach.'}
+   303→          </DialogDescription>
+   304→        </DialogHeader>
+   305→        <form onSubmit={submit} className="space-y-4">
+   306→          <div className="space-y-2">
+   307→            <Label htmlFor="goal-metric">Metric</Label>
+   308→            <Select
+   309→              value={metric}
+   310→              onValueChange={(v) => setMetric(v as MetricKey)}
+   311→              disabled={!!editing}
+   312→            >
+   313→              <SelectTrigger id="goal-metric" className="w-full">
+   314→                <SelectValue />
+   315→              </SelectTrigger>
+   316→              <SelectContent>
+   317→                {metricKeys.map((k) => (
+   318→                  <SelectItem key={k} value={k}>
+   319→                    {metricDefs.metrics[k].label}
+   320→                  </SelectItem>
+   321→                ))}
+   322→              </SelectContent>
+   323→            </Select>
+   324→          </div>
+   325→
+   326→          <div className="grid grid-cols-2 gap-3">
+   327→            <div className="space-y-2">
+   328→              <Label htmlFor="goal-period">Period</Label>
+   329→              <Select
+   330→                value={periodType}
+   331→                onValueChange={(v) => {
+   332→                  const t = v as Goal['periodType'];
+   333→                  setPeriodType(t);
+   334→                  setRefValue(t === 'weekly' ? todayString() : t === 'monthly' ? currentMonthString() : String(new Date().getFullYear()));
+   335→                }}
+   336→                disabled={!!editing}
+   337→              >
+   338→                <SelectTrigger id="goal-period" className="w-full">
+   339→                  <SelectValue />
+   340→                </SelectTrigger>
+   341→                <SelectContent>
+   342→                  <SelectItem value="weekly">Weekly</SelectItem>
+   343→                  <SelectItem value="monthly">Monthly</SelectItem>
+   344→                  <SelectItem value="yearly">Yearly</SelectItem>
+   345→                </SelectContent>
+   346→              </Select>
+   347→            </div>
+   348→            <div className="space-y-2">
+   349→              <Label htmlFor="goal-ref">
+   350→                {periodType === 'weekly' ? 'Any day in the week' : periodType === 'monthly' ? 'Month' : 'Year'}
+   351→              </Label>
+   352→              {periodType === 'weekly' && (
+   353→                <Input
+   354→                  id="goal-ref"
+   355→                  type="date"
+   356→                  value={refValue}
+   357→                  onChange={(e) => setRefValue(e.target.value)}
+   358→                  disabled={!!editing}
+   359→                />
+   360→              )}
+   361→              {periodType === 'monthly' && (
+   362→                <Input
+   363→                  id="goal-ref"
+   364→                  type="month"
+   365→                  value={refValue}
+   366→                  onChange={(e) => setRefValue(e.target.value)}
+   367→                  disabled={!!editing}
+   368→                />
+   369→              )}
+   370→              {periodType === 'yearly' && (
+   371→                <Select value={refValue} onValueChange={setRefValue} disabled={!!editing}>
+   372→                  <SelectTrigger id="goal-ref" className="w-full">
+   373→                    <SelectValue />
+   374→                  </SelectTrigger>
+   375→                  <SelectContent>
+   376→                    {years.map((y) => (
+   377→                      <SelectItem key={y} value={String(y)}>
+   378→                        {y}
+   379→                      </SelectItem>
+   380→                    ))}
+   381→                  </SelectContent>
+   382→                </Select>
+   383→              )}
+   384→            </div>
+   385→          </div>
+   386→
+   387→          <div className="space-y-2">
+   388→            <Label htmlFor="goal-target">
+   389→              Target value ({metricDefs.metrics[metric]?.unit === 'ETB' ? 'ETB' : metricDefs.metrics[metric]?.unit ?? 'count'})
+   390→            </Label>
+   391→            <Input
+   392→              id="goal-target"
+   393→              type="number"
+   394→              min="1"
+   395→              step={metricDefs.metrics[metric]?.unit === 'ETB' ? '1000' : '1'}
+   396→              placeholder={metricDefs.metrics[metric]?.unit === 'ETB' ? 'e.g., 500000' : 'e.g., 25'}
+   397→              value={target}
+   398→              onChange={(e) => setTarget(e.target.value)}
+   399→              required
+   400→            />
+   401→          </div>
+   402→
+   403→          <div className="space-y-2">
+   404→            <Label htmlFor="goal-owner">Responsible office (optional)</Label>
+   405→            <Input
+   406→              id="goal-owner"
+   407→              placeholder="e.g., Job Creation & Enterprise Development"
+   408→              value={owner}
+   409→              onChange={(e) => setOwner(e.target.value)}
+   410→            />
+   411→          </div>
+   412→
+   413→          <DialogFooter className="gap-2">
+   414→            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+   415→              Cancel
+   416→            </Button>
+   417→            <Button type="submit" disabled={saving} className="bg-brand-gradient text-white">
+   418→              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+   419→              {editing ? 'Save Changes' : 'Set Goal'}
+   420→            </Button>
+   421→          </DialogFooter>
+   422→        </form>
+   423→      </DialogContent>
+   424→    </Dialog>
+   425→  );
+   426→}
+   427→
+   428→// ---------------------------------------------------------------------------
+   429→// Goal card — progress bar with pace marker, achievement %, trend comparison
+   430→// ---------------------------------------------------------------------------
+   431→
+   432→function GoalCard({
+   433→  goal,
+   434→  onEdit,
+   435→  onDelete,
+   436→  metricDefs,
+   437→}: {
+   438→  goal: Goal;
+   439→  onEdit: (g: Goal) => void;
+   440→  onDelete: (g: Goal) => void;
+   441→  metricDefs: InitiativeGoals;
+   442→}) {
+   443→  const p = goal.progress;
+   444→  const m = metricDefs.metrics[goal.metric];
+   445→  const MetricIcon = m?.icon ?? Target;
+   446→  const sc = STATUS_CONFIG[p.status];
+   447→  const fill = Math.min(Math.max(p.achievementPct, p.actual > 0 ? 2 : 0), 100);
+   448→  const marker = Math.min(Math.max(p.pacePct, 0), 100);
+   449→
+   450→  return (
+   451→    <Card className="card-lift gap-4 overflow-hidden py-5">
+   452→      <CardContent className="space-y-4 px-5">
+   453→        {/* Header row */}
+   454→        <div className="flex flex-wrap items-start justify-between gap-2">
+   455→          <div className="flex min-w-0 items-center gap-3">
+   456→            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-800/10 text-emerald-800">
+   457→              <MetricIcon className="h-5 w-5" />
+   458→            </span>
+   459→            <div className="min-w-0">
+   460→              <p className="font-display truncate text-sm font-bold text-emerald-950">{m?.label ?? goal.metric}</p>
+   461→              <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+   462→                <CalendarDays className="h-3 w-3" />
+   463→                {p.label}
+   464→                {goal.owner && <span className="text-emerald-800/60">· {goal.owner}</span>}
+   465→              </p>
+   466→            </div>
+   467→          </div>
+   468→          <div className="flex items-center gap-2">
+   469→            <span
+   470→              className={cn(
+   471→                'rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ring-1',
+   472→                PERIOD_BADGE[goal.periodType]
+   473→              )}
+   474→            >
+   475→              {goal.periodType}
+   476→            </span>
+   477→            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1', sc.chip)}>
+   478→              {sc.label}
+   479→            </span>
+   480→          </div>
+   481→        </div>
+   482→
+   483→        {/* Achievement bar with pace marker */}
+   484→        <div>
+   485→          <div className="relative h-3 w-full overflow-hidden rounded-full bg-emerald-900/10">
+   486→            <div
+   487→              className={cn('h-full rounded-full transition-all duration-500', sc.bar)}
+   488→              style={{ width: `${fill}%` }}
+   489→            />
+   490→            {/* Pace marker: where the target "should" be by today */}
+   491→            <div
+   492→              className="absolute top-0 h-full w-0.5 bg-emerald-950/45"
+   493→              style={{ left: `calc(${marker}% - 1px)` }}
+   494→              title={`Expected by now: ${Math.round(p.expectedByNow).toLocaleString()} (${p.pacePct}% of period elapsed)`}
+   495→            />
+   496→          </div>
+   497→          <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+   498→            <span>
+   499→              {formatValue(m?.unit ?? 'jobs', p.actual)} of {formatValue(m?.unit ?? 'jobs', goal.targetValue)}
+   500→            </span>
+   501→            <span className={cn('font-semibold', sc.pct)}>{p.achievementPct}% achieved</span>
+   502→          </div>
+   503→        </div>
+   504→
+   505→        {/* Analysis row */}
+   506→        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+   507→          <div className="rounded-lg bg-emerald-900/[0.04] px-2.5 py-1.5">
+   508→            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Remaining</p>
+   509→            <p className="truncate text-xs font-bold text-emerald-950">{formatValue(m?.unit ?? 'jobs', p.remaining)}</p>
+   510→          </div>
+   511→          <div className="rounded-lg bg-emerald-900/[0.04] px-2.5 py-1.5">
+   512→            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Expected by now</p>
+   513→            <p className="truncate text-xs font-bold text-emerald-950">
+   514→              {formatValue(m?.unit ?? 'jobs', p.expectedByNow)}
+   515→              <span className="ml-1 font-medium text-muted-foreground">({p.pacePct}%)</span>
+   516→            </p>
+   517→          </div>
+   518→          <div className="rounded-lg bg-emerald-900/[0.04] px-2.5 py-1.5">
+   519→            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace</p>
+   520→            <p
+   521→              className={cn(
+   522→                'truncate text-xs font-bold',
+   523→                p.paceDelta >= 0 ? 'text-emerald-700' : 'text-amber-700'
+   524→              )}
+   525→            >
+   526→              {p.status === 'upcoming'
+   527→                ? 'Not started'
+   528→                : p.status === 'achieved'
+   529→                  ? `Ahead by ${Math.round(p.paceDelta)} pts`
+   530→                  : p.paceDelta >= 0
+   531→                    ? `Ahead by ${Math.round(p.paceDelta)} pts`
+   532→                    : `Behind by ${Math.abs(Math.round(p.paceDelta))} pts`}
+   533→            </p>
+   534→          </div>
+   535→          <div className="rounded-lg bg-emerald-900/[0.04] px-2.5 py-1.5">
+   536→            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+   537→              {p.status === 'missed' || p.status === 'achieved' ? 'Period' : 'Days left'}
+   538→            </p>
+   539→            <p className="truncate text-xs font-bold text-emerald-950">
+   540→              {p.status === 'missed'
+   541→                ? 'Ended'
+   542→                : p.status === 'achieved'
+   543→                  ? 'Complete'
+   544→                  : p.status === 'upcoming'
+   545→                    ? 'Starts soon'
+   546→                    : `${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'}`}
+   547→            </p>
+   548→          </div>
+   549→        </div>
+   550→
+   551→        {/* Trend vs previous period */}
+   552→        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-emerald-900/10 pt-2.5">
+   553→          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+   554→            <TrendingUp className="h-3.5 w-3.5" />
+   555→            {p.status === 'upcoming' ? (
+   556→              <span>Period starts {p.label} — progress tracking begins automatically</span>
+   557→            ) : p.prevActual === null || p.trendPct === null ? (
+   558→              <span>
+   559→                Previous {goal.periodType}: {formatValue(m?.unit ?? 'jobs', p.prevActual ?? 0)} — no baseline yet
+   560→              </span>
+   561→            ) : (
+   562→              <span className="flex items-center gap-1">
+   563→                {p.trendPct >= 0 ? (
+   564→                  <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
+   565→                ) : (
+   566→                  <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
+   567→                )}
+   568→                <span className={cn('font-semibold', p.trendPct >= 0 ? 'text-emerald-700' : 'text-red-600')}>
+   569→                  {p.trendPct >= 0 ? '+' : ''}
+   570→                  {p.trendPct}%
+   571→                </span>
+   572→                <span>
+   573→                  vs previous {goal.periodType} ({formatValue(m?.unit ?? 'jobs', p.prevActual)})
+   574→                </span>
+   575→              </span>
+   576→            )}
+   577→          </p>
+   578→          <div className="flex items-center gap-1.5">
+   579→            <Button
+   580→              variant="outline"
+   581→              size="sm"
+   582→              className="h-7 px-2 text-xs"
+   583→              onClick={() => onEdit(goal)}
+   584→              title="Adjust target"
+   585→            >
+   586→              <Pencil className="h-3 w-3" />
+   587→              Adjust
+   588→            </Button>
+   589→            <Button
+   590→              variant="outline"
+   591→              size="sm"
+   592→              className="h-7 border-red-200 px-2 text-xs text-red-600 hover:bg-red-50"
+   593→              onClick={() => onDelete(goal)}
+   594→              title="Delete goal"
+   595→            >
+   596→              <Trash2 className="h-3 w-3" />
+   597→            </Button>
+   598→          </div>
+   599→        </div>
+   600→      </CardContent>
+   601→    </Card>
+   602→  );
+   603→}
+   604→
+   605→// ---------------------------------------------------------------------------
+   606→// Main view — summary strip, set-goal action, goals grouped by period
+   607→// ---------------------------------------------------------------------------
+   608→
+   609→export default function GoalManager({ refreshTrigger = 0, module = 'small-enterprise' }: { refreshTrigger?: number; module?: string }) {
+   610→  const { toast } = useToast();
+   611→  const metricDefs = MODULE_METRICS[module] ?? MODULE_METRICS['small-enterprise'];
+   612→  const [goals, setGoals] = React.useState<Goal[]>([]);
+   613→  const [loading, setLoading] = React.useState(true);
+   614→  const [refreshing, setRefreshing] = React.useState(false);
+   615→  const [formOpen, setFormOpen] = React.useState(false);
+   616→  const [editing, setEditing] = React.useState<Goal | null>(null);
+   617→  const [deleting, setDeleting] = React.useState<Goal | null>(null);
+   618→
+   619→  const load = React.useCallback(async (silent = false) => {
+   620→    if (!silent) setRefreshing(true);
+   621→    try {
+   622→      const res = await fetch(`/api/goals?module=${encodeURIComponent(module)}`, { cache: 'no-store' });
+   623→      const data = await res.json();
+   624→      if (!res.ok) throw new Error(data.error || 'Failed to load goals');
+   625→      setGoals(data.data ?? []);
+   626→    } catch (err) {
+   627→      if (!silent) {
+   628→        toast({
+   629→          title: 'Could not load goals',
+   630→          description: err instanceof Error ? err.message : 'Please try again.',
+   631→          variant: 'destructive',
+   632→        });
+   633→      }
+   634→    } finally {
+   635→      setLoading(false);
+   636→      setRefreshing(false);
+   637→    }
+   638→  }, [toast, module]);
+   639→
+   640→  // Initial load + live refresh every 60 s (real-time progress tracking)
+   641→  React.useEffect(() => {
+   642→    load(true);
+   643→    const t = setInterval(() => load(true), 60_000);
+   644→    return () => clearInterval(t);
+   645→  }, [load]);
+   646→
+   647→  // Re-fetch when a new survey lands (parent bumps refreshTrigger)
+   648→  React.useEffect(() => {
+   649→    if (refreshTrigger > 0) load(true);
+   650→  }, [refreshTrigger, load]);
+   651→
+   652→  const removeGoal = async () => {
+   653→    if (!deleting) return;
+   654→    try {
+   655→      const res = await fetch(`/api/goals/${deleting.id}`, { method: 'DELETE' });
+   656→      const data = await res.json();
+   657→      if (!res.ok) throw new Error(data.error || 'Failed to delete goal');
+   658→      toast({ title: 'Goal deleted', description: `${metricDefs.metrics[deleting.metric]?.label ?? deleting.metric} · ${deleting.progress.label}` });
+   659→      setDeleting(null);
+   660→      load(true);
+   661→    } catch (err) {
+   662→      toast({
+   663→        title: 'Could not delete goal',
+   664→        description: err instanceof Error ? err.message : 'Please try again.',
+   665→        variant: 'destructive',
+   666→      });
+   667→    }
+   668→  };
+   669→
+   670→  const summary = React.useMemo(() => {
+   671→    const started = goals.filter((g) => g.progress.status !== 'upcoming');
+   672→    const avg = started.length
+   673→      ? Math.round(started.reduce((s, g) => s + g.progress.achievementPct, 0) / started.length)
+   674→      : 0;
+   675→    return {
+   676→      total: goals.length,
+   677→      avg,
+   678→      good: goals.filter((g) => g.progress.status === 'achieved' || g.progress.status === 'onTrack').length,
+   679→      behind: goals.filter((g) => g.progress.status === 'behind' || g.progress.status === 'missed').length,
+   680→    };
+   681→  }, [goals]);
+   682→
+   683→  const grouped = React.useMemo(() => {
+   684→    const map = new Map<Goal['periodType'], Goal[]>();
+   685→    for (const g of goals) {
+   686→      const list = map.get(g.periodType) ?? [];
+   687→      list.push(g);
+   688→      map.set(g.periodType, list);
+   689→    }
+   690→    for (const list of map.values()) {
+   691→      list.sort((a, b) => (a.progress.status === 'achieved' ? 1 : 0) - (b.progress.status === 'achieved' ? 1 : 0) || (a.periodStart < b.periodStart ? 1 : -1));
+   692→    }
+   693→    return map;
+   694→  }, [goals]);
+   695→
+   696→  return (
+   697→    <div className="animate-fade-up space-y-4">
+   698→      {/* Hero */}
+   699→      <Card className="overflow-hidden border-0 bg-brand-gradient py-0 text-white shadow-lg shadow-emerald-900/20">
+   700→        <CardContent className="relative px-5 py-5 sm:px-6 sm:py-6">
+   701→          <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+   702→          <div className="pointer-events-none absolute -bottom-20 right-24 h-48 w-48 rounded-full bg-amber-300/20 blur-2xl" />
+   703→          <div className="relative flex flex-wrap items-center justify-between gap-3">
+   704→            <div className="min-w-0">
+   705→              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-50/80">
+   706→                <Target className="h-3.5 w-3.5" />
+   707→                {metricDefs.heroLabel}
+   708→              </p>
+   709→              <h2 className="font-display mt-1 text-xl font-extrabold sm:text-2xl">Goals &amp; Targets</h2>
+   710→              <p className="mt-1 max-w-xl text-xs text-emerald-50/85 sm:text-sm">
+   711→                Set weekly, monthly and yearly targets, then follow live progress, percentage achievement and
+   712→                pace comparisons against the recorded data.
+   713→              </p>
+   714→            </div>
+   715→            <div className="flex shrink-0 items-center gap-2">
+   716→              <Button
+   717→                variant="outline"
+   718→                size="sm"
+   719→                className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+   720→                onClick={() => load()}
+   721→                disabled={refreshing}
+   722→                title="Refresh progress now (auto-refreshes every minute)"
+   723→              >
+   724→                <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+   725→                <span className="ml-1 hidden sm:inline">Refresh</span>
+   726→              </Button>
+   727→              <Button
+   728→                size="sm"
+   729→                className="bg-white text-emerald-800 shadow-md hover:bg-emerald-50"
+   730→                onClick={() => {
+   731→                  setEditing(null);
+   732→                  setFormOpen(true);
+   733→                }}
+   734→              >
+   735→                <Plus className="h-4 w-4" />
+   736→                New Goal
+   737→              </Button>
+   738→            </div>
+   739→          </div>
+   740→        </CardContent>
+   741→      </Card>
+   742→
+   743→      {/* Summary strip */}
+   744→      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   745→        {[
+   746→          { label: 'Active goals', value: summary.total, icon: Target, tone: 'text-emerald-800 bg-emerald-800/10' },
+   747→          { label: 'Avg achievement', value: `${summary.avg}%`, icon: Gauge, tone: 'text-teal-800 bg-teal-800/10' },
+   748→          { label: 'On track / achieved', value: summary.good, icon: TrendingUp, tone: 'text-emerald-700 bg-emerald-700/10' },
+   749→          { label: 'Behind / missed', value: summary.behind, icon: ArrowDownRight, tone: 'text-amber-700 bg-amber-700/10' },
+   750→        ].map((s) => (
+   751→          <Card key={s.label} className="card-lift gap-0 py-4">
+   752→            <CardContent className="flex items-center gap-3 px-4">
+   753→              <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', s.tone)}>
+   754→                <s.icon className="h-4.5 w-4.5" />
+   755→              </span>
+   756→              <div className="min-w-0">
+   757→                <p className="font-display text-lg font-extrabold leading-tight text-emerald-950">{s.value}</p>
+   758→                <p className="truncate text-[11px] text-muted-foreground">{s.label}</p>
+   759→              </div>
+   760→            </CardContent>
+   761→          </Card>
+   762→        ))}
+   763→      </div>
+   764→
+   765→      {/* Goals by period */}
+   766→      {loading ? (
+   767→        <Card className="items-center py-10 text-center">
+   768→          <CardContent className="flex flex-col items-center gap-2">
+   769→            <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+   770→            <p className="text-sm text-muted-foreground">Loading goals…</p>
+   771→          </CardContent>
+   772→        </Card>
+   773→      ) : goals.length === 0 ? (
+   774→        <Card className="py-10 text-center">
+   775→          <CardContent className="flex flex-col items-center gap-2">
+   776→            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-800/10 text-emerald-800">
+   777→              <Target className="h-6 w-6" />
+   778→            </span>
+   779→            <p className="font-display text-base font-bold text-emerald-950">No goals set yet</p>
+   780→            <p className="max-w-sm text-sm text-muted-foreground">
+   781→              {metricDefs.emptyText}
+   782→            </p>
+   783→            <Button
+   784→              className="mt-2 bg-brand-gradient text-white"
+   785→              onClick={() => {
+   786→                setEditing(null);
+   787→                setFormOpen(true);
+   788→              }}
+   789→            >
+   790→              <Plus className="mr-1 h-4 w-4" />
+   791→              Set the first goal
+   792→            </Button>
+   793→          </CardContent>
+   794→        </Card>
+   795→      ) : (
+   796→        PERIOD_ORDER.map((pt) => {
+   797→          const list = grouped.get(pt);
+   798→          if (!list || list.length === 0) return null;
+   799→          return (
+   800→            <section key={pt} className="space-y-3">
+   801→              <h3 className="font-display flex items-center gap-2 px-1 text-sm font-bold uppercase tracking-wide text-emerald-950/70">
+   802→                <CalendarDays className="h-4 w-4 text-emerald-700" />
+   803→                {PERIOD_SECTION_LABEL[pt]}
+   804→                <span className="rounded-full bg-emerald-900/[0.07] px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+   805→                  {list.length}
+   806→                </span>
+   807→              </h3>
+   808→              {list.map((g) => (
+   809→                <GoalCard
+   810→                  key={g.id}
+   811→                  goal={g}
+   812→                  metricDefs={metricDefs}
+   813→                  onEdit={(goal) => {
+   814→                    setEditing(goal);
+   815→                    setFormOpen(true);
+   816→                  }}
+   817→                  onDelete={setDeleting}
+   818→                />
+   819→              ))}
+   820→            </section>
+   821→          );
+   822→        })
+   823→      )}
+   824→
+   825→      {/* New / edit dialog */}
+   826→      <GoalForm open={formOpen} onOpenChange={setFormOpen} onSaved={() => load(true)} editing={editing} module={module} metricDefs={metricDefs} />
+   827→
+   828→      {/* Delete confirmation */}
+   829→      <AlertDialog open={!!deleting} onOpenChange={(v) => !v && setDeleting(null)}>
+   830→        <AlertDialogContent>
+   831→          <AlertDialogHeader>
+   832→            <AlertDialogTitle>Delete this goal?</AlertDialogTitle>
+   833→            <AlertDialogDescription>
+   834→              {deleting &&
+   835→                `${metricDefs.metrics[deleting.metric]?.label ?? deleting.metric} for ${deleting.progress.label} will be removed. This cannot be undone.`}
+   836→            </AlertDialogDescription>
+   837→          </AlertDialogHeader>
+   838→          <AlertDialogFooter>
+   839→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   840→            <AlertDialogAction
+   841→              className="bg-red-600 text-white hover:bg-red-700"
+   842→              onClick={(e) => {
+   843→                e.preventDefault();
+   844→                removeGoal();
+   845→              }}
+   846→            >
+   847→              Delete Goal
+   848→            </AlertDialogAction>
+   849→          </AlertDialogFooter>
+   850→        </AlertDialogContent>
+   851→      </AlertDialog>
+   852→    </div>
+   853→  );
+   854→}
+   855→
