@@ -386,7 +386,7 @@ export function AppSidebar({
       {/* Full vertical management list */}
       <nav className="flex-1 px-2.5 pb-3 pt-2.5" aria-label="Management navigation">
         <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800/45">
-          Manage / Bulchiinsa
+          Kuttaa Magaalaa Dhibayyuu
         </p>
         <SidebarNav activeTab={activeTab} onSelect={onSelect} isAdmin={isAdmin} />
       </nav>
@@ -474,7 +474,7 @@ export function MobileSidebar({ activeTab, onSelect, isAdmin }: MobileSidebarPro
         <SheetHeader className="gap-1 rounded-none border-b border-emerald-900/10 bg-white/60 p-4 text-left">
           <SheetTitle className="flex items-center gap-2 font-display text-base font-bold text-emerald-950">
             <Wrench className="h-4 w-4" />
-            Manage / Bulchiinsa
+            Kuttaa Magaalaa Dhibayyuu
           </SheetTitle>
           <SheetDescription className="text-xs text-emerald-800/60">
             All modules in one place / Module hundii bakka tokkotti

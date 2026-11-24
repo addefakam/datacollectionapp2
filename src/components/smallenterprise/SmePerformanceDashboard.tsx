@@ -132,14 +132,20 @@ export default function SmePerformanceDashboard() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
 
-  // Click-through detail dialog
+  // Click-through detail dialog (accountability table)
   const [detailUnit, setDetailUnit] = React.useState<{ subCity: string; area: string; label: string } | null>(null);
   const [detailSmes, setDetailSmes] = React.useState<SmeRecord[] | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
 
+  // Inline detail record opened by clicking a bar of the Target vs Registered chart
+  const [chartRow, setChartRow] = React.useState<PerfRow | null>(null);
+  const [chartSmes, setChartSmes] = React.useState<SmeRecord[] | null>(null);
+  const [chartLoading, setChartLoading] = React.useState(false);
+
   const load = React.useCallback(() => {
     setLoading(true);
     setError(false);
+    setChartRow(null); // a new scope/period invalidates the opened chart record
     const params = new URLSearchParams({ periodType, ref: refDate });
     if (levelScope !== 'all') params.set('subCity', levelScope);
     fetch(`/api/sme/performance?${params}`)
@@ -153,21 +159,41 @@ export default function SmePerformanceDashboard() {
     load();
   }, [load]);
 
+  /** Fetch the registered enterprises of one administrative unit. */
+  const fetchUnitSmes = (row: { subCity: string; area: string }) => {
+    const params = new URLSearchParams({ subCity: row.subCity, limit: '200' });
+    if (row.area) params.set('area', row.area);
+    return fetch(`/api/smallenterprises?${params}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('failed'))))
+      .then((json) => (json.data ?? []) as SmeRecord[]);
+  };
+
   /** Open the click-through detail for one administrative unit. */
   const openDetail = (row: { subCity: string; area: string; label: string }) => {
     setDetailUnit(row);
     setDetailSmes(null);
     setDetailLoading(true);
-    const params = new URLSearchParams({ subCity: row.subCity, limit: '200' });
-    if (row.area) params.set('area', row.area);
-    fetch(`/api/smallenterprises?${params}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('failed'))))
-      .then((json) => setDetailSmes(json.data ?? []))
+    fetchUnitSmes(row)
+      .then((list) => setDetailSmes(list))
       .catch(() => {
         setDetailSmes([]);
         toast({ title: 'Error', description: 'Could not load the enterprise list', variant: 'destructive' });
       })
       .finally(() => setDetailLoading(false));
+  };
+
+  /** Open the inline detail record below the Target vs Registered chart. */
+  const openChartDetail = (row: PerfRow) => {
+    setChartRow(row);
+    setChartSmes(null);
+    setChartLoading(true);
+    fetchUnitSmes(row)
+      .then((list) => setChartSmes(list))
+      .catch(() => {
+        setChartSmes([]);
+        toast({ title: 'Error', description: 'Could not load the enterprise list', variant: 'destructive' });
+      })
+      .finally(() => setChartLoading(false));
   };
 
   if (loading) {
@@ -209,7 +235,17 @@ export default function SmePerformanceDashboard() {
     label: r.label,
     Target: r.target,
     Registered: r.actual,
+    subCity: r.subCity,
+    area: r.area,
   }));
+
+  /** Map a clicked bar (via its datum payload) back to its performance row. */
+  const selectChartRow = (entry: { payload?: { subCity?: string; area?: string } }) => {
+    const p = entry?.payload;
+    if (!p) return;
+    const row = data.rows.find((r) => r.subCity === p.subCity && r.area === p.area);
+    if (row) openChartDetail(row);
+  };
   const pipelineChartData = data.rows.map((r) => ({
     label: r.label,
     Registered: r.standing.REGISTERED,
@@ -295,10 +331,13 @@ export default function SmePerformanceDashboard() {
             <Card className="card-lift rounded-2xl border-teal-100">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Target vs Registered</CardTitle>
-                <CardDescription>Establishment target and registrations per {isCityOverview ? 'sub-city' : 'woreda'} — {data.period.label}</CardDescription>
+                <CardDescription>
+                  Establishment target and registrations per {isCityOverview ? 'sub-city' : 'woreda'} — {data.period.label}.
+                  Click a bar to open its detail record below.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-64">
+                <div className="h-64 [&_.recharts-bar-rectangle]:cursor-pointer">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={targetChartData} margin={{ top: 4, right: 8, bottom: 0, left: -14 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" vertical={false} />
@@ -306,11 +345,66 @@ export default function SmePerformanceDashboard() {
                       <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
                       <Tooltip contentStyle={chartTooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="Target" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={22} />
-                      <Bar dataKey="Registered" fill="#0d9488" radius={[6, 6, 0, 0]} barSize={22} />
+                      <Bar
+                        dataKey="Target"
+                        fill="#f59e0b"
+                        radius={[6, 6, 0, 0]}
+                        barSize={22}
+                        cursor="pointer"
+                        onClick={(entry: { payload?: { subCity: string; area: string } }) => selectChartRow(entry)}
+                      />
+                      <Bar
+                        dataKey="Registered"
+                        fill="#0d9488"
+                        radius={[6, 6, 0, 0]}
+                        barSize={22}
+                        cursor="pointer"
+                        onClick={(entry: { payload?: { subCity: string; area: string } }) => selectChartRow(entry)}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+
+                {/* Inline detail record for the clicked bar */}
+                {chartRow && (
+                  <div className="mt-4 overflow-hidden rounded-xl border border-teal-100 bg-teal-50/40">
+                    <div className="flex items-center justify-between gap-2 border-b border-teal-100 bg-white/70 px-3 py-2">
+                      <p className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-teal-950">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-teal-700" />
+                        <span className="truncate">{chartRow.label}</span>
+                        <span className="shrink-0 text-[10px] font-normal text-muted-foreground">
+                          {chartRow.area ? `woreda of ${chartRow.subCity}` : 'sub-city'} · {data.period.label}
+                        </span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setChartRow(null)}
+                        className="shrink-0 rounded-md border border-teal-200 bg-white px-2 py-1 text-[10px] font-medium text-teal-700 transition-colors hover:bg-teal-50"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div className="space-y-3 p-3">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <MiniStat label="Target" value={chartRow.target > 0 ? fmt(chartRow.target) : 'Not set'} />
+                        <MiniStat label="Registered" value={fmt(chartRow.actual)} />
+                        <MiniStat label="Achievement" value={chartRow.target > 0 ? `${chartRow.achievementPct}%` : '—'} />
+                        <MiniStat label="Pending" value={fmt(chartRow.pending)} />
+                      </div>
+                      <UnitStatusChips row={chartRow} />
+                      <div className="rounded-xl border border-teal-100 bg-white">
+                        <p className="border-b border-teal-100 bg-teal-50/60 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+                          Registered enterprises {chartLoading ? '' : `(${chartSmes?.length ?? 0})`}
+                        </p>
+                        <EnterpriseListBlock loading={chartLoading} smes={chartSmes} />
+                      </div>
+                      <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <ChevronRight className="h-3 w-3" />
+                        Status changes and updates are managed in the SME Records page.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -470,7 +564,6 @@ export default function SmePerformanceDashboard() {
 
           {detailUnit && (() => {
             const row = data.rows.find((r) => r.subCity === detailUnit.subCity && r.area === detailUnit.area);
-            const statusMeta = row ? SME_UNIT_STATUS_META[row.unitStatus] : null;
             return (
               <div className="space-y-3">
                 {/* Summary */}
@@ -480,60 +573,14 @@ export default function SmePerformanceDashboard() {
                   <MiniStat label="Achievement" value={row && row.target > 0 ? `${row.achievementPct}%` : '—'} />
                   <MiniStat label="Pending" value={row ? fmt(row.pending) : '—'} />
                 </div>
-                {row && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline" className={cn('text-[10px]', statusMeta?.badgeClass)}>{statusMeta?.label}</Badge>
-                    {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
-                      <span key={s} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SME_STATUS_META[s].color }} />
-                        {SME_STATUS_META[s].label} {fmt(row.standing[s] ?? 0)}
-                      </span>
-                    ))}
-                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-                      <Users className="h-3 w-3" />{fmt(row.members)} members · F {fmt(row.femaleMembers)}
-                    </span>
-                    {row.target === 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-                        No target assigned for this period
-                      </span>
-                    )}
-                  </div>
-                )}
+                {row && <UnitStatusChips row={row} />}
 
                 {/* Enterprise list */}
                 <div className="rounded-xl border border-teal-100">
                   <p className="border-b border-teal-100 bg-teal-50/60 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
                     Registered enterprises {detailLoading ? '' : `(${detailSmes?.length ?? 0})`}
                   </p>
-                  {detailLoading ? (
-                    <div className="space-y-2 p-3">
-                      {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
-                    </div>
-                  ) : detailSmes && detailSmes.length > 0 ? (
-                    <div className="max-h-72 divide-y divide-teal-50 overflow-y-auto">
-                      {detailSmes.map((sme) => {
-                        const meta = SME_STATUS_META[(sme.status as SmeStatus) in SME_STATUS_META ? (sme.status as SmeStatus) : 'REGISTERED'];
-                        return (
-                          <div key={sme.id} className="flex items-center justify-between gap-2 px-3 py-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-semibold text-teal-950">{sme.enterpriseName}</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {sme.enterpriseType} · {fmt(sme.employeeCount)} members
-                                {sme.femaleEmployees > 0 ? ` (F ${fmt(sme.femaleEmployees)})` : ''}
-                                {' · '}{new Date(sme.createdAt).toLocaleDateString('en-GB')}
-                              </p>
-                            </div>
-                            <Badge variant="outline" className={cn('shrink-0 text-[10px]', meta.badgeClass)}>{meta.label}</Badge>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-1.5 p-6 text-center">
-                      <Store className="h-7 w-7 text-teal-200" />
-                      <p className="text-xs text-muted-foreground">No enterprises registered under this unit yet</p>
-                    </div>
-                  )}
+                  <EnterpriseListBlock loading={detailLoading} smes={detailSmes} />
                 </div>
                 <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   <ChevronRight className="h-3 w-3" />
@@ -592,6 +639,69 @@ function MiniStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2">
       <p className="text-[10px] uppercase tracking-wide text-teal-900/50">{label}</p>
       <p className="text-sm font-bold text-teal-950">{value}</p>
+    </div>
+  );
+}
+
+/** Standing chips (status pipeline, members, target flag) of one administrative unit. */
+function UnitStatusChips({ row }: { row: PerfRow }) {
+  const statusMeta = SME_UNIT_STATUS_META[row.unitStatus];
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
+      {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
+        <span key={s} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SME_STATUS_META[s].color }} />
+          {SME_STATUS_META[s].label} {fmt(row.standing[s] ?? 0)}
+        </span>
+      ))}
+      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+        <Users className="h-3 w-3" />{fmt(row.members)} members · F {fmt(row.femaleMembers)}
+      </span>
+      {row.target === 0 && (
+        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+          No target assigned for this period
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Body of the "Registered enterprises" box (loading skeleton, list or empty state). */
+function EnterpriseListBlock({ loading, smes }: { loading: boolean; smes: SmeRecord[] | null }) {
+  if (loading) {
+    return (
+      <div className="space-y-2 p-3">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+      </div>
+    );
+  }
+  if (smes && smes.length > 0) {
+    return (
+      <div className="max-h-72 divide-y divide-teal-50 overflow-y-auto">
+        {smes.map((sme) => {
+          const meta = SME_STATUS_META[(sme.status as SmeStatus) in SME_STATUS_META ? (sme.status as SmeStatus) : 'REGISTERED'];
+          return (
+            <div key={sme.id} className="flex items-center justify-between gap-2 px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-teal-950">{sme.enterpriseName}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {sme.enterpriseType} · {fmt(sme.employeeCount)} members
+                  {sme.femaleEmployees > 0 ? ` (F ${fmt(sme.femaleEmployees)})` : ''}
+                  {' · '}{new Date(sme.createdAt).toLocaleDateString('en-GB')}
+                </p>
+              </div>
+              <Badge variant="outline" className={cn('shrink-0 text-[10px]', meta.badgeClass)}>{meta.label}</Badge>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center gap-1.5 p-6 text-center">
+      <Store className="h-7 w-7 text-teal-200" />
+      <p className="text-xs text-muted-foreground">No enterprises registered under this unit yet</p>
     </div>
   );
 }
