@@ -616,8 +616,8 @@ export default function SmePerformanceDashboard() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">By Enterprise Type</CardTitle>
                 <CardDescription>
-                  Standing pipeline per enterprise type in scope — registered-in-period, stage breakdown and members.
-                  Click a bar or a row to see its records below.
+                  Standing pipeline per enterprise type in scope.
+                  Click a bar to show its stage breakdown, members and records below.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -625,12 +625,12 @@ export default function SmePerformanceDashboard() {
                   <p className="py-6 text-center text-sm text-muted-foreground">No enterprise records in scope yet</p>
                 ) : (
                   <>
-                    <div className="h-56 [&_.recharts-bar-rectangle]:cursor-pointer">
+                    <div className="h-64 [&_.recharts-bar-rectangle]:cursor-pointer">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={typeChartData} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 12 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" horizontal={false} />
-                          <XAxis type="number" tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
-                          <YAxis type="category" dataKey="type" width={110} tick={{ fontSize: 10, fill: '#134e4a' }} />
+                        <BarChart data={typeChartData} margin={{ top: 4, right: 8, bottom: 0, left: -14 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" vertical={false} />
+                          <XAxis type="category" dataKey="type" tick={{ fontSize: 10, fill: '#134e4a' }} />
+                          <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
                           <Tooltip contentStyle={chartTooltipStyle} />
                           <Legend wrapperStyle={{ fontSize: 11 }} />
                           {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
@@ -639,7 +639,7 @@ export default function SmePerformanceDashboard() {
                               dataKey={SME_STATUS_META[s].label}
                               stackId="type"
                               fill={SME_STATUS_META[s].color}
-                              barSize={14}
+                              barSize={18}
                               cursor="pointer"
                               onClick={(entry: { payload?: { type?: string } }) => {
                                 const t = entry?.payload?.type;
@@ -650,6 +650,7 @@ export default function SmePerformanceDashboard() {
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
+                    {typeDetail && (
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[680px] text-left text-xs sm:text-sm">
                         <thead>
@@ -669,7 +670,7 @@ export default function SmePerformanceDashboard() {
                           {(data.byType ?? []).map((t) => (
                             <tr
                               key={`type-${t.type}`}
-                              className="cursor-pointer border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60"
+                              className={`cursor-pointer border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60 ${typeDetail?.type === t.type ? 'bg-teal-50/80' : ''}`}
                               onClick={() => openTypeDetail(t.type)}
                               title="View records of this type"
                             >
@@ -693,6 +694,7 @@ export default function SmePerformanceDashboard() {
                         </tbody>
                       </table>
                     </div>
+                    )}
                   </>
                 )}
 
