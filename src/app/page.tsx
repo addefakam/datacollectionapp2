@@ -39,6 +39,8 @@ import SmallEnterpriseSurveyForm from '@/components/smallenterprise/SmallEnterpr
 import SmallEnterpriseList from '@/components/smallenterprise/SmallEnterpriseList';
 import SmallEnterpriseStats from '@/components/smallenterprise/SmallEnterpriseStats';
 import GoalManager from '@/components/smallenterprise/GoalManager';
+import SmeTargetManager from '@/components/smallenterprise/SmeTargetManager';
+import SmePerformanceDashboard from '@/components/smallenterprise/SmePerformanceDashboard';
 import CampaignGoalForm from '@/components/charity/campaign/CampaignGoalForm';
 import CampaignAchievementForm from '@/components/charity/campaign/CampaignAchievementForm';
 import CampaignReport from '@/components/charity/campaign/CampaignReport';
@@ -344,6 +346,20 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="mseGoals" className="mt-2 sm:mt-3">
               <GoalManager refreshTrigger={refreshTrigger} module="small-enterprise" />
+            </TabsContent>
+          )}
+
+          {/* ============ SME establishment targets: set + distribute (admin) ============ */}
+          {isAdmin && (
+            <TabsContent value="mseTargets" className="mt-2 sm:mt-3">
+              <SmeTargetManager refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {/* ============ SME performance dashboard: targets vs actual (admin) ============ */}
+          {isAdmin && (
+            <TabsContent value="mseDash" className="mt-2 sm:mt-3">
+              <SmePerformanceDashboard />
             </TabsContent>
           )}
 

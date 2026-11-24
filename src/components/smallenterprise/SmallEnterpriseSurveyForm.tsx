@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SMALL_ENTERPRISE_TYPES, SMALL_ENTERPRISE_OWNERSHIP_TYPES } from '@/lib/location-data';
+import { SME_STATUS_META, SME_STATUSES, type SmeStatus } from '@/lib/sme';
 import { useSettings } from '@/components/SettingsProvider';
 
 interface SmallEnterpriseSurveyFormProps {
@@ -79,6 +80,7 @@ export default function SmallEnterpriseSurveyForm({
     startupCapital: '',
     hasPremises: 'no',
     hasTraining: 'no',
+    status: 'REGISTERED',
     contactName: '',
     contactPhone: '',
   };
@@ -242,6 +244,7 @@ export default function SmallEnterpriseSurveyForm({
   const reviewItems = [
     { label: 'Enterprise / Midhaalee', value: formData.enterpriseName },
     { label: 'Enterprise Type / Gosa', value: formData.enterpriseType },
+    { label: 'Current Status / Sadarkaa', value: SME_STATUS_META[(formData.status as SmeStatus) in SME_STATUS_META ? (formData.status as SmeStatus) : 'REGISTERED'].label },
     { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
     { label: 'Sub-City / Kututtaa Maggalaa', value: formData.subCity },
     { label: 'Werreda', value: formData.area },
@@ -340,6 +343,21 @@ export default function SmallEnterpriseSurveyForm({
                 <div className="space-y-1.5 sm:space-y-2">
                   <Label htmlFor="specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
                   <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+                </div>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="status" className="text-xs sm:text-sm">Current Status<br /><span className="text-xs font-normal text-muted-foreground">Sadarkaa Ammaa</span></Label>
+                  <Select value={formData.status} onValueChange={(v) => handleSelectChange('status', v)}>
+                    <SelectTrigger id="status" className="text-sm sm:text-base"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SME_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          <span className="font-medium">{SME_STATUS_META[s].label}</span>
+                          <span className="block text-[10px] text-muted-foreground">{SME_STATUS_META[s].description}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">Establishment lifecycle: registered → fully legalized → awaiting operation → operational</p>
                 </div>
               </CardContent>
             </>

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { isSmeStatus } from '@/lib/sme';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -67,6 +68,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Establishment status — defaults to REGISTERED, must be a known lifecycle value
+    const status = isSmeStatus(body.status) ? body.status : 'REGISTERED';
+
     const smallEnterprise = await db.smallEnterprise.create({
       data: {
         enterpriseName,
@@ -82,6 +86,8 @@ export async function POST(request: NextRequest) {
         startupCapital: capital,
         hasPremises: toBool(hasPremises),
         hasTraining: toBool(hasTraining),
+        status,
+        statusUpdatedAt: status === 'REGISTERED' ? null : new Date(),
         contactName,
         contactPhone,
         surveyorName: surveyorName || null,

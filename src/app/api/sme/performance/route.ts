@@ -1,0 +1,215 @@
+import { db } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuthUser } from '@/lib/api-auth';
+import {
+  isSmePeriodType,
+  smePeriodLabel,
+  smePeriodPace,
+  smePeriodRange,
+  smeUnitStatus,
+  type SmeStatus,
+  type SmeUnitStatus,
+} from '@/lib/sme';
+import { smeRegisteredInPeriod, smeScopeStanding } from '@/lib/sme-server';
+
+export const dynamic = 'force-dynamic';
+
+// ---------------------------------------------------------------------------
+// GET /api/sme/performance?periodType=monthly|quarterly|yearly&ref=&subCity=
+//
+// Automated performance analysis of SME establishment per administrative
+// level, computed live from the SmallEnterprise records + ACTIVE SmeTargets:
+//   • no subCity   → city overview: one row per sub-city (SUB_CITY targets)
+//   • subCity=name → woreda drill-down: one row per woreda (WOREDA targets)
+//
+// Each row: target vs actual registrations in the period, achievement rate,
+// pace, standing pipeline (registered / legalized / awaiting / operational),
+// pending SMEs, operational progress and members mobilized. Units without an
+// assigned target are flagged for accountability.
+// ---------------------------------------------------------------------------
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const periodTypeParam = searchParams.get('periodType');
+    const periodType = isSmePeriodType(periodTypeParam) ? periodTypeParam : 'yearly';
+    const refParam = searchParams.get('ref');
+    const ref = refParam && !Number.isNaN(new Date(refParam).getTime()) ? new Date(refParam) : new Date();
+    const subCityParam = searchParams.get('subCity');
+    const drillSubCity = subCityParam ? String(subCityParam).trim() : '';
+
+    const { start, end } = smePeriodRange(periodType, ref);
+    const now = new Date();
+    const pacePct = smePeriodPace(start, end, now);
+
+    // ------------------------------------------------------------------
+    // Units for the requested level — from the managed locations so every
+    // administrative unit shows up (even those without records yet).
+    // ------------------------------------------------------------------
+    interface Unit {
+      subCity: string;
+      area: string; // '' for sub-city rows
+      label: string;
+    }
+    let units: Unit[] = [];
+    let scopeLevel: 'city' | 'subcity' = 'city';
+    let drillName: string | null = null;
+
+    if (drillSubCity) {
+      const sc = await db.subCity.findUnique({
+        where: { name: drillSubCity },
+        include: { areas: { orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] } },
+      });
+      if (!sc) {
+        return NextResponse.json({ error: `Unknown sub-city "${drillSubCity}"` }, { status: 404 });
+      }
+      scopeLevel = 'subcity';
+      drillName = sc.name;
+      units = sc.areas.map((a) => ({ subCity: sc.name, area: a.name, label: a.name }));
+    } else {
+      const subCities = await db.subCity.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      });
+      units = subCities.map((sc) => ({ subCity: sc.name, area: '', label: sc.name }));
+    }
+
+    // ------------------------------------------------------------------
+    // ACTIVE targets for the period at the row level (and the CITY-level
+    // target when showing the city overview).
+    // ------------------------------------------------------------------
+    const targetWhere = {
+      status: 'ACTIVE' as const,
+      periodType,
+      periodStart: start,
+      periodEnd: end,
+      level: scopeLevel === 'city' ? 'SUB_CITY' : 'WOREDA',
+    };
+    const targets = await db.smeTarget.findMany({ where: targetWhere });
+    const targetByScope = new Map<string, number>();
+    for (const t of targets) {
+      const key = scopeLevel === 'city' ? t.subCity : `${t.subCity}||${t.area}`;
+      targetByScope.set(key, (targetByScope.get(key) ?? 0) + t.targetValue);
+    }
+
+    let cityTarget: number | null = null;
+    if (scopeLevel === 'city') {
+      const cityGoal = await db.smeTarget.findFirst({
+        where: { status: 'ACTIVE', level: 'CITY', periodType, periodStart: start },
+      });
+      cityTarget = cityGoal ? cityGoal.targetValue : null;
+    }
+
+    // ------------------------------------------------------------------
+    // Per-unit analysis: period registrations + current standing pipeline.
+    // ------------------------------------------------------------------
+    const rows = await Promise.all(
+      units.map(async (u) => {
+        const target = targetByScope.get(scopeLevel === 'city' ? u.subCity : `${u.subCity}||${u.area}`) ?? 0;
+        const [actual, standing] = await Promise.all([
+          smeRegisteredInPeriod(u.subCity, u.area || undefined, start, end),
+          smeScopeStanding(u.subCity, u.area || undefined),
+        ]);
+
+        const pending = standing.total - standing.byStatus.OPERATIONAL;
+        const achievementPct = target > 0 ? Math.round((actual / target) * 1000) / 10 : 0;
+        const unitStatus: SmeUnitStatus = smeUnitStatus(target, actual, start, end, now);
+
+        return {
+          subCity: u.subCity,
+          area: u.area,
+          label: u.label,
+          target,
+          actual,
+          achievementPct,
+          unitStatus,
+          standing: standing.byStatus,
+          standingTotal: standing.total,
+          pending,
+          operationalRate:
+            standing.total > 0
+              ? Math.round((standing.byStatus.OPERATIONAL / standing.total) * 1000) / 10
+              : 0,
+          members: standing.members,
+          femaleMembers: standing.femaleMembers,
+        };
+      })
+    );
+
+    // ------------------------------------------------------------------
+    // Aggregates (KPI cards + overall status donut).
+    // ------------------------------------------------------------------
+    const totals = rows.reduce(
+      (acc, r) => {
+        acc.totalTarget += r.target;
+        acc.totalRegistered += r.actual;
+        acc.pending += r.pending;
+        acc.operational += r.standing.OPERATIONAL;
+        acc.standingTotal += r.standingTotal;
+        acc.members += r.members;
+        acc.femaleMembers += r.femaleMembers;
+        for (const s of Object.keys(r.standing) as SmeStatus[]) {
+          acc.byStatus[s] = (acc.byStatus[s] ?? 0) + r.standing[s];
+        }
+        return acc;
+      },
+      {
+        totalTarget: 0,
+        totalRegistered: 0,
+        pending: 0,
+        operational: 0,
+        standingTotal: 0,
+        members: 0,
+        femaleMembers: 0,
+        byStatus: { REGISTERED: 0, FULLY_LEGALIZED: 0, AWAITING_OPERATION: 0, OPERATIONAL: 0 } as Record<SmeStatus, number>,
+      }
+    );
+
+    const kpis = {
+      totalTarget: totals.totalTarget,
+      totalRegistered: totals.totalRegistered,
+      achievementPct:
+        totals.totalTarget > 0
+          ? Math.round((totals.totalRegistered / totals.totalTarget) * 1000) / 10
+          : 0,
+      pending: totals.pending,
+      operational: totals.operational,
+      standingTotal: totals.standingTotal,
+      operationalRate:
+        totals.standingTotal > 0
+          ? Math.round((totals.operational / totals.standingTotal) * 1000) / 10
+          : 0,
+      members: totals.members,
+      femaleMembers: totals.femaleMembers,
+      avgMembers: totals.standingTotal > 0 ? Math.round(totals.members / totals.standingTotal) : 0,
+    };
+
+    return NextResponse.json({
+      period: {
+        type: periodType,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        label: smePeriodLabel(periodType, start, end),
+        pacePct,
+      },
+      scope: { level: scopeLevel, subCity: drillName },
+      cityTarget,
+      cityActual:
+        scopeLevel === 'city'
+          ? await smeRegisteredInPeriod(undefined, undefined, start, end)
+          : null,
+      kpis,
+      totals: { byStatus: totals.byStatus, standingTotal: totals.standingTotal },
+      rows: rows.sort((a, b) => b.actual - a.actual || b.target - a.target || a.label.localeCompare(b.label)),
+    });
+  } catch (error) {
+    console.error('Error computing SME performance:', error);
+    return NextResponse.json(
+      { error: 'Failed to compute SME performance', detail: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
+  }
+}

@@ -219,9 +219,12 @@ model AgricultureCenter {
   updatedAt        DateTime @updatedAt
 }
 
-// Small enterprise (MSE — Micro & Small Enterprise) — Dhibayyuu initiative survey
+// Small enterprise (MSE — Micro & Small Enterprise) — Dhibayyuu initiative survey.
+// Status follows the establishment lifecycle tracked by the registration &
+// performance monitoring module: registered → fully legalized → awaiting
+// operation → operational.
 model SmallEnterprise {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   enterpriseName  String
   enterpriseType  String // Manufacturing, Construction, Retail Trade, Services, ...
   ownershipType   String // Private, Cooperative, Government / Public, NGO, ...
@@ -229,18 +232,24 @@ model SmallEnterprise {
   area            String
   specificAddress String
   licenseNumber   String?
-  employeeCount   Int      @default(0) // total employees
-  maleEmployees   Int      @default(0) // employees by sex: male
-  femaleEmployees Int      @default(0) // employees by sex: female
+  employeeCount   Int       @default(0) // total members / employees of the SME
+  maleEmployees   Int       @default(0) // employees by sex: male
+  femaleEmployees Int       @default(0) // employees by sex: female
   startupCapital  Float? // start-up / working capital in ETB
-  hasPremises     Boolean  @default(false) // has own working premises / space
-  hasTraining     Boolean  @default(false) // received MSE training or business support
+  hasPremises     Boolean   @default(false) // has own working premises / space
+  hasTraining     Boolean   @default(false) // received MSE training or business support
+  status          String    @default("REGISTERED") // REGISTERED | FULLY_LEGALIZED | AWAITING_OPERATION | OPERATIONAL
+  statusUpdatedAt DateTime? // when the establishment status last changed
+  statusNote      String? // optional note recorded with the latest status change
   contactName     String
   contactPhone    String
   surveyorName    String?
   surveyorId      String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status])
+  @@index([subCity, area])
 }
 
 // Bussa Goonofa / Charity initiative — charitable organizations serving the
@@ -266,6 +275,30 @@ model CharityInitiative {
   surveyorId           String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+}
+
+// Small Enterprise (MSE) establishment target set at city, sub-city or woreda
+// level. The city sets the overall establishment target; sub-cities distribute
+// theirs across their woredas; performance (registered vs target, achievement
+// rate, pending and operational progress) is computed live from the
+// SmallEnterprise records per administrative level.
+model SmeTarget {
+  id            String   @id @default(cuid())
+  level         String // CITY | SUB_CITY | WOREDA
+  subCity       String   @default("") // sub-city name (SUB_CITY / WOREDA), "" for city-wide
+  area          String   @default("") // woreda name (WOREDA), "" otherwise
+  periodType    String // monthly | quarterly | yearly
+  periodStart   DateTime // inclusive start of the target period
+  periodEnd     DateTime // inclusive end of the target period
+  targetValue   Int // number of SMEs to be established in the scope + period
+  note          String?
+  status        String   @default("ACTIVE") // ACTIVE | ARCHIVED
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([level, subCity, area, periodType, periodStart])
+  @@index([level, subCity, area, status])
 }
 
 // Official goal/target set on an initiative metric for a weekly, monthly or yearly

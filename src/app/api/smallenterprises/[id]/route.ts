@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { isSmeStatus } from '@/lib/sme';
 
 // GET /api/smallenterprises/[id]
 export async function GET(
@@ -77,6 +78,29 @@ export async function PUT(
 
     const toBool = (v: unknown) => v === true || v === 'true' || v === 'yes' || v === 1;
 
+    // Establishment status lifecycle: REGISTERED | FULLY_LEGALIZED |
+    // AWAITING_OPERATION | OPERATIONAL — stamps statusUpdatedAt + note on change
+    let status = existing.status;
+    let statusUpdatedAt = existing.statusUpdatedAt;
+    let statusNote = existing.statusNote;
+    if (body.status !== undefined) {
+      if (!isSmeStatus(body.status)) {
+        return NextResponse.json(
+          { error: 'Invalid status. Use REGISTERED, FULLY_LEGALIZED, AWAITING_OPERATION or OPERATIONAL' },
+          { status: 400 }
+        );
+      }
+      if (body.status !== existing.status) {
+        status = body.status;
+        statusUpdatedAt = new Date();
+        statusNote = body.statusNote ? String(body.statusNote).trim() || null : null;
+      } else if (body.statusNote !== undefined) {
+        statusNote = body.statusNote ? String(body.statusNote).trim() || null : null;
+      }
+    } else if (body.statusNote !== undefined) {
+      statusNote = body.statusNote ? String(body.statusNote).trim() || null : null;
+    }
+
     const updated = await db.smallEnterprise.update({
       where: { id },
       data: {
@@ -95,6 +119,9 @@ export async function PUT(
           : existing.startupCapital,
         hasPremises: body.hasPremises != null ? toBool(body.hasPremises) : existing.hasPremises,
         hasTraining: body.hasTraining != null ? toBool(body.hasTraining) : existing.hasTraining,
+        status,
+        statusUpdatedAt,
+        statusNote,
         contactName: body.contactName ?? existing.contactName,
         contactPhone: body.contactPhone ?? existing.contactPhone,
       },

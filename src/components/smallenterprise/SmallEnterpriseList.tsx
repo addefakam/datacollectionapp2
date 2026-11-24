@@ -59,9 +59,11 @@ import {
   Coins,
   Home,
   GraduationCap,
+  ArrowRightCircle,
 } from 'lucide-react';
 import { SMALL_ENTERPRISE_TYPES, SMALL_ENTERPRISE_OWNERSHIP_TYPES } from '@/lib/location-data';
 import { hasSexBreakdown } from '@/lib/sex-counts';
+import { SME_STATUSES, SME_STATUS_META, type SmeStatus } from '@/lib/sme';
 import { useSettings } from '@/components/SettingsProvider';
 
 interface SmallEnterprise {
@@ -79,6 +81,9 @@ interface SmallEnterprise {
   startupCapital: number | null;
   hasPremises: boolean;
   hasTraining: boolean;
+  status: string;
+  statusUpdatedAt: string | null;
+  statusNote: string | null;
   contactName: string;
   contactPhone: string;
   surveyorName: string | null;
@@ -101,6 +106,7 @@ interface EditForm {
   startupCapital: string;
   hasPremises: string;
   hasTraining: string;
+  status: string;
   contactName: string;
   contactPhone: string;
 }
@@ -130,6 +136,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
   const [filterSubCity, setFilterSubCity] = useState('');
   const [filterArea, setFilterArea] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [areas, setAreas] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -145,6 +152,9 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
   const [importing, setImporting] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
+  const [statusItem, setStatusItem] = useState<SmallEnterprise | null>(null);
+  const [statusForm, setStatusForm] = useState<{ status: string; note: string }>({ status: 'REGISTERED', note: '' });
+  const [savingStatus, setSavingStatus] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = useCallback(async () => {
@@ -155,6 +165,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
       if (filterSubCity) params.set('subCity', filterSubCity);
       if (filterArea) params.set('area', filterArea);
       if (filterType) params.set('enterpriseType', filterType);
+      if (filterStatus) params.set('status', filterStatus);
       params.set('page', String(page));
       params.set('limit', String(PAGE_SIZE));
 
@@ -173,7 +184,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSubCity, filterArea, filterType, page, toast]);
+  }, [search, filterSubCity, filterArea, filterType, filterStatus, page, toast]);
 
   useEffect(() => {
     fetchData();
@@ -208,6 +219,36 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
     }
   };
 
+  /** Advance the establishment status of one enterprise (REGISTERED →
+   * FULLY_LEGALIZED → AWAITING_OPERATION → OPERATIONAL). */
+  const openStatusUpdate = (item: SmallEnterprise) => {
+    setStatusItem(item);
+    setStatusForm({ status: item.status || 'REGISTERED', note: item.statusNote || '' });
+  };
+
+  const submitStatusUpdate = async () => {
+    if (!statusItem) return;
+    setSavingStatus(true);
+    try {
+      const res = await fetch(`/api/smallenterprises/${statusItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: statusForm.status, statusNote: statusForm.note || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Status update failed');
+      }
+      toast({ title: 'Status Updated', description: `${statusItem.enterpriseName} is now ${SME_STATUS_META[statusForm.status as SmeStatus]?.label ?? statusForm.status}` });
+      setStatusItem(null);
+      fetchData();
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to update status', variant: 'destructive' });
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const openEdit = (item: SmallEnterprise) => {
     setEditItem(item);
     setEditForm({
@@ -224,6 +265,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
       startupCapital: item.startupCapital != null ? String(item.startupCapital) : '',
       hasPremises: item.hasPremises ? 'yes' : 'no',
       hasTraining: item.hasTraining ? 'yes' : 'no',
+      status: item.status || 'REGISTERED',
       contactName: item.contactName,
       contactPhone: item.contactPhone,
     });
@@ -267,6 +309,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
       if (filterSubCity) params.set('subCity', filterSubCity);
       if (filterArea) params.set('area', filterArea);
       if (filterType) params.set('enterpriseType', filterType);
+      if (filterStatus) params.set('status', filterStatus);
       const res = await fetch(`/api/smallenterprises/export${format === 'excel' ? '/excel' : ''}?${params}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -344,7 +387,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Filters */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -365,6 +408,12 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
             <Select value={filterType} onValueChange={(v) => { setFilterType(v); setPage(1); }}>
               <SelectTrigger className="text-sm"><SelectValue placeholder="All Types" /></SelectTrigger>
               <SelectContent className="max-h-64">{SMALL_ENTERPRISE_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setPage(1); }}>
+              <SelectTrigger className="text-sm"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+              <SelectContent>
+                {SME_STATUSES.map((s) => (<SelectItem key={s} value={s}>{SME_STATUS_META[s].label}</SelectItem>))}
+              </SelectContent>
             </Select>
           </div>
 
@@ -399,6 +448,12 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <p className="truncate text-sm font-semibold text-teal-950">{item.enterpriseName}</p>
+                        <Badge
+                          variant="outline"
+                          className={"text-[10px] " + (SME_STATUS_META[(item.status as SmeStatus) in SME_STATUS_META ? (item.status as SmeStatus) : 'REGISTERED'].badgeClass)}
+                        >
+                          {SME_STATUS_META[(item.status as SmeStatus) in SME_STATUS_META ? (item.status as SmeStatus) : 'REGISTERED'].label}
+                        </Badge>
                         <Badge variant="secondary" className="bg-amber-100 text-[10px] text-amber-800">{item.enterpriseType}</Badge>
                         <Badge variant="outline" className="text-[10px]">{item.ownershipType}</Badge>
                         {item.licenseNumber && (
@@ -436,6 +491,9 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                     <div className="flex shrink-0 flex-row gap-1">
                       <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setViewItem(item)} title="View">
                         <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8 border-teal-200 text-teal-700 hover:bg-teal-50" onClick={() => openStatusUpdate(item)} title="Update Status">
+                        <ArrowRightCircle className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => openEdit(item)} title="Edit">
                         <Pencil className="h-3.5 w-3.5" />
@@ -479,6 +537,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
               </DialogHeader>
               <div className="rounded-lg border bg-slate-50 text-sm">
                 {[
+                  { label: 'Current Status / Sadarkaa', value: SME_STATUS_META[(viewItem.status as SmeStatus) in SME_STATUS_META ? (viewItem.status as SmeStatus) : 'REGISTERED'].label },
                   { label: 'Sub-City / Kututtaa Maggalaa', value: viewItem.subCity },
                   { label: 'Werreda', value: viewItem.area },
                   { label: 'Specific Address / Baka Addaa', value: viewItem.specificAddress },
@@ -607,6 +666,17 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                     </Select>
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Establishment Status</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SME_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>{SME_STATUS_META[s].label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-contactName" className="text-xs">Contact Person</Label>
@@ -627,6 +697,53 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Update status dialog */}
+      <Dialog open={!!statusItem} onOpenChange={(open) => { if (!open) setStatusItem(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightCircle className="h-5 w-5 text-teal-700" />
+              Update Establishment Status
+            </DialogTitle>
+            <DialogDescription>{statusItem?.enterpriseName}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">New Status</Label>
+              <Select value={statusForm.status} onValueChange={(v) => setStatusForm({ ...statusForm, status: v })}>
+                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SME_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      <span className="font-medium">{SME_STATUS_META[s].label}</span>
+                      <span className="block text-[10px] text-muted-foreground">{SME_STATUS_META[s].description}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="status-note" className="text-xs">Note</Label>
+              <Input
+                id="status-note"
+                placeholder="Optional note (e.g., license issued, started operation)"
+                value={statusForm.note}
+                onChange={(e) => setStatusForm({ ...statusForm, note: e.target.value })}
+                className="text-sm"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground">Lifecycle: Registered → Fully Legalized → Awaiting Operation → Operational</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusItem(null)}>Cancel</Button>
+            <Button onClick={submitStatusUpdate} disabled={savingStatus} className="bg-teal-700 text-white hover:bg-teal-800">
+              {savingStatus ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRightCircle className="mr-1.5 h-4 w-4" />}
+              Save Status
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

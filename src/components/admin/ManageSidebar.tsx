@@ -12,6 +12,7 @@ import {
   Database,
   Factory,
   FileBarChart2,
+  Flag,
   GraduationCap,
   HandCoins,
   HeartHandshake,
@@ -127,8 +128,10 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { tab: 'mseSurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'mseData', label: 'Records', icon: Database, adminOnly: true },
+      { tab: 'mseTargets', label: 'Set Targets', icon: Target, adminOnly: true },
+      { tab: 'mseDash', label: 'Performance Dashboard', icon: LineChart, adminOnly: true },
       { tab: 'mseStats', label: 'Stats', icon: BarChart3, adminOnly: true },
-      { tab: 'mseGoals', label: 'Goals', icon: Target, adminOnly: true },
+      { tab: 'mseGoals', label: 'Goals', icon: Flag, adminOnly: true },
     ],
   },
   {
