@@ -2,11 +2,9 @@
 
 import * as React from 'react';
 import {
-  Activity,
   BarChart3,
   Building2,
   Calendar,
-  CalendarCheck,
   ClipboardList,
   CloudOff,
   Database,
@@ -140,18 +138,6 @@ const NAV_GROUPS: NavGroup[] = [
       { tab: 'charityCampaignSet', label: 'Set Goal & Distribute', icon: Target, adminOnly: true },
       { tab: 'charityAchievements', label: 'Record Achievement', icon: HandCoins },
       { tab: 'charityOfficeReport', label: 'Office Goal Report', icon: FileBarChart2, adminOnly: true },
-    ],
-  },
-  {
-    key: 'performance-monitoring',
-    label: 'Performance Monitoring',
-    icon: Activity,
-    section: 'initiatives',
-    items: [
-      { tab: 'monEstablish', label: 'Establish Initiative', icon: Rocket },
-      { tab: 'monReports', label: 'Daily Report', icon: CalendarCheck },
-      { tab: 'monData', label: 'Initiative Records', icon: Database, adminOnly: true },
-      { tab: 'monDash', label: 'Performance Dashboard', icon: LineChart, adminOnly: true },
     ],
   },
   {
