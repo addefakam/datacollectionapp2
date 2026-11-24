@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   AlertTriangle,
   CalendarDays,
+  CheckCircle2,
   ChevronRight,
   Loader2,
   MapPin,
@@ -263,6 +264,51 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
   };
 
   const distributeTotal = Object.values(distributeValues).reduce((s, v) => s + (Number(v) || 0), 0);
+  const distributeRemaining = (distributeTarget?.targetValue ?? 0) - distributeTotal;
+  const distributePct = distributeTarget && distributeTarget.targetValue > 0
+    ? Math.min(100, (distributeTotal / distributeTarget.targetValue) * 100)
+    : 0;
+
+  /** Add the not-yet-distributed remainder equally across all child units (last unit takes the rounding leftover). */
+  const distributeRemainingEqually = () => {
+    if (!distributeTarget || childUnits.length === 0 || distributeRemaining <= 0) return;
+    const each = Math.floor(distributeRemaining / childUnits.length);
+    setDistributeValues((prev) => {
+      const next = { ...prev };
+      let leftover = distributeRemaining;
+      childUnits.forEach(({ key }, i) => {
+        const add = i === childUnits.length - 1 ? leftover : each;
+        next[key] = String((Number(next[key]) || 0) + Math.max(0, add));
+        leftover -= add;
+      });
+      return next;
+    });
+  };
+
+  // --- overview stats & grouped list ---------------------------------------
+
+  /** Targets grouped by administrative level so the city → sub-city → woreda hierarchy reads top-down. */
+  const grouped = React.useMemo(() => {
+    const order: Record<SmeTargetLevel, number> = { CITY: 0, SUB_CITY: 1, WOREDA: 2 };
+    const sorted = [...targets].sort((a, b) =>
+      order[a.level] - order[b.level]
+      || (a.subCity || '').localeCompare(b.subCity || '')
+      || (a.area || '').localeCompare(b.area || '')
+      || a.periodStart.localeCompare(b.periodStart)
+    );
+    return {
+      city: sorted.filter((t) => t.level === 'CITY'),
+      subCity: sorted.filter((t) => t.level === 'SUB_CITY'),
+      woreda: sorted.filter((t) => t.level === 'WOREDA'),
+    };
+  }, [targets]);
+
+  const stats = React.useMemo(() => ({
+    city: targets.filter((t) => t.level === 'CITY').length,
+    subCity: targets.filter((t) => t.level === 'SUB_CITY').length,
+    woreda: targets.filter((t) => t.level === 'WOREDA').length,
+    achieved: targets.filter((t) => t.progress.unitStatus === 'achieved').length,
+  }), [targets]);
 
   const handleDistribute = async () => {
     if (!distributeTarget) return;
@@ -293,7 +339,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
   // --- render ---------------------------------------------------------------
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <Card className="rounded-2xl border-teal-100">
         <CardHeaderComponent
           total={targets.length}
@@ -301,7 +347,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
           onRefresh={load}
           loading={loading}
         />
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           {loading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 w-full rounded-xl" />)}
@@ -319,89 +365,40 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
               </Button>
             </div>
           ) : (
-            targets.map((t) => {
-              const statusMeta = SME_UNIT_STATUS_META[t.progress.unitStatus];
-              const canDistribute = t.level === 'CITY' || t.level === 'SUB_CITY';
-              return (
-                <div key={t.id} className="rounded-xl border border-teal-100 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            'text-[10px]',
-                            t.level === 'CITY' && 'bg-teal-100 text-teal-800',
-                            t.level === 'SUB_CITY' && 'bg-blue-50 text-blue-700',
-                            t.level === 'WOREDA' && 'bg-violet-50 text-violet-700'
-                          )}
-                        >
-                          {t.level === 'CITY' ? 'City-wide' : t.level === 'SUB_CITY' ? 'Sub-city' : 'Woreda'}
-                        </Badge>
-                        <p className="text-sm font-semibold text-teal-950">
-                          {smeTargetScopeLabel(t.level, t.subCity, t.area)}
-                        </p>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{t.periodLabel} · {t.periodType}</span>
-                        <span className="font-semibold text-teal-900">Target {fmt(t.targetValue)} enterprises</span>
-                        {t.createdByName && <span>set by {t.createdByName}</span>}
-                      </div>
-                      {t.note && <p className="mt-1 text-[11px] italic text-muted-foreground">{t.note}</p>}
-                    </div>
-                    <div className="flex shrink-0 flex-row gap-1">
-                      {canDistribute && (
-                        <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => openDistribute(t)}>
-                          <Share2 className="mr-1 h-3 w-3" />
-                          {t.level === 'CITY' ? 'Distribute' : 'Assign to woredas'}
-                        </Button>
-                      )}
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => openEdit(t)} title="Edit">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50" onClick={() => setDeletingId(t.id)} title="Delete">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
+            <>
+              {/* Overview strip */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <SummaryStat icon={<Target className="h-3 w-3 text-teal-600" />} label="City-wide" value={stats.city} hint="overall target(s)" />
+                <SummaryStat icon={<MapPin className="h-3 w-3 text-blue-600" />} label="Sub-city" value={stats.subCity} hint="distributed shares" />
+                <SummaryStat icon={<ChevronRight className="h-3 w-3 text-violet-600" />} label="Woreda" value={stats.woreda} hint="assigned targets" />
+                <SummaryStat icon={<CheckCircle2 className="h-3 w-3 text-emerald-600" />} label="Achieved" value={`${stats.achieved}/${targets.length}`} hint="targets already reached" />
+              </div>
 
-                  {/* Live progress */}
-                  <div className="mt-3 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">
-                        Registered <span className="font-bold text-teal-900">{fmt(t.progress.actual)}</span> of {fmt(t.targetValue)}
-                        {' · '}{t.progress.achievementPct}% of target vs {t.progress.pacePct}% of period elapsed
-                      </span>
-                      <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
-                    </div>
-                    <div className="relative h-2 overflow-hidden rounded-full bg-teal-50">
-                      <div
-                        className={cn(
-                          'absolute inset-y-0 left-0 rounded-full',
-                          t.progress.unitStatus === 'achieved' ? 'bg-emerald-500'
-                            : t.progress.unitStatus === 'behind' || t.progress.unitStatus === 'missed' ? 'bg-red-400'
-                              : 'bg-teal-500'
-                        )}
-                        style={{ width: `${Math.min(t.progress.achievementPct, 100)}%` }}
-                      />
-                      {/* pace marker */}
-                      <div className="absolute inset-y-0 w-0.5 bg-amber-500/70" style={{ left: `${Math.min(t.progress.pacePct, 100)}%` }} title="Expected pace" />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11px]">
-                      {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
-                        <span key={s} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5 text-slate-600">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SME_STATUS_META[s].color }} />
-                          {SME_STATUS_META[s].label} {fmt(t.progress.standing[s] ?? 0)}
-                        </span>
-                      ))}
-                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700">
-                        <Users className="h-3 w-3" />{fmt(t.progress.standing.members ?? 0)} members
-                      </span>
-                    </div>
-                  </div>
+              {grouped.city.length > 0 && (
+                <div className="space-y-2.5">
+                  <GroupHeading icon={<Target className="h-3.5 w-3.5 text-teal-700" />} label="City-wide targets" count={grouped.city.length} hint="the overall goal for the whole city" />
+                  {grouped.city.map((t) => (
+                    <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
+                  ))}
                 </div>
-              );
-            })
+              )}
+              {grouped.subCity.length > 0 && (
+                <div className="space-y-2.5">
+                  <GroupHeading icon={<MapPin className="h-3.5 w-3.5 text-blue-600" />} label="Sub-city targets" count={grouped.subCity.length} hint="shares distributed from the city target" />
+                  {grouped.subCity.map((t) => (
+                    <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
+                  ))}
+                </div>
+              )}
+              {grouped.woreda.length > 0 && (
+                <div className="space-y-2.5">
+                  <GroupHeading icon={<ChevronRight className="h-3.5 w-3.5 text-violet-600" />} label="Woreda targets" count={grouped.woreda.length} hint="assigned by sub-cities" />
+                  {grouped.woreda.map((t) => (
+                    <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -542,18 +539,36 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
                 No {distributeTarget?.level === 'CITY' ? 'sub-cities' : 'woredas'} configured yet — add them in Settings first.
               </p>
             )}
-            <div className={cn(
-              'flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium',
-              distributeTotal === (distributeTarget?.targetValue ?? 0)
-                ? 'bg-teal-50 text-teal-800'
-                : 'bg-amber-50 text-amber-800'
-            )}>
-              <span className="flex items-center gap-1.5">
-                {distributeTotal !== (distributeTarget?.targetValue ?? 0) && <AlertTriangle className="h-3.5 w-3.5" />}
-                Distributed total
-              </span>
-              <span>{fmt(distributeTotal)} / {fmt(distributeTarget?.targetValue ?? 0)}</span>
+            <div className="space-y-1.5 rounded-lg border border-teal-100 bg-slate-50/60 px-3 py-2">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span className={cn('flex items-center gap-1.5', distributeRemaining === 0 ? 'text-teal-800' : 'text-amber-800')}>
+                  {distributeRemaining !== 0 && <AlertTriangle className="h-3.5 w-3.5" />}
+                  Distributed total
+                </span>
+                <span className="text-teal-950">{fmt(distributeTotal)} / {fmt(distributeTarget?.targetValue ?? 0)}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-white">
+                <div className={cn('h-full rounded-full', distributeRemaining === 0 ? 'bg-teal-600' : 'bg-amber-500')} style={{ width: `${distributePct}%` }} />
+              </div>
+              <p className={cn('text-[10px]', distributeRemaining === 0 ? 'text-teal-700' : 'text-amber-700')}>
+                {distributeRemaining === 0
+                  ? 'Fully distributed — every enterprise is accounted for.'
+                  : distributeRemaining > 0
+                    ? `${fmt(distributeRemaining)} enterprises not yet assigned.`
+                    : `${fmt(-distributeRemaining)} more than the parent target.`}
+              </p>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-full text-xs"
+              disabled={distributeRemaining <= 0 || childUnits.length === 0}
+              onClick={distributeRemainingEqually}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              Add remaining {fmt(Math.max(0, distributeRemaining))} equally
+            </Button>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDistributeTarget(null)}>Cancel</Button>
@@ -587,6 +602,137 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
   );
 }
 
+/** One target: scope header, actions, and live progress against registrations. */
+function TargetCard({
+  t,
+  onDistribute,
+  onEdit,
+  onDelete,
+}: {
+  t: SmeTarget;
+  onDistribute: (t: SmeTarget) => void;
+  onEdit: (t: SmeTarget) => void;
+  onDelete: (id: string) => void;
+}) {
+  const statusMeta = SME_UNIT_STATUS_META[t.progress.unitStatus];
+  const canDistribute = t.level === 'CITY' || t.level === 'SUB_CITY';
+  return (
+    <div className="rounded-xl border border-teal-100 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge
+              variant="secondary"
+              className={cn(
+                'text-[10px]',
+                t.level === 'CITY' && 'bg-teal-100 text-teal-800',
+                t.level === 'SUB_CITY' && 'bg-blue-50 text-blue-700',
+                t.level === 'WOREDA' && 'bg-violet-50 text-violet-700'
+              )}
+            >
+              {t.level === 'CITY' ? 'City-wide' : t.level === 'SUB_CITY' ? 'Sub-city' : 'Woreda'}
+            </Badge>
+            <p className="truncate text-sm font-semibold text-teal-950">
+              {smeTargetScopeLabel(t.level, t.subCity, t.area)}
+            </p>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{t.periodLabel} · {t.periodType}</span>
+            <span className="font-semibold text-teal-900">Target {fmt(t.targetValue)} enterprises</span>
+            {t.createdByName && <span>set by {t.createdByName}</span>}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-row gap-1">
+          {canDistribute && (
+            <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => onDistribute(t)}>
+              <Share2 className="mr-1 h-3 w-3" />
+              {t.level === 'CITY' ? 'Distribute' : 'Assign to woredas'}
+            </Button>
+          )}
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onEdit(t)} title="Edit target">
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50" onClick={() => onDelete(t.id)} title="Delete target">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Live progress */}
+      <div className="mt-3 rounded-lg bg-slate-50/70 px-3 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-slate-600">
+            <span className="text-lg font-bold leading-none text-teal-900">{fmt(t.progress.actual)}</span>
+            <span className="ml-1 text-muted-foreground">of {fmt(t.targetValue)} registered</span>
+          </p>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-teal-800">{t.progress.achievementPct}%</span>
+            <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
+          </div>
+        </div>
+        <div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-white">
+          <div
+            className={cn(
+              'absolute inset-y-0 left-0 rounded-full',
+              t.progress.unitStatus === 'achieved' ? 'bg-emerald-500'
+                : t.progress.unitStatus === 'behind' || t.progress.unitStatus === 'missed' ? 'bg-red-400'
+                  : 'bg-teal-500'
+            )}
+            style={{ width: `${Math.min(t.progress.achievementPct, 100)}%` }}
+          />
+          {/* pace marker */}
+          <div className="absolute inset-y-0 w-0.5 bg-amber-500/80" style={{ left: `${Math.min(t.progress.pacePct, 100)}%` }} title="Expected pace for today" />
+        </div>
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          {t.progress.pacePct}% of the period elapsed — the amber marker shows the expected pace for today.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200/70 pt-2">
+          {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-slate-600">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SME_STATUS_META[s].color }} />
+              {SME_STATUS_META[s].label} {fmt(t.progress.standing[s] ?? 0)}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+            <Users className="h-3 w-3" />{fmt(t.progress.standing.members ?? 0)} members
+          </span>
+        </div>
+      </div>
+      {t.note && (
+        <p className="mt-2 flex items-start gap-1.5 text-[11px] italic text-muted-foreground">
+          <span aria-hidden="true" className="leading-none text-teal-400">“</span>
+          <span>{t.note}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Section heading for one administrative level of the target hierarchy. */
+function GroupHeading({ icon, label, count, hint }: { icon: React.ReactNode; label: string; count: number; hint?: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-teal-100 pb-1.5">
+      <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+        {icon}
+        {label}
+      </span>
+      <Badge variant="secondary" className="bg-teal-50 text-[10px] text-teal-700">{count}</Badge>
+      {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+    </div>
+  );
+}
+
+/** Compact overview stat for the strip above the target list. */
+function SummaryStat({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: React.ReactNode; hint: string }) {
+  return (
+    <div className="rounded-xl border border-teal-100 bg-white px-3 py-2.5">
+      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">{icon}{label}</p>
+      <p className="mt-1 text-xl font-bold leading-none text-teal-950">{value}</p>
+      <p className="mt-1 text-[10px] text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
 /** Local header — keeps the component self-contained. */
 function CardHeaderComponent({
   total,
@@ -603,7 +749,7 @@ function CardHeaderComponent({
     <div className="flex flex-wrap items-center justify-between gap-2 px-6 pt-6">
       <div>
         <h2 className="flex items-center gap-2 text-base font-semibold sm:text-lg">
-          <Store className="h-5 w-5 text-amber-600" />
+          <Store className="h-5 w-5 text-teal-700" />
           SME Establishment Targets
           <Badge variant="secondary" className="bg-amber-100 text-amber-800">{total}</Badge>
         </h2>
