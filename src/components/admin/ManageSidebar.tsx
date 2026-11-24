@@ -44,8 +44,16 @@ interface NavGroup {
   label: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  /** Sidebar band this module belongs to: sector data collection vs. city initiatives. */
+  section?: 'data' | 'initiatives' | 'admin';
   items: NavItem[];
 }
+
+/** Section headers rendered between module groups in the sidebar. */
+const SECTION_LABELS: Partial<Record<string, string>> = {
+  data: 'Data Collection',
+  initiatives: 'Initiatives',
+};
 
 /** Every page in the app, grouped by module — rendered vertically in the left sidebar. */
 const NAV_GROUPS: NavGroup[] = [
@@ -53,6 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'industry',
     label: 'Industry',
     icon: Factory,
+    section: 'data',
     items: [
       { tab: 'survey', label: 'Survey', icon: ClipboardList },
       { tab: 'indData', label: 'Records', icon: Database, adminOnly: true },
@@ -64,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'hotel',
     label: 'Hotel',
     icon: Building2,
+    section: 'data',
     items: [
       { tab: 'hotelSurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'hotelData', label: 'Records', icon: Database, adminOnly: true },
@@ -75,6 +85,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'health',
     label: 'Health',
     icon: Stethoscope,
+    section: 'data',
     items: [
       { tab: 'healthSurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'healthData', label: 'Records', icon: Database, adminOnly: true },
@@ -85,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'education',
     label: 'Education',
     icon: GraduationCap,
+    section: 'data',
     items: [
       { tab: 'eduSurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'eduData', label: 'Records', icon: Database, adminOnly: true },
@@ -95,6 +107,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'agriculture',
     label: 'Agriculture',
     icon: Sprout,
+    section: 'data',
     items: [
       { tab: 'agriSurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'agriData', label: 'Records', icon: Database, adminOnly: true },
@@ -105,6 +118,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: 'small-enterprise',
     label: 'Small Enterprise',
     icon: Store,
+    section: 'initiatives',
     items: [
       { tab: 'mseSurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'mseData', label: 'Records', icon: Database, adminOnly: true },
@@ -160,11 +174,27 @@ export function SidebarNav({ activeTab, onSelect, isAdmin }: SidebarNavProps) {
 
   return (
     <Accordion type="multiple" value={openGroups} onValueChange={setOpenGroups} className="w-full">
-      {groups.map((group) => {
+      {groups.map((group, index) => {
         const GroupIcon = group.icon;
         const isGroupActive = group.key === activeGroupKey;
+        // Render a section header (e.g. "Initiatives") when the sidebar band changes.
+        const sectionLabel =
+          group.section && SECTION_LABELS[group.section] && group.section !== groups[index - 1]?.section
+            ? SECTION_LABELS[group.section]
+            : null;
         return (
-          <AccordionItem key={group.key} value={group.key} className="rounded-xl border-b-0">
+          <React.Fragment key={group.key}>
+            {sectionLabel && (
+              <p
+                className={cn(
+                  'px-2 text-[10px] font-bold uppercase tracking-wider text-emerald-800/45',
+                  index === 0 ? 'pb-1.5' : 'pb-1.5 pt-3'
+                )}
+              >
+                {sectionLabel}
+              </p>
+            )}
+          <AccordionItem value={group.key} className="rounded-xl border-b-0">
             <AccordionTrigger
               className={cn(
                 'items-center gap-2 rounded-xl px-2.5 py-2.5 text-[13px] font-bold no-underline transition-colors hover:bg-emerald-900/[0.06] hover:no-underline data-[state=open]:bg-emerald-900/[0.06] [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:translate-y-0 [&>svg]:text-emerald-700/50',
@@ -210,6 +240,7 @@ export function SidebarNav({ activeTab, onSelect, isAdmin }: SidebarNavProps) {
               </div>
             </AccordionContent>
           </AccordionItem>
+          </React.Fragment>
         );
       })}
     </Accordion>
