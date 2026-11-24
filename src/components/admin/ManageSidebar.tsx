@@ -13,6 +13,7 @@ import {
   Menu,
   PieChart,
   RefreshCw,
+  Rocket,
   Shield,
   Sprout,
   Store,
@@ -49,11 +50,8 @@ interface NavGroup {
   items: NavItem[];
 }
 
-/** Section headers rendered between module groups in the sidebar. */
-const SECTION_LABELS: Partial<Record<string, string>> = {
-  data: 'Data Collection',
-  initiatives: 'Initiatives',
-};
+/** Section header rendered above the sector module groups. */
+const DATA_SECTION_LABEL = 'Data Collection';
 
 /** Every page in the app, grouped by module — rendered vertically in the left sidebar. */
 const NAV_GROUPS: NavGroup[] = [
@@ -154,95 +152,163 @@ interface SidebarNavProps {
   isAdmin: boolean;
 }
 
-/** Vertical list of ALL management pages — collapsible groups, folded at load.
- *  Only the group holding the active tab starts open; navigating into another
- *  module expands that group automatically. Styled for the light porcelain sidebar. */
+/** Vertical list of ALL management pages — collapsible, folded at load.
+ *  Sector modules sit directly under the sidebar; initiative modules (e.g. Small
+ *  Enterprise) are listed inside the expandable "Initiatives" tab — expanding it
+ *  shows the initiatives, each unfolding to its Survey/Records/Stats/Goals pages.
+ *  Styled for the light porcelain sidebar. */
 export function SidebarNav({ activeTab, onSelect, isAdmin }: SidebarNavProps) {
   const groups = React.useMemo(() => visibleGroups(isAdmin), [isAdmin]);
-  const activeGroupKey = groups.find((g) => g.items.some((i) => i.tab === activeTab))?.key;
-  // Start folded: only the active module's group is open at load time.
+  const dataGroups = groups.filter((g) => g.section === 'data');
+  const initiativeModules = groups.filter((g) => g.section === 'initiatives');
+  const adminGroups = groups.filter((g) => !g.section || g.section === 'admin');
+
+  const activeModuleKey = initiativeModules.find((m) => m.items.some((i) => i.tab === activeTab))?.key;
+  const activePlainGroup = groups
+    .filter((g) => g.section !== 'initiatives')
+    .find((g) => g.items.some((i) => i.tab === activeTab))?.key;
+
+  // Start folded: at load only the active tab's own path is open, everything
+  // else (including the Initiatives tab) stays collapsed until clicked.
   const [openGroups, setOpenGroups] = React.useState<string[]>(() =>
-    activeGroupKey ? [activeGroupKey] : []
+    activeModuleKey ? ['initiatives'] : activePlainGroup ? [activePlainGroup] : []
+  );
+  const [openModules, setOpenModules] = React.useState<string[]>(() =>
+    activeModuleKey ? [activeModuleKey] : []
   );
 
-  // When navigation lands on a tab inside a folded group, unfold that group.
-  // Runs only when the active group changes, so manual collapsing still sticks.
+  // When navigation lands inside a folded area, unfold exactly that path.
+  // Runs only when the destination changes, so manual collapsing still sticks.
   React.useEffect(() => {
-    if (!activeGroupKey) return;
-    setOpenGroups((prev) => (prev.includes(activeGroupKey) ? prev : [...prev, activeGroupKey]));
-  }, [activeGroupKey]);
+    if (activeModuleKey) {
+      setOpenGroups((prev) => (prev.includes('initiatives') ? prev : [...prev, 'initiatives']));
+      setOpenModules((prev) => (prev.includes(activeModuleKey) ? prev : [...prev, activeModuleKey]));
+    } else if (activePlainGroup) {
+      setOpenGroups((prev) => (prev.includes(activePlainGroup) ? prev : [...prev, activePlainGroup]));
+    }
+  }, [activeModuleKey, activePlainGroup]);
+
+  const renderPageButtons = (items: NavItem[]) => (
+    <div className="space-y-0.5 pl-3">
+      {items.map((item) => {
+        const ItemIcon = item.icon;
+        const isActive = activeTab === item.tab;
+        return (
+          <button
+            key={item.tab}
+            type="button"
+            onClick={() => onSelect(item.tab)}
+            className={cn(
+              'flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-[13px] transition-colors',
+              isActive
+                ? 'bg-brand-gradient font-semibold text-white shadow-md shadow-emerald-600/25'
+                : 'text-emerald-950/60 hover:bg-emerald-900/[0.06] hover:text-emerald-950'
+            )}
+          >
+            <ItemIcon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const renderModuleGroup = (group: NavGroup) => {
+    const GroupIcon = group.icon;
+    const isGroupActive = group.key === activePlainGroup;
+    return (
+      <AccordionItem key={group.key} value={group.key} className="rounded-xl border-b-0">
+        <AccordionTrigger
+          className={cn(
+            'items-center gap-2 rounded-xl px-2.5 py-2.5 text-[13px] font-bold no-underline transition-colors hover:bg-emerald-900/[0.06] hover:no-underline data-[state=open]:bg-emerald-900/[0.06] [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:translate-y-0 [&>svg]:text-emerald-700/50',
+            isGroupActive && 'bg-emerald-900/[0.06]'
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all',
+                isGroupActive
+                  ? 'bg-brand-gradient text-white shadow-md shadow-emerald-600/25'
+                  : 'bg-emerald-800/10 text-emerald-800'
+              )}
+            >
+              <GroupIcon className="h-3.5 w-3.5" />
+            </span>
+            <span className="truncate uppercase tracking-wide text-emerald-950/75">{group.label}</span>
+          </span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-1.5 pt-0.5">
+          {renderPageButtons(group.items)}
+        </AccordionContent>
+      </AccordionItem>
+    );
+  };
 
   return (
     <Accordion type="multiple" value={openGroups} onValueChange={setOpenGroups} className="w-full">
-      {groups.map((group, index) => {
-        const GroupIcon = group.icon;
-        const isGroupActive = group.key === activeGroupKey;
-        // Render a section header (e.g. "Initiatives") when the sidebar band changes.
-        const sectionLabel =
-          group.section && SECTION_LABELS[group.section] && group.section !== groups[index - 1]?.section
-            ? SECTION_LABELS[group.section]
-            : null;
-        return (
-          <React.Fragment key={group.key}>
-            {sectionLabel && (
-              <p
+      {dataGroups.length > 0 && (
+        <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800/45">
+          {DATA_SECTION_LABEL}
+        </p>
+      )}
+      {dataGroups.map((group) => renderModuleGroup(group))}
+
+      {initiativeModules.length > 0 && (
+        <AccordionItem value="initiatives" className="mt-3 rounded-xl border-b-0">
+          <AccordionTrigger
+            className={cn(
+              'items-center gap-2 rounded-xl px-2.5 py-2.5 text-[13px] font-bold no-underline transition-colors hover:bg-emerald-900/[0.06] hover:no-underline data-[state=open]:bg-emerald-900/[0.06] [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:translate-y-0 [&>svg]:text-emerald-700/50',
+              activeModuleKey && 'bg-emerald-900/[0.06]'
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span
                 className={cn(
-                  'px-2 text-[10px] font-bold uppercase tracking-wider text-emerald-800/45',
-                  index === 0 ? 'pb-1.5' : 'pb-1.5 pt-3'
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all',
+                  activeModuleKey
+                    ? 'bg-brand-gradient text-white shadow-md shadow-emerald-600/25'
+                    : 'bg-emerald-800/10 text-emerald-800'
                 )}
               >
-                {sectionLabel}
-              </p>
-            )}
-          <AccordionItem value={group.key} className="rounded-xl border-b-0">
-            <AccordionTrigger
-              className={cn(
-                'items-center gap-2 rounded-xl px-2.5 py-2.5 text-[13px] font-bold no-underline transition-colors hover:bg-emerald-900/[0.06] hover:no-underline data-[state=open]:bg-emerald-900/[0.06] [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:translate-y-0 [&>svg]:text-emerald-700/50',
-                isGroupActive && 'bg-emerald-900/[0.06]'
-              )}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <span
-                  className={cn(
-                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all',
-                    isGroupActive
-                      ? 'bg-brand-gradient text-white shadow-md shadow-emerald-600/25'
-                      : 'bg-emerald-800/10 text-emerald-800'
-                  )}
-                >
-                  <GroupIcon className="h-3.5 w-3.5" />
-                </span>
-                <span className="truncate uppercase tracking-wide text-emerald-950/75">{group.label}</span>
+                <Rocket className="h-3.5 w-3.5" />
               </span>
-            </AccordionTrigger>
-            <AccordionContent className="pb-1.5 pt-0.5">
-              <div className="space-y-0.5 pl-3">
-                {group.items.map((item) => {
-                  const ItemIcon = item.icon;
-                  const isActive = activeTab === item.tab;
-                  return (
-                    <button
-                      key={item.tab}
-                      type="button"
-                      onClick={() => onSelect(item.tab)}
+              <span className="truncate uppercase tracking-wide text-emerald-950/75">Initiatives</span>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="pb-1.5 pt-0.5">
+            {/* Expandable list of initiatives — one nested accordion per initiative module. */}
+            <Accordion type="multiple" value={openModules} onValueChange={setOpenModules} className="w-full">
+              {initiativeModules.map((module) => {
+                const ModuleIcon = module.icon;
+                const isModuleActive = module.key === activeModuleKey;
+                return (
+                  <AccordionItem key={module.key} value={module.key} className="rounded-xl border-b-0">
+                    <AccordionTrigger
                       className={cn(
-                        'flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-[13px] transition-colors',
-                        isActive
-                          ? 'bg-brand-gradient font-semibold text-white shadow-md shadow-emerald-600/25'
-                          : 'text-emerald-950/60 hover:bg-emerald-900/[0.06] hover:text-emerald-950'
+                        'items-center gap-2 rounded-lg px-2 py-2 text-[12px] font-semibold no-underline transition-colors hover:bg-emerald-900/[0.06] hover:no-underline data-[state=open]:bg-emerald-900/[0.06] [&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:translate-y-0 [&>svg]:text-emerald-700/50',
+                        isModuleActive && 'bg-emerald-900/[0.06]'
                       )}
                     >
-                      <ItemIcon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-          </React.Fragment>
-        );
-      })}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <ModuleIcon
+                          className={cn('h-3.5 w-3.5 shrink-0', isModuleActive ? 'text-emerald-700' : 'text-emerald-800/70')}
+                        />
+                        <span className="truncate text-emerald-950/80">{module.label}</span>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-1 pt-0.5">
+                      {renderPageButtons(module.items)}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          </AccordionContent>
+        </AccordionItem>
+      )}
+
+      {adminGroups.map((group) => renderModuleGroup(group))}
     </Accordion>
   );
 }
