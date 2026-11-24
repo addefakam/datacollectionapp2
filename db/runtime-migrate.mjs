@@ -49,8 +49,9 @@ async function main() {
     return;
   }
 
-  // Same normalization as src/lib/db.ts: the platform may inject a bare path
-  // ("/app/db/custom.db") — Prisma rejects URLs without the file: protocol.
+  // Same policy as src/lib/db.ts: bare paths get the file: protocol; a full
+  // non-file URL (postgresql:// — the platform's managed Postgres) cannot be
+  // used by this SQLite-only app, so fall back to the packaged database.
   if (
     process.env.DATABASE_URL &&
     !process.env.DATABASE_URL.startsWith('file:') &&
@@ -58,6 +59,20 @@ async function main() {
   ) {
     log(`DATABASE_URL lacks the file: protocol — normalizing "${process.env.DATABASE_URL}"`);
     process.env.DATABASE_URL = `file:${process.env.DATABASE_URL}`;
+  } else if (
+    process.env.DATABASE_URL &&
+    !process.env.DATABASE_URL.startsWith('file:') &&
+    process.env.DATABASE_URL.includes('://')
+  ) {
+    const { existsSync } = await import('fs');
+    const packaged = process.env.PACKAGED_DB_PATH || '/app/db/custom.db';
+    if (existsSync(packaged)) {
+      log(`DATABASE_URL is a non-SQLite URL (managed Postgres) — using packaged file database ${packaged} instead`);
+      process.env.DATABASE_URL = `file:${packaged}`;
+    } else {
+      log('DATABASE_URL is a non-SQLite URL and no packaged database found — skipping migration');
+      return;
+    }
   }
 
   const db = new Client({

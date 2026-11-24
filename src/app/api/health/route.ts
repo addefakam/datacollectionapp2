@@ -12,18 +12,23 @@ import { db } from '@/lib/db';
  * (db/runtime-migrate.mjs) exists to repair. 500s here mean the server can
  * not reach its database at all.
  *
- * The payload also reports the SHAPE of DATABASE_URL (never a credential —
- * this project only ever uses file: paths) so a misconfigured runtime URL is
- * visible in the response itself.
+ * The payload also reports the SHAPE of DATABASE_URL with credentials masked,
+ * so a misconfigured runtime URL is visible in the response itself.
  */
+/** Hide userinfo credentials in URLs (user:pass@host) — never echo secrets. */
+function maskUrl(url: string): string {
+  return url.replace(/:\/\/[^@/\s]+@/, '://***@');
+}
+
 function describeDatabaseUrl(): Record<string, unknown> {
   const url = process.env.DATABASE_URL;
   if (!url) return { present: false, note: 'DATABASE_URL is not set' };
   return {
     present: true,
     startsWithFileProtocol: url.startsWith('file:'),
-    // file: URLs carry a path, not a secret — safe to show for diagnosis.
-    value: url.length > 120 ? `${url.slice(0, 120)}…` : url,
+    isSqlite: url.startsWith('file:'),
+    // Masked — file paths carry no credentials, remote URLs might.
+    value: maskUrl(url.length > 120 ? `${url.slice(0, 120)}…` : url),
   };
 }
 
