@@ -1,0 +1,444 @@
+     1→'use client';
+     2→
+     3→import { useState, useRef } from 'react';
+     4→import { Button } from '@/components/ui/button';
+     5→import { Input } from '@/components/ui/input';
+     6→import { Label } from '@/components/ui/label';
+     7→import {
+     8→  Select,
+     9→  SelectContent,
+    10→  SelectItem,
+    11→  SelectTrigger,
+    12→  SelectValue,
+    13→} from '@/components/ui/select';
+    14→import {
+    15→  Card,
+    16→  CardContent,
+    17→  CardDescription,
+    18→  CardHeader,
+    19→  CardTitle,
+    20→} from '@/components/ui/card';
+    21→import { useToast } from '@/hooks/use-toast';
+    22→import {
+    23→  Building2,
+    24→  Loader2,
+    25→  RotateCcw,
+    26→  ChevronLeft,
+    27→  ChevronRight,
+    28→  Check,
+    29→  UserCircle,
+    30→  Phone,
+    31→  FileText,
+    32→  Eye,
+    33→} from 'lucide-react';
+    34→import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+    35→import SignaturePad, { SignaturePadHandle } from '@/components/SignaturePad';
+    36→import {
+    37→  locationData,
+    38→  getAreasForSubCity,
+    39→  LICENSE_TYPES,
+    40→  LICENSE_LEVELS,
+    41→} from '@/lib/location-data';
+    42→
+    43→interface SurveyFormProps {
+    44→  onSubmit: () => void;
+    45→  surveyorName: string;
+    46→  surveyorId: string;
+    47→  isOnline?: boolean;
+    48→  onOfflineSave?: (data: Record<string, unknown>) => Promise<boolean>;
+    49→}
+    50→
+    51→const STEPS = [
+    52→  { id: 1, title: 'Establishment', titleOr: 'Qophiin', icon: Building2 },
+    53→  { id: 2, title: 'License', titleOr: 'Laisansii', icon: FileText },
+    54→  { id: 3, title: 'Contact', titleOr: 'Quunnamtii', icon: Phone },
+    55→  { id: 4, title: 'Review', titleOr: 'Mirkanaa', icon: Eye },
+    56→];
+    57→
+    58→export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnline = true, onOfflineSave }: SurveyFormProps) {
+    59→  const { toast } = useToast();
+    60→  const [isSubmitting, setIsSubmitting] = useState(false);
+    61→  const [currentStep, setCurrentStep] = useState(1);
+    62→  const [selectedSubCity, setSelectedSubCity] = useState('');
+    63→  const [areas, setAreas] = useState<string[]>([]);
+    64→  const [dataConfirmed, setDataConfirmed] = useState('');
+    65→  const signaturePadRef = useRef<SignaturePadHandle>(null);
+    66→
+    67→  const emptyForm = {
+    68→    guestHouseName: '',
+    69→    organizationName: '',
+    70→    subCity: '',
+    71→    area: '',
+    72→    specificAddress: '',
+    73→    numberOfRooms: '',
+    74→    licenseType: '',
+    75→    licenseLevel: '',
+    76→    licenseNumber: '',
+    77→    contactPhone: '',
+    78→    contactName: '',
+    79→    contactPhone2: '',
+    80→    contactName2: '',
+    81→    ownerName: '',
+    82→  };
+    83→
+    84→  const [formData, setFormData] = useState(emptyForm);
+    85→
+    86→  const handleSubCityChange = (value: string) => {
+    87→    setSelectedSubCity(value);
+    88→    setAreas(getAreasForSubCity(value));
+    89→    setFormData((prev) => ({ ...prev, subCity: value, area: '' }));
+    90→  };
+    91→
+    92→  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    93→    const { name, value } = e.target;
+    94→    setFormData((prev) => ({ ...prev, [name]: value }));
+    95→  };
+    96→
+    97→  const handleSelectChange = (name: string, value: string) => {
+    98→    setFormData((prev) => ({ ...prev, [name]: value }));
+    99→  };
+   100→
+   101→  const validateStep = (step: number): boolean => {
+   102→    switch (step) {
+   103→      case 1:
+   104→        if (!formData.organizationName || !formData.subCity || !formData.area || !formData.specificAddress) {
+   105→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+   106→          return false;
+   107→        }
+   108→        return true;
+   109→      case 2:
+   110→        if (!formData.numberOfRooms || !formData.licenseType || !formData.licenseLevel || !formData.licenseNumber) {
+   111→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+   112→          return false;
+   113→        }
+   114→        return true;
+   115→      case 3:
+   116→        if (!formData.ownerName || !formData.contactName || !formData.contactPhone) {
+   117→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+   118→          return false;
+   119→        }
+   120→        const phoneClean = formData.contactPhone.replace(/[\s-]/g, '');
+   121→        const ethPhoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
+   122→        if (!ethPhoneRegex.test(phoneClean)) {
+   123→          toast({ title: 'Invalid Phone / Bilbila Dogoggora', description: 'Enter valid Ethiopian number (e.g., +251 91 234 5678)', variant: 'destructive' });
+   124→          return false;
+   125→        }
+   126→        if (formData.contactPhone2) {
+   127→          const phoneClean2 = formData.contactPhone2.replace(/[\s-]/g, '');
+   128→          if (!ethPhoneRegex.test(phoneClean2)) {
+   129→            toast({ title: 'Invalid Phone 2 / Bilbila 2 Dogoggora', description: 'Enter valid Ethiopian number for second contact', variant: 'destructive' });
+   130→            return false;
+   131→          }
+   132→        }
+   133→        if (formData.contactPhone2 && !formData.contactName2) {
+   134→          toast({ title: 'Name Required / Maqaa Barbaachisaa', description: 'Second contact person name is required when phone is provided / Bilbila 2 qofatu yoo galmeessame maqaan isaa barbaachisaa', variant: 'destructive' });
+   135→          return false;
+   136→        }
+   137→        return true;
+   138→      case 4:
+   139→        if (dataConfirmed !== 'yes') {
+   140→          toast({ title: 'Confirmation Required / Mirkanaa\'uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\'eef mirkanaadhu', variant: 'destructive' });
+   141→          return false;
+   142→        }
+   143→        if (signaturePadRef.current?.isEmpty()) {
+   144→          toast({ title: 'Signature Required / Mallattoo Barbaachisaa', description: 'Please provide your signature / Mallattoo keessan galmeessaa', variant: 'destructive' });
+   145→          return false;
+   146→        }
+   147→        return true;
+   148→      default:
+   149→        return true;
+   150→    }
+   151→  };
+   152→
+   153→  const nextStep = () => { if (validateStep(currentStep)) setCurrentStep((s) => Math.min(s + 1, STEPS.length)); };
+   154→  const prevStep = () => { setCurrentStep((s) => Math.max(s - 1, 1)); };
+   155→
+   156→  const resetForm = () => {
+   157→    setFormData(emptyForm);
+   158→    setSelectedSubCity('');
+   159→    setAreas([]);
+   160→    setDataConfirmed('');
+   161→    setCurrentStep(1);
+   162→    signaturePadRef.current?.clear();
+   163→  };
+   164→
+   165→  const handleSubmit = async (e: React.FormEvent) => {
+   166→    e.preventDefault();
+   167→    if (!validateStep(currentStep)) return;
+   168→    const signatureData = signaturePadRef.current?.getSignature() || null;
+   169→    const payload = { ...formData, serviceRating: 0, surveyorName, surveyorId, signature: signatureData };
+   170→    setIsSubmitting(true);
+   171→    if (isOnline) {
+   172→      try {
+   173→        const response = await fetch('/api/guesthouses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+   174→        if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Failed to submit'); }
+   175→        toast({ title: 'Survey Submitted! / Galma Qabame!', description: `${formData.organizationName} recorded successfully / galmeen safiisan argame` });
+   176→        resetForm();
+   177→        onSubmit();
+   178→      } catch (error) {
+   179→        if (onOfflineSave) {
+   180→          const saved = await onOfflineSave(payload);
+   181→          if (saved) { toast({ title: 'Saved Offline / Offliin Kuusame', description: 'Will sync when connected / Netiirkii qunnamaa waanin dhiheenya' }); resetForm(); onSubmit(); }
+   182→          else { toast({ title: 'Submission Failed / Galmeen Hin Dhufne', description: error instanceof Error ? error.message : 'Please try again / Dabalataan yaali', variant: 'destructive' }); }
+   183→        } else { toast({ title: 'Submission Failed / Galmeen Hin Dhufne', description: error instanceof Error ? error.message : 'Please try again / Dabalataan yaali', variant: 'destructive' }); }
+   184→      } finally { setIsSubmitting(false); }
+   185→    } else {
+   186→      if (onOfflineSave) {
+   187→        const saved = await onOfflineSave(payload);
+   188→        if (saved) { toast({ title: 'Saved Offline / Offliin Kuusame', description: 'Will sync when connected / Netiirkii qunnamaa waanin dhiheenya' }); resetForm(); onSubmit(); }
+   189→        else { toast({ title: 'Save Failed / Hin Kuusanne', description: 'Storage full or unavailable / Qabiyyee dhiphaachaa ykn hin jiru', variant: 'destructive' }); }
+   190→      }
+   191→      setIsSubmitting(false);
+   192→    }
+   193→  };
+   194→
+   195→  const reviewItems = [
+   196→    { label: 'Organization / Dhaabbataa', value: formData.organizationName },
+   197→    { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
+   198→    { label: 'Werreda', value: formData.area },
+   199→    { label: 'Address / Baka Addaa', value: formData.specificAddress },
+   200→    { label: 'Rooms / Qubeettii', value: formData.numberOfRooms },
+   201→    { label: 'License Type / Goossa Eyyema', value: formData.licenseType },
+   202→    { label: 'License Level / Saddarkaa Eyyema', value: formData.licenseLevel },
+   203→    { label: 'License No. / Lakofsaa Eyyema', value: formData.licenseNumber },
+   204→    { label: 'Owner / Abbaa Qaabeyee', value: formData.ownerName },
+   205→    { label: 'Contact 1 / Quunnamtaa 1', value: `${formData.contactName} — ${formData.contactPhone}` },
+   206→    { label: 'Contact 2 / Quunnamtaa 2', value: formData.contactName2 ? `${formData.contactName2} — ${formData.contactPhone2}` : '' },
+   207→  ];
+   208→
+   209→  return (
+   210→    <div>
+   211→      {/* Step Indicator */}
+   212→      <div className="mb-4 sm:mb-6">
+   213→        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:gap-0 sm:pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+   214→          {STEPS.map((step, idx) => {
+   215→            const Icon = step.icon;
+   216→            const isActive = currentStep === step.id;
+   217→            const isCompleted = currentStep > step.id;
+   218→            return (
+   219→              <div key={step.id} className="flex flex-1 shrink-0 items-center">
+   220→                <button
+   221→                  type="button"
+   222→                  onClick={() => isCompleted && setCurrentStep(step.id)}
+   223→                  className={`flex w-full flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 transition-all sm:gap-1 sm:rounded-xl sm:px-2 sm:py-2 ${
+   224→                    isActive ? 'bg-emerald-600 text-white shadow-md sm:shadow-lg sm:shadow-emerald-200'
+   225→                      : isCompleted ? 'bg-emerald-100 text-emerald-700 cursor-pointer'
+   226→                      : 'bg-gray-100 text-gray-400'
+   227→                  }`}>
+   228→                  <div className={`flex h-7 w-7 items-center justify-center rounded-full sm:h-8 sm:w-8 ${isCompleted ? 'bg-emerald-600 text-white' : ''}`}>
+   229→                    {isCompleted ? <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+   230→                  </div>
+   231→                  <span className="text-[9px] leading-tight font-medium text-center truncate w-full sm:text-[10px]">{step.title}</span>
+   232→                  <span className="hidden text-[8px] leading-tight text-center opacity-75 truncate w-full sm:block sm:text-[9px]">{step.titleOr}</span>
+   233→                </button>
+   234→                {idx < STEPS.length - 1 && (
+   235→                  <div className={`mx-0.5 h-0.5 flex-1 rounded sm:mx-1 ${currentStep > step.id ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+   236→                )}
+   237→              </div>
+   238→            );
+   239→          })}
+   240→        </div>
+   241→        <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">
+   242→          <span>Step {currentStep} of {STEPS.length} / Qajeelfannaa {currentStep} kiyya {STEPS.length} keessaa</span>
+   243→          <button type="button" onClick={resetForm} className="flex items-center gap-1 text-red-500 hover:text-red-700">
+   244→            <RotateCcw className="h-3 w-3" />
+   245→            <span className="hidden sm:inline">Reset / Balleessuu</span><span className="sm:hidden">Reset</span>
+   246→          </button>
+   247→        </div>
+   248→      </div>
+   249→
+   250→      <form onSubmit={handleSubmit}>
+   251→        <Card className="min-h-[300px] sm:min-h-[360px]">
+   252→          {/* Step 1: Establishment */}
+   253→          {currentStep === 1 && (
+   254→            <>
+   255→              <CardHeader className="pb-2 sm:pb-3">
+   256→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   257→                  <Building2 className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5" />
+   258→                  <span className="leading-tight">Odeeffannoo Hundeeffama<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Establishment information</span></span>
+   259→                </CardTitle>
+   260→                <CardDescription className="text-xs sm:text-sm">Basic details about the establishment</CardDescription>
+   261→              </CardHeader>
+   262→              <CardContent className="space-y-3 sm:space-y-4">
+   263→                <div className="space-y-1.5 sm:space-y-2">
+   264→                  <Label htmlFor="organizationName" className="text-xs sm:text-sm">Organization Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Dhaabbataa</span> <span className="text-red-500">*</span></Label>
+   265→                  <Input id="organizationName" name="organizationName" placeholder="e.g., GOLD MARK HOTEL" value={formData.organizationName} onChange={handleChange} required className="text-sm sm:text-base" />
+   266→                </div>
+   267→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   268→                  <div className="space-y-1.5 sm:space-y-2">
+   269→                    <Label htmlFor="subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+   270→                    <Select value={formData.subCity} onValueChange={handleSubCityChange}>
+   271→                      <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+   272→                      <SelectContent>{locationData.subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+   273→                    </Select>
+   274→                  </div>
+   275→                  <div className="space-y-1.5 sm:space-y-2">
+   276→                    <Label htmlFor="area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+   277→                    <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
+   278→                      <SelectTrigger id="area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
+   279→                      <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
+   280→                    </Select>
+   281→                  </div>
+   282→                </div>
+   283→                <div className="space-y-1.5 sm:space-y-2">
+   284→                  <Label htmlFor="specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
+   285→                  <Input id="specificAddress" name="specificAddress" placeholder="Street name, landmark..." value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+   286→                </div>
+   287→              </CardContent>
+   288→            </>
+   289→          )}
+   290→
+   291→          {/* Step 2: License */}
+   292→          {currentStep === 2 && (
+   293→            <>
+   294→              <CardHeader className="pb-2 sm:pb-3">
+   295→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   296→                  <FileText className="h-4 w-4 shrink-0 text-blue-600 sm:h-5 sm:w-5" />
+   297→                  <span className="leading-tight">Dandeettii fi Hayyama<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Capacity and license</span></span>
+   298→                </CardTitle>
+   299→                <CardDescription className="text-xs sm:text-sm">Room capacity and licensing information</CardDescription>
+   300→              </CardHeader>
+   301→              <CardContent className="space-y-3 sm:space-y-4">
+   302→                <div className="space-y-1.5 sm:space-y-2">
+   303→                  <Label htmlFor="numberOfRooms" className="text-xs sm:text-sm">Number of Rooms<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Qubeettii</span> <span className="text-red-500">*</span></Label>
+   304→                  <Input id="numberOfRooms" name="numberOfRooms" type="number" min="1" placeholder="e.g., 20" value={formData.numberOfRooms} onChange={handleChange} required className="text-sm sm:text-base" />
+   305→                </div>
+   306→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   307→                  <div className="space-y-1.5 sm:space-y-2">
+   308→                    <Label className="text-xs sm:text-sm">License Type<br /><span className="text-xs font-normal text-muted-foreground">Goossa Eyyema</span> <span className="text-red-500">*</span></Label>
+   309→                    <Select value={formData.licenseType} onValueChange={(v) => handleSelectChange('licenseType', v)}>
+   310→                      <SelectTrigger className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+   311→                      <SelectContent>{LICENSE_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+   312→                    </Select>
+   313→                  </div>
+   314→                  <div className="space-y-1.5 sm:space-y-2">
+   315→                    <Label className="text-xs sm:text-sm">License Level<br /><span className="text-xs font-normal text-muted-foreground">Saddarkaa Eyyema</span> <span className="text-red-500">*</span></Label>
+   316→                    <Select value={formData.licenseLevel} onValueChange={(v) => handleSelectChange('licenseLevel', v)}>
+   317→                      <SelectTrigger className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+   318→                      <SelectContent>{LICENSE_LEVELS.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}</SelectContent>
+   319→                    </Select>
+   320→                  </div>
+   321→                </div>
+   322→                <div className="space-y-1.5 sm:space-y-2">
+   323→                  <Label htmlFor="licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyema</span> <span className="text-red-500">*</span></Label>
+   324→                  <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., GH-2024-001" value={formData.licenseNumber} onChange={handleChange} required className="text-sm sm:text-base" />
+   325→                </div>
+   326→              </CardContent>
+   327→            </>
+   328→          )}
+   329→
+   330→          {/* Step 3: Contact */}
+   331→          {currentStep === 3 && (
+   332→            <>
+   333→              <CardHeader className="pb-2 sm:pb-3">
+   334→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   335→                  <Phone className="h-4 w-4 shrink-0 text-purple-600 sm:h-5 sm:w-5" />
+   336→                  <span className="leading-tight">Contact Information<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Odeeffannoo Quunnamtii</span></span>
+   337→                </CardTitle>
+   338→                <CardDescription className="text-xs sm:text-sm">Owner and contact details</CardDescription>
+   339→              </CardHeader>
+   340→              <CardContent className="space-y-3 sm:space-y-4">
+   341→                <div className="space-y-1.5 sm:space-y-2">
+   342→                  <Label htmlFor="ownerName" className="text-xs sm:text-sm">Owner Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Abbaa Qaabeyee</span> <span className="text-red-500">*</span></Label>
+   343→                  <Input id="ownerName" name="ownerName" placeholder="Full name of owner" value={formData.ownerName} onChange={handleChange} required className="text-sm sm:text-base" />
+   344→                </div>
+   345→                <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-3 space-y-3">
+   346→                  <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">Quunnamtaa 1 / Contact 1</p>
+   347→                  <div className="space-y-1.5 sm:space-y-2">
+   348→                    <Label htmlFor="contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Adadura Qunnamnu</span> <span className="text-red-500">*</span></Label>
+   349→                    <Input id="contactName" name="contactName" placeholder="Manager or reception contact" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
+   350→                  </div>
+   351→                  <div className="space-y-1.5 sm:space-y-2">
+   352→                    <Label htmlFor="contactPhone" className="text-xs sm:text-sm">Phone Number<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Bilbila</span> <span className="text-red-500">*</span></Label>
+   353→                    <Input id="contactPhone" name="contactPhone" type="tel" placeholder="e.g., +251 91 234 5678" value={formData.contactPhone} onChange={(e) => { const val = e.target.value.replace(/[^0-9+\s-]/g, ''); setFormData(prev => ({ ...prev, contactPhone: val })); }} required className="text-sm sm:text-base" />
+   354→                  </div>
+   355→                </div>
+   356→                <div className="rounded-lg border border-dashed border-gray-300 p-3 space-y-3">
+   357→                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Quunnamtaa 2 / Contact 2 <span className="normal-case font-normal">(optional)</span></p>
+   358→                  <div className="space-y-1.5 sm:space-y-2">
+   359→                    <Label htmlFor="contactName2" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Adadura Qunnamnu 2</span></Label>
+   360→                    <Input id="contactName2" name="contactName2" placeholder="Second contact person" value={formData.contactName2} onChange={handleChange} className="text-sm sm:text-base" />
+   361→                  </div>
+   362→                  <div className="space-y-1.5 sm:space-y-2">
+   363→                    <Label htmlFor="contactPhone2" className="text-xs sm:text-sm">Phone Number<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Bilbila 2</span></Label>
+   364→                    <Input id="contactPhone2" name="contactPhone2" type="tel" placeholder="e.g., +251 92 345 6789" value={formData.contactPhone2} onChange={(e) => { const val = e.target.value.replace(/[^0-9+\s-]/g, ''); setFormData(prev => ({ ...prev, contactPhone2: val })); }} className="text-sm sm:text-base" />
+   365→                  </div>
+   366→                </div>
+   367→              </CardContent>
+   368→            </>
+   369→          )}
+   370→
+   371→          {/* Step 4: Review & Confirm */}
+   372→          {currentStep === 4 && (
+   373→            <>
+   374→              <CardHeader className="pb-2 sm:pb-3">
+   375→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   376→                  <Eye className="h-4 w-4 shrink-0 text-blue-600 sm:h-5 sm:w-5" />
+   377→                  <span className="leading-tight">Odeeffannoo Quunnamtii<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Review and confirm</span></span>
+   378→                </CardTitle>
+   379→                <CardDescription className="text-xs sm:text-sm">Review all data before submitting / Galii hunda ilaalii booda erguu</CardDescription>
+   380→              </CardHeader>
+   381→              <CardContent className="space-y-3 sm:space-y-4">
+   382→                <div className="rounded-lg border bg-muted/30 divide-y">
+   383→                  {reviewItems.map((item) => (
+   384→                    <div key={item.label} className="flex justify-between gap-2 px-2.5 py-2 text-xs sm:px-3 sm:py-2.5 sm:text-sm">
+   385→                      <span className="text-muted-foreground whitespace-nowrap">{item.label}</span>
+   386→                      <span className="font-medium text-right">{item.value || '-'}</span>
+   387→                    </div>
+   388→                  ))}
+   389→                </div>
+   390→                <div className="rounded-lg bg-muted/50 p-2.5 sm:p-3">
+   391→                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground sm:gap-2 sm:text-sm">
+   392→                    <UserCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+   393→                    <span>Surveyor</span><span className="opacity-70">/ Sakatta'aa</span>
+   394→                  </div>
+   395→                  <p className="mt-0.5 text-sm font-medium sm:mt-1">{surveyorName || 'Not logged in'}</p>
+   396→                </div>
+   397→                <div className="pt-1 sm:pt-2">
+   398→                  <RadioGroup value={dataConfirmed} onValueChange={setDataConfirmed}>
+   399→                    <div className="flex items-start space-x-2.5 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 transition-all has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-100 has-[:checked]:shadow-md sm:space-x-3 sm:p-4">
+   400→                      <RadioGroupItem value="yes" id="confirm-yes" className="mt-0.5 sm:mt-1" />
+   401→                      <Label htmlFor="confirm-yes" className="cursor-pointer leading-relaxed">
+   402→                        <span className="text-xs font-bold text-emerald-800 sm:text-sm">I confirm that the data provided is true and authenticated</span>
+   403→                        <br />
+   404→                        <span className="text-[11px] font-semibold text-emerald-700 sm:text-sm">Daataan keneenaa dhagafee merkanawa ta'uu Issaa raaggaa Nibaanaa</span>
+   405→                      </Label>
+   406→                    </div>
+   407→                  </RadioGroup>
+   408→                </div>
+   409→                <div className="mt-3">
+   410→                  <SignaturePad
+   411→                    ref={signaturePadRef}
+   412→                    label="Signature / Mallattoo"
+   413→                    labelOr="Mallattoo Galmeessitichaa"
+   414→                  />
+   415→                </div>
+   416→              </CardContent>
+   417→            </>
+   418→          )}
+   419→        </Card>
+   420→
+   421→        {/* Navigation Buttons */}
+   422→        <div className="mt-3 flex gap-2 sm:mt-4 sm:gap-3">
+   423→          {currentStep > 1 && (
+   424→            <Button type="button" variant="outline" className="h-10 flex-1 text-xs sm:h-auto sm:text-sm" onClick={prevStep}>
+   425→              <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Back / Deebi'uu</span><span className="sm:hidden">Back</span>
+   426→            </Button>
+   427→          )}
+   428→          {currentStep < STEPS.length ? (
+   429→            <Button type="button" className="h-10 flex-1 bg-emerald-600 hover:bg-emerald-700 text-xs sm:h-auto sm:text-sm" onClick={nextStep}>
+   430→              <span className="hidden sm:inline">Next / Itti Fufuu </span><span className="sm:hidden">Next </span><ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+   431→            </Button>
+   432→          ) : (
+   433→            <Button type="submit" className="h-10 flex-1 bg-emerald-600 hover:bg-emerald-700 text-xs sm:h-auto sm:text-sm" disabled={isSubmitting}>
+   434→              {isSubmitting
+   435→                ? (<><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin sm:mr-2 sm:h-4 sm:w-4" /><span className="hidden sm:inline">Submitting... / Galma Nagaan Qabaachu...</span><span className="sm:hidden">Submitting...</span></>)
+   436→                : 'Submit Survey / Galma Erguu'}
+   437→            </Button>
+   438→          )}
+   439→        </div>
+   440→      </form>
+   441→    </div>
+   442→  );
+   443→}
+   444→

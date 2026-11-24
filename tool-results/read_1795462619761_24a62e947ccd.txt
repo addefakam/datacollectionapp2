@@ -1,0 +1,467 @@
+     1→'use client';
+     2→
+     3→import { useState } from 'react';
+     4→import { Button } from '@/components/ui/button';
+     5→import { Input } from '@/components/ui/input';
+     6→import { Label } from '@/components/ui/label';
+     7→import {
+     8→  Select,
+     9→  SelectContent,
+    10→  SelectItem,
+    11→  SelectTrigger,
+    12→  SelectValue,
+    13→} from '@/components/ui/select';
+    14→import {
+    15→  Card,
+    16→  CardContent,
+    17→  CardDescription,
+    18→  CardHeader,
+    19→  CardTitle,
+    20→} from '@/components/ui/card';
+    21→import { useToast } from '@/hooks/use-toast';
+    22→import {
+    23→  Sprout,
+    24→  Loader2,
+    25→  RotateCcw,
+    26→  ChevronLeft,
+    27→  ChevronRight,
+    28→  Check,
+    29→  UserCircle,
+    30→  Phone,
+    31→  Tractor,
+    32→  Eye,
+    33→} from 'lucide-react';
+    34→import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+    35→import { AGRICULTURE_FARM_TYPES, AGRICULTURE_OWNERSHIP_TYPES } from '@/lib/location-data';
+    36→import { useSettings } from '@/components/SettingsProvider';
+    37→
+    38→interface AgricultureSurveyFormProps {
+    39→  onSubmit: () => void;
+    40→  surveyorName: string;
+    41→  surveyorId: string;
+    42→  isOnline?: boolean;
+    43→  onOfflineSave?: (data: Record<string, unknown>) => Promise<boolean>;
+    44→}
+    45→
+    46→const STEPS = [
+    47→  { id: 1, title: 'Farm', titleOr: 'Mana Qonnaa', icon: Sprout },
+    48→  { id: 2, title: 'Land & Capacity', titleOr: 'Dachaa fi Dandeettii', icon: Tractor },
+    49→  { id: 3, title: 'Contact', titleOr: 'Quunnamtii', icon: Phone },
+    50→  { id: 4, title: 'Review', titleOr: 'Mirkanaa', icon: Eye },
+    51→];
+    52→
+    53→const SERVICE_FIELDS: { name: string; label: string; labelOr?: string; hint: string }[] = [
+    54→  { name: 'hasIrrigation', label: 'Irrigation', hint: 'On-site irrigation system' },
+    55→  { name: 'hasGreenhouse', label: 'Greenhouse', hint: 'Protected / greenhouse farming' },
+    56→  { name: 'hasMachinery', label: 'Machinery', labelOr: 'Meeshaa Qonnaa', hint: 'Tractors & farm machinery' },
+    57→  { name: 'hasStorage', label: 'Storage', hint: 'On-site storage facility' },
+    58→];
+    59→
+    60→export default function AgricultureSurveyForm({
+    61→  onSubmit,
+    62→  surveyorName,
+    63→  surveyorId,
+    64→  isOnline = true,
+    65→  onOfflineSave,
+    66→}: AgricultureSurveyFormProps) {
+    67→  const { toast } = useToast();
+    68→  const { subCities, areasFor } = useSettings();
+    69→  const [isSubmitting, setIsSubmitting] = useState(false);
+    70→  const [currentStep, setCurrentStep] = useState(1);
+    71→  const [selectedSubCity, setSelectedSubCity] = useState('');
+    72→  const [areas, setAreas] = useState<string[]>([]);
+    73→  const [dataConfirmed, setDataConfirmed] = useState('');
+    74→
+    75→  const emptyForm = {
+    76→    farmName: '',
+    77→    farmType: '',
+    78→    ownershipType: '',
+    79→    subCity: '',
+    80→    area: '',
+    81→    specificAddress: '',
+    82→    licenseNumber: '',
+    83→    landSizeHectares: '',
+    84→    workerCount: '',
+    85→    hasIrrigation: 'no',
+    86→    hasGreenhouse: 'no',
+    87→    hasMachinery: 'no',
+    88→    hasStorage: 'no',
+    89→    contactName: '',
+    90→    contactPhone: '',
+    91→  };
+    92→
+    93→  const [formData, setFormData] = useState(emptyForm);
+    94→
+    95→  const handleSubCityChange = (value: string) => {
+    96→    setSelectedSubCity(value);
+    97→    setAreas(areasFor(value));
+    98→    setFormData((prev) => ({ ...prev, subCity: value, area: '' }));
+    99→  };
+   100→
+   101→  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+   102→    const { name, value } = e.target;
+   103→    setFormData((prev) => ({ ...prev, [name]: value }));
+   104→  };
+   105→
+   106→  const handleSelectChange = (name: string, value: string) => {
+   107→    setFormData((prev) => ({ ...prev, [name]: value }));
+   108→  };
+   109→
+   110→  const validateStep = (step: number): boolean => {
+   111→    switch (step) {
+   112→      case 1:
+   113→        if (!formData.farmName || !formData.farmType || !formData.subCity || !formData.area || !formData.specificAddress) {
+   114→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+   115→          return false;
+   116→        }
+   117→        return true;
+   118→      case 2:
+   119→        if (!formData.ownershipType) {
+   120→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Ownership type is required / Gosa abbaa qabuu barbaachisaadha', variant: 'destructive' });
+   121→          return false;
+   122→        }
+   123→        if (!formData.workerCount || Number(formData.workerCount) < 0) {
+   124→          toast({ title: 'Invalid Worker Count', description: 'Enter a valid worker count', variant: 'destructive' });
+   125→          return false;
+   126→        }
+   127→        if (!formData.landSizeHectares || Number(formData.landSizeHectares) < 0) {
+   128→          toast({ title: 'Invalid Land Size', description: 'Land size cannot be negative', variant: 'destructive' });
+   129→          return false;
+   130→        }
+   131→        return true;
+   132→      case 3:
+   133→        if (!formData.contactName || !formData.contactPhone) {
+   134→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Contact person and phone are required / Maqaa fi bilbila quunnamtii barbaachisa', variant: 'destructive' });
+   135→          return false;
+   136→        }
+   137→        {
+   138→          const phoneClean = formData.contactPhone.replace(/[\s-]/g, '');
+   139→          const ethPhoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
+   140→          if (!ethPhoneRegex.test(phoneClean)) {
+   141→            toast({ title: 'Invalid Phone / Bilbila Dogoggora', description: 'Enter valid Ethiopian number (e.g., +251 91 234 5678)', variant: 'destructive' });
+   142→            return false;
+   143→          }
+   144→        }
+   145→        return true;
+   146→      case 4:
+   147→        if (dataConfirmed !== 'yes') {
+   148→          toast({ title: 'Confirmation Required / Mirkanaa\u2019uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\u2019eef mirkanaadhu', variant: 'destructive' });
+   149→          return false;
+   150→        }
+   151→        return true;
+   152→      default:
+   153→        return true;
+   154→    }
+   155→  };
+   156→
+   157→  const nextStep = () => { if (validateStep(currentStep)) setCurrentStep((s) => Math.min(s + 1, STEPS.length)); };
+   158→  const prevStep = () => { setCurrentStep((s) => Math.max(s - 1, 1)); };
+   159→
+   160→  const resetForm = () => {
+   161→    setFormData(emptyForm);
+   162→    setSelectedSubCity('');
+   163→    setAreas([]);
+   164→    setDataConfirmed('');
+   165→    setCurrentStep(1);
+   166→  };
+   167→
+   168→  const handleSubmit = async (e: React.FormEvent) => {
+   169→    e.preventDefault();
+   170→    if (!validateStep(currentStep)) return;
+   171→    const payload = {
+   172→      ...formData,
+   173→      workerCount: Number(formData.workerCount || 0),
+   174→      landSizeHectares: formData.landSizeHectares === '' ? 0 : Number(formData.landSizeHectares),
+   175→      hasIrrigation: formData.hasIrrigation === 'yes',
+   176→      hasGreenhouse: formData.hasGreenhouse === 'yes',
+   177→      hasMachinery: formData.hasMachinery === 'yes',
+   178→      hasStorage: formData.hasStorage === 'yes',
+   179→      surveyorName,
+   180→      surveyorId,
+   181→    };
+   182→    setIsSubmitting(true);
+   183→    if (isOnline) {
+   184→      try {
+   185→        const response = await fetch('/api/agriculturecenters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+   186→        if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Failed to submit'); }
+   187→        toast({ title: 'Survey Submitted! / Galma Qabame!', description: `${formData.farmName} recorded successfully / galmeen safiisan argame` });
+   188→        resetForm();
+   189→        onSubmit();
+   190→      } catch (error) {
+   191→        if (onOfflineSave) {
+   192→          const saved = await onOfflineSave(payload);
+   193→          if (saved) { toast({ title: 'Saved Offline / Offliin Kuusame', description: 'Will sync when connected / Netiirkii qunnamaa waanin dhiheenya' }); resetForm(); onSubmit(); }
+   194→          else { toast({ title: 'Submission Failed / Galmeen Hin Dhufne', description: error instanceof Error ? error.message : 'Please try again / Dabalataan yaali', variant: 'destructive' }); }
+   195→        } else { toast({ title: 'Submission Failed / Galmeen Hin Dhufne', description: error instanceof Error ? error.message : 'Please try again / Dabalataan yaali', variant: 'destructive' }); }
+   196→      } finally { setIsSubmitting(false); }
+   197→    } else {
+   198→      if (onOfflineSave) {
+   199→        const saved = await onOfflineSave(payload);
+   200→        if (saved) { toast({ title: 'Saved Offline / Offliin Kuusame', description: 'Will sync when connected / Netiirkii qunnamaa waanin dhiheenya' }); resetForm(); onSubmit(); }
+   201→        else { toast({ title: 'Save Failed / Hin Kuusanne', description: 'Storage full or unavailable / Qabiyyee dhiphaachaa ykn hin jiru', variant: 'destructive' }); }
+   202→      }
+   203→      setIsSubmitting(false);
+   204→    }
+   205→  };
+   206→
+   207→  const reviewItems = [
+   208→    { label: 'Farm / Mana Qonnaa', value: formData.farmName },
+   209→    { label: 'Farm Type / Gosa Qonnaa', value: formData.farmType },
+   210→    { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
+   211→    { label: 'Sub-City / Kututtaa Maggalaa', value: formData.subCity },
+   212→    { label: 'Werreda', value: formData.area },
+   213→    { label: 'Address / Baka Addaa', value: formData.specificAddress },
+   214→    { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
+   215→    { label: 'Land (ha) / Dachaa', value: formData.landSizeHectares === '' ? '0' : formData.landSizeHectares },
+   216→    { label: 'Workers / Hojjetaa', value: formData.workerCount },
+   217→    { label: 'Irrigation', value: formData.hasIrrigation === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+   218→    { label: 'Greenhouse', value: formData.hasGreenhouse === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+   219→    { label: 'Machinery / Meeshaa Qonnaa', value: formData.hasMachinery === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+   220→    { label: 'Storage', value: formData.hasStorage === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+   221→    { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
+   222→  ];
+   223→
+   224→  return (
+   225→    <div className="mx-auto max-w-2xl">
+   226→      {/* Step Indicator */}
+   227→      <div className="mb-4 sm:mb-6">
+   228→        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:gap-0 sm:pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+   229→          {STEPS.map((step, idx) => {
+   230→            const Icon = step.icon;
+   231→            const isActive = currentStep === step.id;
+   232→            const isCompleted = currentStep > step.id;
+   233→            return (
+   234→              <div key={step.id} className="flex flex-1 shrink-0 items-center">
+   235→                <button
+   236→                  type="button"
+   237→                  onClick={() => isCompleted && setCurrentStep(step.id)}
+   238→                  className={`flex w-full flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 transition-all sm:gap-1 sm:rounded-xl sm:px-2 sm:py-2 ${
+   239→                    isActive ? 'bg-emerald-600 text-white shadow-md sm:shadow-lg sm:shadow-emerald-100'
+   240→                      : isCompleted ? 'bg-emerald-100 text-emerald-700 cursor-pointer'
+   241→                      : 'bg-gray-100 text-gray-400'
+   242→                  }`}>
+   243→                  <div className={`flex h-7 w-7 items-center justify-center rounded-full sm:h-8 sm:w-8 ${isCompleted ? 'bg-emerald-600 text-white' : ''}`}>
+   244→                    {isCompleted ? <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+   245→                  </div>
+   246→                  <span className="text-[9px] leading-tight font-medium text-center truncate w-full sm:text-[10px]">{step.title}</span>
+   247→                  <span className="hidden text-[8px] leading-tight text-center opacity-75 truncate w-full sm:block sm:text-[9px]">{step.titleOr}</span>
+   248→                </button>
+   249→                {idx < STEPS.length - 1 && (
+   250→                  <div className={`mx-0.5 h-0.5 flex-1 rounded sm:mx-1 ${currentStep > step.id ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+   251→                )}
+   252→              </div>
+   253→            );
+   254→          })}
+   255→        </div>
+   256→        <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">
+   257→          <span>Step {currentStep} of {STEPS.length} / Qajeelfannaa {currentStep} kiyya {STEPS.length} keessaa</span>
+   258→          <button type="button" onClick={resetForm} className="flex items-center gap-1 text-red-500 hover:text-red-700">
+   259→            <RotateCcw className="h-3 w-3" />
+   260→            <span className="hidden sm:inline">Reset / Balleessuu</span><span className="sm:hidden">Reset</span>
+   261→          </button>
+   262→        </div>
+   263→      </div>
+   264→
+   265→      <form onSubmit={handleSubmit}>
+   266→        <Card className="min-h-[300px] sm:min-h-[360px]">
+   267→          {/* Step 1: Farm */}
+   268→          {currentStep === 1 && (
+   269→            <>
+   270→              <CardHeader className="pb-2 sm:pb-3">
+   271→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   272→                  <Sprout className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5" />
+   273→                  <span className="leading-tight">Odeeffannoo Mana Qonnaa<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Farm establishment information</span></span>
+   274→                </CardTitle>
+   275→                <CardDescription className="text-xs sm:text-sm">Basic details about the farm establishment</CardDescription>
+   276→              </CardHeader>
+   277→              <CardContent className="space-y-3 sm:space-y-4">
+   278→                <div className="space-y-1.5 sm:space-y-2">
+   279→                  <Label htmlFor="a-farmName" className="text-xs sm:text-sm">Farm / Establishment Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Mana Qonnaa</span> <span className="text-red-500">*</span></Label>
+   280→                  <Input id="a-farmName" name="farmName" placeholder="e.g., ADAA GREEN DAIRY FARM" value={formData.farmName} onChange={handleChange} required className="text-sm sm:text-base" />
+   281→                </div>
+   282→                <div className="space-y-1.5 sm:space-y-2">
+   283→                  <Label htmlFor="a-farmType" className="text-xs sm:text-sm">Farm Type / Gosa Qonnaa <span className="text-red-500">*</span></Label>
+   284→                  <Select value={formData.farmType} onValueChange={(v) => handleSelectChange('farmType', v)}>
+   285→                    <SelectTrigger id="a-farmType" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+   286→                    <SelectContent className="max-h-64">{AGRICULTURE_FARM_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+   287→                  </Select>
+   288→                </div>
+   289→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   290→                  <div className="space-y-1.5 sm:space-y-2">
+   291→                    <Label htmlFor="a-subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+   292→                    <Select value={formData.subCity} onValueChange={handleSubCityChange}>
+   293→                      <SelectTrigger id="a-subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+   294→                      <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+   295→                    </Select>
+   296→                  </div>
+   297→                  <div className="space-y-1.5 sm:space-y-2">
+   298→                    <Label htmlFor="a-area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+   299→                    <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
+   300→                      <SelectTrigger id="a-area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
+   301→                      <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
+   302→                    </Select>
+   303→                  </div>
+   304→                </div>
+   305→                <div className="space-y-1.5 sm:space-y-2">
+   306→                  <Label htmlFor="a-specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
+   307→                  <Input id="a-specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+   308→                </div>
+   309→              </CardContent>
+   310→            </>
+   311→          )}
+   312→
+   313→          {/* Step 2: Land & Capacity */}
+   314→          {currentStep === 2 && (
+   315→            <>
+   316→              <CardHeader className="pb-2 sm:pb-3">
+   317→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   318→                  <Tractor className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5" />
+   319→                  <span className="leading-tight">Dachaa fi Dandeettii<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Land &amp; capacity</span></span>
+   320→                </CardTitle>
+   321→                <CardDescription className="text-xs sm:text-sm">License, ownership, land size and available infrastructure</CardDescription>
+   322→              </CardHeader>
+   323→              <CardContent className="space-y-3 sm:space-y-4">
+   324→                <div className="space-y-1.5 sm:space-y-2">
+   325→                  <Label htmlFor="a-licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyeema</span></Label>
+   326→                  <Input id="a-licenseNumber" name="licenseNumber" placeholder="e.g., AG/2024/0234" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
+   327→                </div>
+   328→                <div className="space-y-1.5 sm:space-y-2">
+   329→                  <Label className="text-xs sm:text-sm">Ownership Type / Gosa Abbaa Qabuu <span className="text-red-500">*</span></Label>
+   330→                  <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+   331→                    {AGRICULTURE_OWNERSHIP_TYPES.map((t) => (
+   332→                      <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-emerald-500 has-data-[state=checked]:bg-emerald-50">
+   333→                        <RadioGroupItem value={t} id={`a-ownership-${t}`} />
+   334→                        <Label htmlFor={`a-ownership-${t}`} className="cursor-pointer text-xs sm:text-sm font-normal">{t}</Label>
+   335→                      </div>
+   336→                    ))}
+   337→                  </RadioGroup>
+   338→                </div>
+   339→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   340→                  <div className="space-y-1.5 sm:space-y-2">
+   341→                    <Label htmlFor="a-landSizeHectares" className="text-xs sm:text-sm">Land Size (ha)<br /><span className="text-xs font-normal text-muted-foreground">Dachaa</span> <span className="text-red-500">*</span></Label>
+   342→                    <Input id="a-landSizeHectares" name="landSizeHectares" type="number" min="0" step="0.1" placeholder="e.g., 12.5" value={formData.landSizeHectares} onChange={handleChange} required className="text-sm sm:text-base" />
+   343→                  </div>
+   344→                  <div className="space-y-1.5 sm:space-y-2">
+   345→                    <Label htmlFor="a-workerCount" className="text-xs sm:text-sm">Worker Count<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa</span> <span className="text-red-500">*</span></Label>
+   346→                    <Input id="a-workerCount" name="workerCount" type="number" min="0" placeholder="e.g., 15" value={formData.workerCount} onChange={handleChange} required className="text-sm sm:text-base" />
+   347→                  </div>
+   348→                </div>
+   349→                {/* Available infrastructure */}
+   350→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   351→                  {SERVICE_FIELDS.map((svc) => (
+   352→                    <div key={svc.name} className="space-y-1.5 sm:space-y-2">
+   353→                      <Label className="text-xs sm:text-sm">{svc.label}{svc.labelOr && (<><br /><span className="text-xs font-normal text-muted-foreground">{svc.labelOr} — {svc.hint}</span></>)}{!svc.labelOr && (<><br /><span className="text-xs font-normal text-muted-foreground">{svc.hint}</span></>)}</Label>
+   354→                      <RadioGroup value={formData[svc.name as keyof typeof formData]} onValueChange={(v) => handleSelectChange(svc.name, v)} className="flex gap-4">
+   355→                        <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-emerald-500 has-data-[state=checked]:bg-emerald-50">
+   356→                          <RadioGroupItem value="yes" id={`a-${svc.name}-yes`} />
+   357→                          <Label htmlFor={`a-${svc.name}-yes`} className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+   358→                        </div>
+   359→                        <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-emerald-500 has-data-[state=checked]:bg-emerald-50">
+   360→                          <RadioGroupItem value="no" id={`a-${svc.name}-no`} />
+   361→                          <Label htmlFor={`a-${svc.name}-no`} className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+   362→                        </div>
+   363→                      </RadioGroup>
+   364→                    </div>
+   365→                  ))}
+   366→                </div>
+   367→              </CardContent>
+   368→            </>
+   369→          )}
+   370→
+   371→          {/* Step 3: Contact */}
+   372→          {currentStep === 3 && (
+   373→            <>
+   374→              <CardHeader className="pb-2 sm:pb-3">
+   375→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   376→                  <UserCircle className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5" />
+   377→                  <span className="leading-tight">Odeeffannoo Quunnamtii<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Contact information</span></span>
+   378→                </CardTitle>
+   379→                <CardDescription className="text-xs sm:text-sm">Who we can reach about this establishment</CardDescription>
+   380→              </CardHeader>
+   381→              <CardContent className="space-y-3 sm:space-y-4">
+   382→                <div className="space-y-1.5 sm:space-y-2">
+   383→                  <Label htmlFor="a-contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Quunnamtu</span> <span className="text-red-500">*</span></Label>
+   384→                  <Input id="a-contactName" name="contactName" placeholder="Full name of manager / farm head" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
+   385→                </div>
+   386→                <div className="space-y-1.5 sm:space-y-2">
+   387→                  <Label htmlFor="a-contactPhone" className="text-xs sm:text-sm">Contact Phone<br /><span className="text-xs font-normal text-muted-foreground">Bilbila Quunnamtii</span> <span className="text-red-500">*</span></Label>
+   388→                  <Input id="a-contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
+   389→                  <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
+   390→                </div>
+   391→              </CardContent>
+   392→            </>
+   393→          )}
+   394→
+   395→          {/* Step 4: Review */}
+   396→          {currentStep === 4 && (
+   397→            <>
+   398→              <CardHeader className="pb-2 sm:pb-3">
+   399→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   400→                  <Eye className="h-4 w-4 shrink-0 text-emerald-600 sm:h-5 sm:w-5" />
+   401→                  <span className="leading-tight">Mirkeenya Daataa<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Review &amp; confirm</span></span>
+   402→                </CardTitle>
+   403→                <CardDescription className="text-xs sm:text-sm">Check all information before submitting</CardDescription>
+   404→              </CardHeader>
+   405→              <CardContent className="space-y-3 sm:space-y-4">
+   406→                <div className="rounded-lg border bg-slate-50">
+   407→                  {reviewItems.map((item) => (
+   408→                    <div key={item.label} className="flex items-start justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0">
+   409→                      <span className="shrink-0 text-[11px] text-muted-foreground sm:text-xs">{item.label}</span>
+   410→                      <span className="text-right text-xs font-medium sm:text-sm">{item.value || '—'}</span>
+   411→                    </div>
+   412→                  ))}
+   413→                </div>
+   414→                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+   415→                  <p className="mb-2 text-xs font-medium text-amber-900 sm:text-sm">
+   416→                    I confirm that the information provided is true and authenticated / Ani daataan kenname dhugaa fi mirkanaa&#39;eef mirkaneera
+   417→                  </p>
+   418→                  <RadioGroup value={dataConfirmed} onValueChange={setDataConfirmed} className="flex gap-4">
+   419→                    <div className="flex items-center space-x-2">
+   420→                      <RadioGroupItem value="yes" id="a-confirm-yes" />
+   421→                      <Label htmlFor="a-confirm-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+   422→                    </div>
+   423→                    <div className="flex items-center space-x-2">
+   424→                      <RadioGroupItem value="no" id="a-confirm-no" />
+   425→                      <Label htmlFor="a-confirm-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+   426→                    </div>
+   427→                  </RadioGroup>
+   428→                </div>
+   429→              </CardContent>
+   430→            </>
+   431→          )}
+   432→        </Card>
+   433→
+   434→        {/* Navigation Buttons */}
+   435→        <div className="mt-3 flex gap-2 sm:mt-4 sm:gap-3">
+   436→          {currentStep > 1 && (
+   437→            <Button type="button" variant="outline" onClick={prevStep} className="flex-1 text-sm sm:text-base">
+   438→              <ChevronLeft className="h-4 w-4" />
+   439→              Back / Gara Duubatti
+   440→            </Button>
+   441→          )}
+   442→          {currentStep < STEPS.length ? (
+   443→            <Button type="button" onClick={nextStep} className="flex-[2] bg-emerald-600 text-sm text-white hover:bg-emerald-700 sm:text-base">
+   444→              Next / Itti fufi
+   445→              <ChevronRight className="h-4 w-4" />
+   446→            </Button>
+   447→          ) : (
+   448→            <Button type="submit" disabled={isSubmitting} className="flex-[2] bg-emerald-600 text-sm text-white hover:bg-emerald-700 sm:text-base">
+   449→              {isSubmitting ? (
+   450→                <>
+   451→                  <Loader2 className="h-4 w-4 animate-spin" />
+   452→                  Submitting...
+   453→                </>
+   454→              ) : (
+   455→                <>
+   456→                  <Check className="h-4 w-4" />
+   457→                  Submit Survey / Galchi
+   458→                </>
+   459→              )}
+   460→            </Button>
+   461→          )}
+   462→        </div>
+   463→      </form>
+   464→    </div>
+   465→  );
+   466→}
+   467→

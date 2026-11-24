@@ -1,0 +1,888 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback, useRef } from 'react';
+     4→import { Button } from '@/components/ui/button';
+     5→import { Input } from '@/components/ui/input';
+     6→import { Label } from '@/components/ui/label';
+     7→import {
+     8→  Select,
+     9→  SelectContent,
+    10→  SelectItem,
+    11→  SelectTrigger,
+    12→  SelectValue,
+    13→} from '@/components/ui/select';
+    14→import {
+    15→  Card,
+    16→  CardContent,
+    17→  CardDescription,
+    18→  CardHeader,
+    19→  CardTitle,
+    20→} from '@/components/ui/card';
+    21→import {
+    22→  AlertDialog,
+    23→  AlertDialogAction,
+    24→  AlertDialogCancel,
+    25→  AlertDialogContent,
+    26→  AlertDialogDescription,
+    27→  AlertDialogFooter,
+    28→  AlertDialogHeader,
+    29→  AlertDialogTitle,
+    30→} from '@/components/ui/alert-dialog';
+    31→import {
+    32→  Dialog,
+    33→  DialogContent,
+    34→  DialogDescription,
+    35→  DialogHeader,
+    36→  DialogTitle,
+    37→  DialogFooter,
+    38→} from '@/components/ui/dialog';
+    39→import { Badge } from '@/components/ui/badge';
+    40→import { Skeleton } from '@/components/ui/skeleton';
+    41→import { useToast } from '@/hooks/use-toast';
+    42→import {
+    43→  Search,
+    44→  Download,
+    45→  Trash2,
+    46→  Eye,
+    47→  Stethoscope,
+    48→  ChevronLeft,
+    49→  ChevronRight,
+    50→  RefreshCw,
+    51→  FileSpreadsheet,
+    52→  Pencil,
+    53→  Loader2,
+    54→  Save,
+    55→  Upload,
+    56→  Phone,
+    57→  MapPin,
+    58→  FileBadge,
+    59→  Check,
+    60→  X,
+    61→  FlaskConical,
+    62→  Pill,
+    63→  Baby,
+    64→  Siren,
+    65→} from 'lucide-react';
+    66→import { HEALTH_FACILITY_TYPES, HEALTH_OWNERSHIP_TYPES } from '@/lib/location-data';
+    67→import { useSettings } from '@/components/SettingsProvider';
+    68→
+    69→interface HealthCenter {
+    70→  id: string;
+    71→  facilityName: string;
+    72→  facilityType: string;
+    73→  ownershipType: string;
+    74→  subCity: string;
+    75→  area: string;
+    76→  specificAddress: string;
+    77→  licenseNumber: string | null;
+    78→  staffCount: number;
+    79→  bedCount: number;
+    80→  hasLaboratory: boolean;
+    81→  hasPharmacy: boolean;
+    82→  hasMaternity: boolean;
+    83→  hasEmergency: boolean;
+    84→  contactName: string;
+    85→  contactPhone: string;
+    86→  surveyorName: string | null;
+    87→  surveyorId: string | null;
+    88→  createdAt: string;
+    89→  updatedAt: string;
+    90→}
+    91→
+    92→interface EditForm {
+    93→  facilityName: string;
+    94→  facilityType: string;
+    95→  ownershipType: string;
+    96→  subCity: string;
+    97→  area: string;
+    98→  specificAddress: string;
+    99→  licenseNumber: string;
+   100→  staffCount: string;
+   101→  bedCount: string;
+   102→  hasLaboratory: string;
+   103→  hasPharmacy: string;
+   104→  hasMaternity: string;
+   105→  hasEmergency: string;
+   106→  contactName: string;
+   107→  contactPhone: string;
+   108→}
+   109→
+   110→interface DataListProps {
+   111→  refreshTrigger: number;
+   112→}
+   113→
+   114→const PAGE_SIZE = 50;
+   115→
+   116→const SERVICE_FIELDS: { name: string; label: string }[] = [
+   117→  { name: 'hasLaboratory', label: 'Laboratory' },
+   118→  { name: 'hasPharmacy', label: 'Pharmacy' },
+   119→  { name: 'hasMaternity', label: 'Maternity' },
+   120→  { name: 'hasEmergency', label: 'Emergency (24/7)' },
+   121→];
+   122→
+   123→function fmtDate(value: string): string {
+   124→  const d = new Date(value);
+   125→  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB');
+   126→}
+   127→
+   128→export default function HealthList({ refreshTrigger }: DataListProps) {
+   129→  const { subCities, areasFor } = useSettings();
+   130→  const { toast } = useToast();
+   131→  const [data, setData] = useState<HealthCenter[]>([]);
+   132→  const [loading, setLoading] = useState(true);
+   133→  const [search, setSearch] = useState('');
+   134→  const [filterSubCity, setFilterSubCity] = useState('');
+   135→  const [filterArea, setFilterArea] = useState('');
+   136→  const [filterType, setFilterType] = useState('');
+   137→  const [areas, setAreas] = useState<string[]>([]);
+   138→  const [page, setPage] = useState(1);
+   139→  const [totalPages, setTotalPages] = useState(1);
+   140→  const [total, setTotal] = useState(0);
+   141→  const [deleteId, setDeleteId] = useState<string | null>(null);
+   142→  const [viewItem, setViewItem] = useState<HealthCenter | null>(null);
+   143→  const [editItem, setEditItem] = useState<HealthCenter | null>(null);
+   144→  const [editForm, setEditForm] = useState<EditForm | null>(null);
+   145→  const [editAreas, setEditAreas] = useState<string[]>([]);
+   146→  const [saving, setSaving] = useState(false);
+   147→  const [deleting, setDeleting] = useState(false);
+   148→  const [exporting, setExporting] = useState(false);
+   149→  const [importing, setImporting] = useState(false);
+   150→  const [showImport, setShowImport] = useState(false);
+   151→  const [importResult, setImportResult] = useState<{success: number, failed: number, errors: string[]} | null>(null);
+   152→  const fileInputRef = useRef<HTMLInputElement>(null);
+   153→
+   154→  const fetchData = useCallback(async () => {
+   155→    setLoading(true);
+   156→    try {
+   157→      const params = new URLSearchParams();
+   158→      if (search) params.set('search', search);
+   159→      if (filterSubCity) params.set('subCity', filterSubCity);
+   160→      if (filterArea) params.set('area', filterArea);
+   161→      if (filterType) params.set('facilityType', filterType);
+   162→      params.set('page', String(page));
+   163→      params.set('limit', String(PAGE_SIZE));
+   164→
+   165→      const res = await fetch(`/api/healthcenters?${params}`);
+   166→      if (!res.ok) throw new Error('Failed to fetch');
+   167→      const json = await res.json();
+   168→      setData(json.data);
+   169→      setTotal(json.total);
+   170→      setTotalPages(json.totalPages);
+   171→    } catch {
+   172→      toast({
+   173→        title: 'Error',
+   174→        description: 'Failed to load data',
+   175→        variant: 'destructive',
+   176→      });
+   177→    } finally {
+   178→      setLoading(false);
+   179→    }
+   180→  }, [search, filterSubCity, filterArea, filterType, page, toast]);
+   181→
+   182→  useEffect(() => {
+   183→    fetchData();
+   184→  }, [fetchData, refreshTrigger]);
+   185→
+   186→  const handleSubCityFilterChange = (value: string) => {
+   187→    setFilterSubCity(value);
+   188→    setFilterArea('');
+   189→    setPage(1);
+   190→    setAreas(value ? areasFor(value) : []);
+   191→  };
+   192→
+   193→  const handleDelete = async () => {
+   194→    if (!deleteId) return;
+   195→    setDeleting(true);
+   196→    try {
+   197→      const res = await fetch(`/api/healthcenters/${deleteId}`, {
+   198→        method: 'DELETE',
+   199→      });
+   200→      if (!res.ok) throw new Error('Delete failed');
+   201→      toast({ title: 'Deleted', description: 'Record removed successfully.' });
+   202→      fetchData();
+   203→    } catch {
+   204→      toast({
+   205→        title: 'Delete Failed',
+   206→        description: 'Could not delete the record.',
+   207→        variant: 'destructive',
+   208→      });
+   209→    } finally {
+   210→      setDeleting(false);
+   211→      setDeleteId(null);
+   212→    }
+   213→  };
+   214→
+   215→  const openEdit = (item: HealthCenter) => {
+   216→    setEditItem(item);
+   217→    setEditForm({
+   218→      facilityName: item.facilityName,
+   219→      facilityType: item.facilityType,
+   220→      ownershipType: item.ownershipType,
+   221→      subCity: item.subCity,
+   222→      area: item.area,
+   223→      specificAddress: item.specificAddress,
+   224→      licenseNumber: item.licenseNumber || '',
+   225→      staffCount: String(item.staffCount),
+   226→      bedCount: String(item.bedCount),
+   227→      hasLaboratory: item.hasLaboratory ? 'yes' : 'no',
+   228→      hasPharmacy: item.hasPharmacy ? 'yes' : 'no',
+   229→      hasMaternity: item.hasMaternity ? 'yes' : 'no',
+   230→      hasEmergency: item.hasEmergency ? 'yes' : 'no',
+   231→      contactName: item.contactName,
+   232→      contactPhone: item.contactPhone,
+   233→    });
+   234→    setEditAreas(areasFor(item.subCity));
+   235→  };
+   236→
+   237→  const handleEditSubCityChange = (value: string) => {
+   238→    if (!editForm) return;
+   239→    setEditAreas(areasFor(value));
+   240→    setEditForm({ ...editForm, subCity: value, area: '' });
+   241→  };
+   242→
+   243→  const handleSave = async () => {
+   244→    if (!editItem || !editForm) return;
+   245→    setSaving(true);
+   246→    try {
+   247→      const res = await fetch(`/api/healthcenters/${editItem.id}`, {
+   248→        method: 'PUT',
+   249→        headers: { 'Content-Type': 'application/json' },
+   250→        body: JSON.stringify(editForm),
+   251→      });
+   252→      if (!res.ok) {
+   253→        const err = await res.json().catch(() => ({}));
+   254→        throw new Error(err.error || 'Update failed');
+   255→      }
+   256→      toast({ title: 'Saved / Nuusame', description: 'Record updated successfully' });
+   257→      setEditItem(null);
+   258→      setEditForm(null);
+   259→      fetchData();
+   260→    } catch (error) {
+   261→      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to save', variant: 'destructive' });
+   262→    } finally {
+   263→      setSaving(false);
+   264→    }
+   265→  };
+   266→
+   267→  const handleExport = async (format: 'csv' | 'excel') => {
+   268→    setExporting(true);
+   269→    try {
+   270→      const params = new URLSearchParams();
+   271→      if (filterSubCity) params.set('subCity', filterSubCity);
+   272→      if (filterArea) params.set('area', filterArea);
+   273→      if (filterType) params.set('facilityType', filterType);
+   274→      const res = await fetch(`/api/healthcenters/export${format === 'excel' ? '/excel' : ''}?${params}`);
+   275→      if (!res.ok) {
+   276→        const err = await res.json().catch(() => ({}));
+   277→        throw new Error(err.error || 'Export failed');
+   278→      }
+   279→      const blob = await res.blob();
+   280→      const url = window.URL.createObjectURL(blob);
+   281→      const a = document.createElement('a');
+   282→      a.href = url;
+   283→      a.download = `bishoftu_health_survey_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+   284→      document.body.appendChild(a);
+   285→      a.click();
+   286→      document.body.removeChild(a);
+   287→      window.URL.revokeObjectURL(url);
+   288→      toast({ title: 'Export Successful', description: `Downloaded ${format.toUpperCase()} file` });
+   289→    } catch (error) {
+   290→      toast({ title: 'Export Failed', description: error instanceof Error ? error.message : 'Failed to export', variant: 'destructive' });
+   291→    } finally {
+   292→      setExporting(false);
+   293→    }
+   294→  };
+   295→
+   296→  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   297→    const file = e.target.files?.[0];
+   298→    if (!file) return;
+   299→    setImporting(true);
+   300→    setImportResult(null);
+   301→    try {
+   302→      const fd = new FormData();
+   303→      fd.append('file', file);
+   304→      const res = await fetch('/api/healthcenters/import', { method: 'POST', body: fd });
+   305→      const json = await res.json();
+   306→      if (!res.ok) throw new Error(json.error || 'Import failed');
+   307→      setImportResult(json);
+   308→      toast({ title: 'Galmeessaa Keessaa / Import Complete', description: json.message });
+   309→      fetchData();
+   310→    } catch (error) {
+   311→      toast({ title: 'Import Failed', description: error instanceof Error ? error.message : 'Check file format', variant: 'destructive' });
+   312→    } finally { setImporting(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+   313→  };
+   314→
+   315→  const actionButtons = (item: HealthCenter) => (
+   316→    <>
+   317→      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewItem(item)} title="View">
+   318→        <Eye className="h-3.5 w-3.5" />
+   319→      </Button>
+   320→      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)} title="Edit">
+   321→        <Pencil className="h-3.5 w-3.5 text-blue-600" />
+   322→      </Button>
+   323→      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteId(item.id)} title="Delete">
+   324→        <Trash2 className="h-3.5 w-3.5" />
+   325→      </Button>
+   326→    </>
+   327→  );
+   328→
+   329→  const serviceChips = (item: HealthCenter, size: 'sm' | 'lg' = 'sm') => {
+   330→    const svc = [
+   331→      { ok: item.hasLaboratory, short: 'Lab', icon: FlaskConical },
+   332→      { ok: item.hasPharmacy, short: 'Pharm', icon: Pill },
+   333→      { ok: item.hasMaternity, short: 'Mat', icon: Baby },
+   334→      { ok: item.hasEmergency, short: '24/7', icon: Siren },
+   335→    ];
+   336→    const cls = size === 'sm'
+   337→      ? 'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold'
+   338→      : 'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold';
+   339→    return svc.map((s) => (
+   340→      <span key={s.short} className={`${cls} ${s.ok ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+   341→        {s.ok ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} {s.short}
+   342→      </span>
+   343→    ));
+   344→  };
+   345→
+   346→  const startIndex = (page - 1) * PAGE_SIZE;
+   347→
+   348→  return (
+   349→    <div className="space-y-3 sm:space-y-4">
+   350→      <Card>
+   351→        <CardHeader className="pb-2 sm:pb-3">
+   352→          <CardTitle className="flex items-center justify-between gap-2 text-base sm:text-lg">
+   353→            <span className="flex items-center gap-2">
+   354→              <Stethoscope className="h-5 w-5 text-sky-600" />
+   355→              Health Records / Galmee Fayyummaa
+   356→            </span>
+   357→            <Badge variant="secondary" className="shrink-0 bg-sky-100 text-sky-700 text-xs sm:text-sm">
+   358→              {total} record{total !== 1 ? 's' : ''}
+   359→            </Badge>
+   360→          </CardTitle>
+   361→          <CardDescription className="text-xs sm:text-sm">View and manage all collected health facility survey data</CardDescription>
+   362→        </CardHeader>
+   363→        <CardContent className="space-y-2.5 sm:space-y-3">
+   364→          {/* Search */}
+   365→          <div className="relative">
+   366→            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+   367→            <Input
+   368→              placeholder="Search name, address, license, contact..."
+   369→              value={search}
+   370→              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   371→              className="pl-9 text-sm sm:text-base"
+   372→            />
+   373→          </div>
+   374→
+   375→          {/* Filters */}
+   376→          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2">
+   377→            <Select value={filterType || undefined} onValueChange={(v) => { setFilterType(v === 'all' ? '' : v); setPage(1); }}>
+   378→              <SelectTrigger className="text-xs sm:text-sm"><SelectValue placeholder="All facility types" /></SelectTrigger>
+   379→              <SelectContent className="max-h-64">
+   380→                <SelectItem value="all">All facility types</SelectItem>
+   381→                {HEALTH_FACILITY_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}
+   382→              </SelectContent>
+   383→            </Select>
+   384→            <Select value={filterSubCity || undefined} onValueChange={(v) => { handleSubCityFilterChange(v === 'all' ? '' : v); }}>
+   385→              <SelectTrigger className="text-xs sm:text-sm"><SelectValue placeholder="All sub-cities" /></SelectTrigger>
+   386→              <SelectContent>
+   387→                <SelectItem value="all">All sub-cities</SelectItem>
+   388→                {subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}
+   389→              </SelectContent>
+   390→            </Select>
+   391→            <Select value={filterArea || undefined} onValueChange={(v) => { setFilterArea(v === 'all' ? '' : v); setPage(1); }} disabled={!filterSubCity}>
+   392→              <SelectTrigger className="text-xs sm:text-sm"><SelectValue placeholder={filterSubCity ? 'All woredas' : 'Select sub-city first'} /></SelectTrigger>
+   393→              <SelectContent>
+   394→                <SelectItem value="all">All woredas</SelectItem>
+   395→                {areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}
+   396→              </SelectContent>
+   397→            </Select>
+   398→          </div>
+   399→
+   400→          {/* Export / Import buttons */}
+   401→          <div className="flex gap-2">
+   402→            <Button variant="outline" size="sm" onClick={() => handleExport('csv')} disabled={exporting} className="flex-1 text-xs sm:text-sm">
+   403→              <Download className="h-3.5 w-3.5" /> CSV
+   404→            </Button>
+   405→            <Button variant="outline" size="sm" onClick={() => handleExport('excel')} disabled={exporting} className="flex-1 text-xs sm:text-sm">
+   406→              <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+   407→            </Button>
+   408→            <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="flex-1 text-xs sm:text-sm">
+   409→              <Upload className="h-3.5 w-3.5" /> Import
+   410→            </Button>
+   411→            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="shrink-0">
+   412→              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+   413→            </Button>
+   414→          </div>
+   415→        </CardContent>
+   416→      </Card>
+   417→
+   418→      {/* Records List */}
+   419→      {loading ? (
+   420→        <div className="space-y-2">
+   421→          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
+   422→        </div>
+   423→      ) : data.length === 0 ? (
+   424→        <Card>
+   425→          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+   426→            <Stethoscope className="mb-3 h-10 w-10 text-muted-foreground/40" />
+   427→            <p className="text-sm font-medium text-muted-foreground">No health facility records found</p>
+   428→            <p className="mt-1 text-xs text-muted-foreground/70">Collect a survey, import Excel, or adjust your filters</p>
+   429→          </CardContent>
+   430→        </Card>
+   431→      ) : (
+   432→        <>
+   433→          {/* Desktop: full data table */}
+   434→          <Card className="hidden md:block overflow-hidden">
+   435→            <CardContent className="px-0 py-0">
+   436→              <table className="w-full text-xs">
+   437→                <thead>
+   438→                  <tr className="border-b bg-gradient-to-r from-slate-50 via-sky-50/60 to-slate-50">
+   439→                    <th className="w-10 px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">#</th>
+   440→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Facility</th>
+   441→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Type</th>
+   442→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Sub-City</th>
+   443→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Werreda</th>
+   444→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">License No</th>
+   445→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Ownership</th>
+   446→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Services</th>
+   447→                    <th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Staff</th>
+   448→                    <th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Beds</th>
+   449→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Contact</th>
+   450→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Surveyor</th>
+   451→                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Collected</th>
+   452→                    <th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-sky-900/60">Actions</th>
+   453→                  </tr>
+   454→                </thead>
+   455→                <tbody>
+   456→                  {data.map((item, i) => (
+   457→                    <tr key={item.id} className="border-b last:border-b-0 hover:bg-sky-50/40 transition-colors">
+   458→                      <td className="px-2.5 py-2 text-center text-muted-foreground/70">{startIndex + i + 1}</td>
+   459→                      <td className="max-w-[200px] px-2.5 py-2">
+   460→                        <p className="truncate font-semibold text-foreground" title={item.facilityName}>{item.facilityName}</p>
+   461→                        <p className="truncate text-[10px] text-muted-foreground" title={item.specificAddress}>
+   462→                          <span className="inline-flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{item.specificAddress}</span>
+   463→                        </p>
+   464→                      </td>
+   465→                      <td className="max-w-[130px] px-2.5 py-2">
+   466→                        <Badge variant="outline" className="max-w-full truncate bg-sky-50 text-[10px] font-normal text-sky-700" title={item.facilityType}>{item.facilityType}</Badge>
+   467→                      </td>
+   468→                      <td className="whitespace-nowrap px-2.5 py-2">{item.subCity}</td>
+   469→                      <td className="whitespace-nowrap px-2.5 py-2">{item.area}</td>
+   470→                      <td className="whitespace-nowrap px-2.5 py-2 font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</td>
+   471→                      <td className="max-w-[110px] truncate px-2.5 py-2 text-muted-foreground" title={item.ownershipType}>{item.ownershipType}</td>
+   472→                      <td className="whitespace-nowrap px-2.5 py-2">
+   473→                        <div className="flex items-center gap-1">{serviceChips(item)}</div>
+   474→                      </td>
+   475→                      <td className="px-2.5 py-2 text-center">
+   476→                        <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-sky-100 px-1.5 text-xs font-semibold text-sky-700">{item.staffCount}</span>
+   477→                      </td>
+   478→                      <td className="px-2.5 py-2 text-center">
+   479→                        <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-violet-100 px-1.5 text-xs font-semibold text-violet-700">{item.bedCount}</span>
+   480→                      </td>
+   481→                      <td className="whitespace-nowrap px-2.5 py-2">
+   482→                        <p className="max-w-[110px] truncate font-medium" title={item.contactName}>{item.contactName}</p>
+   483→                        <a href={`tel:${item.contactPhone}`} className="text-[11px] font-medium text-sky-600 hover:underline">{item.contactPhone}</a>
+   484→                      </td>
+   485→                      <td className="max-w-[90px] truncate px-2.5 py-2 text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '—'}</td>
+   486→                      <td className="whitespace-nowrap px-2.5 py-2 text-muted-foreground">{fmtDate(item.createdAt)}</td>
+   487→                      <td className="px-2.5 py-2">
+   488→                        <div className="flex justify-center gap-0.5">{actionButtons(item)}</div>
+   489→                      </td>
+   490→                    </tr>
+   491→                  ))}
+   492→                </tbody>
+   493→              </table>
+   494→            </CardContent>
+   495→          </Card>
+   496→
+   497→          {/* Mobile: enriched record cards */}
+   498→          <div className="space-y-2 md:hidden">
+   499→            {data.map((item, i) => (
+   500→              <Card key={item.id} className="overflow-hidden border-sky-100/80 transition-shadow hover:shadow-md">
+   501→                {/* slim gradient top edge */}
+   502→                <div className="h-1 bg-gradient-to-r from-sky-500 via-cyan-400 to-sky-500" />
+   503→                <CardContent className="p-3 space-y-2.5">
+   504→                  <div className="flex items-start justify-between gap-2">
+   505→                    <div className="min-w-0 flex-1">
+   506→                      <div className="flex items-center gap-1.5">
+   507→                        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-md bg-sky-100 px-1 text-[10px] font-bold text-sky-700">{startIndex + i + 1}</span>
+   508→                        <p className="truncate text-sm font-semibold">{item.facilityName}</p>
+   509→                      </div>
+   510→                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+   511→                        <Badge variant="outline" className="bg-sky-50 text-[10px] text-sky-700">{item.facilityType}</Badge>
+   512→                        <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{item.subCity} — {item.area}</span>
+   513→                      </div>
+   514→                    </div>
+   515→                    <div className="flex shrink-0 gap-0.5">{actionButtons(item)}</div>
+   516→                  </div>
+   517→
+   518→                  {/* Stat tiles */}
+   519→                  <div className="grid grid-cols-3 gap-2">
+   520→                    <div className="rounded-lg bg-sky-50 px-2 py-1.5 text-center">
+   521→                      <p className="text-[9px] text-sky-600">Hojjetaa</p>
+   522→                      <p className="text-sm font-bold text-sky-700">{item.staffCount}</p>
+   523→                    </div>
+   524→                    <div className="rounded-lg bg-violet-50 px-2 py-1.5 text-center">
+   525→                      <p className="text-[9px] text-violet-600">Siree</p>
+   526→                      <p className="text-sm font-bold text-violet-700">{item.bedCount}</p>
+   527→                    </div>
+   528→                    <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
+   529→                      <p className="text-[9px] text-amber-600">Abbaa Qabuu</p>
+   530→                      <p className="truncate text-[11px] font-semibold text-amber-700 leading-tight mt-0.5" title={item.ownershipType}>{item.ownershipType}</p>
+   531→                    </div>
+   532→                  </div>
+   533→
+   534→                  {/* License + services */}
+   535→                  <div className="flex items-center justify-between gap-2 border-t pt-2">
+   536→                    <div className="flex min-w-0 items-center gap-1.5">
+   537→                      <FileBadge className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+   538→                      <p className="truncate font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</p>
+   539→                    </div>
+   540→                    <div className="flex shrink-0 gap-1">{serviceChips(item)}</div>
+   541→                  </div>
+   542→
+   543→                  {/* Contact row */}
+   544→                  <div className="flex items-center justify-between gap-2 border-t pt-2">
+   545→                    <div className="min-w-0">
+   546→                      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Contact</p>
+   547→                      <p className="truncate text-[11px] font-medium">{item.contactName}</p>
+   548→                    </div>
+   549→                    <a href={`tel:${item.contactPhone}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700 active:bg-sky-100">
+   550→                      <Phone className="h-3 w-3" /> {item.contactPhone}
+   551→                    </a>
+   552→                  </div>
+   553→
+   554→                  <p className="text-[10px] text-muted-foreground/60 text-right">
+   555→                    {item.surveyorName && <span>{item.surveyorName} &middot; </span>}
+   556→                    {fmtDate(item.createdAt)}
+   557→                  </p>
+   558→                </CardContent>
+   559→              </Card>
+   560→            ))}
+   561→          </div>
+   562→        </>
+   563→      )}
+   564→
+   565→      {/* Pagination */}
+   566→      {totalPages > 1 && (
+   567→        <div className="flex items-center justify-center gap-2">
+   568→          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+   569→            <ChevronLeft className="h-4 w-4" />
+   570→          </Button>
+   571→          <span className="text-sm text-muted-foreground">Fuula / Page {page} of {totalPages}</span>
+   572→          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+   573→            <ChevronRight className="h-4 w-4" />
+   574→          </Button>
+   575→        </div>
+   576→      )}
+   577→
+   578→      {/* Delete Confirmation */}
+   579→      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+   580→        <AlertDialogContent>
+   581→          <AlertDialogHeader>
+   582→            <AlertDialogTitle>Delete Record?</AlertDialogTitle>
+   583→            <AlertDialogDescription>
+   584→              This will permanently delete this health facility record. This action cannot be undone.
+   585→            </AlertDialogDescription>
+   586→          </AlertDialogHeader>
+   587→          <AlertDialogFooter>
+   588→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   589→            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700">
+   590→              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+   591→              Delete
+   592→            </AlertDialogAction>
+   593→          </AlertDialogFooter>
+   594→        </AlertDialogContent>
+   595→      </AlertDialog>
+   596→
+   597→      {/* View Dialog */}
+   598→      <Dialog open={!!viewItem} onOpenChange={(open) => !open && setViewItem(null)}>
+   599→        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg p-0 gap-0">
+   600→          {viewItem && (
+   601→            <>
+   602→              {/* Gradient header with watermark */}
+   603→              <div className="relative overflow-hidden bg-gradient-to-br from-sky-600 via-sky-700 to-blue-700 px-5 pt-6 pb-5 rounded-t-lg">
+   604→                <Stethoscope className="absolute -right-3 -top-4 h-28 w-28 rotate-12 text-white/10" />
+   605→                <Stethoscope className="absolute right-16 top-8 h-14 w-14 -rotate-6 text-white/10" />
+   606→                <DialogHeader>
+   607→                  <DialogTitle className="pr-8 text-lg font-bold text-white leading-tight">{viewItem.facilityName}</DialogTitle>
+   608→                  <DialogDescription className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sky-50 text-xs">
+   609→                    <span className="rounded-full bg-white/15 px-2 py-0.5 backdrop-blur-sm">{viewItem.facilityType}</span>
+   610→                    <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{viewItem.area} &middot; {viewItem.subCity}</span>
+   611→                  </DialogDescription>
+   612→                </DialogHeader>
+   613→              </div>
+   614→
+   615→              <div className="px-5 py-4 space-y-4">
+   616→                {/* Stat tiles */}
+   617→                <div className="grid grid-cols-2 gap-2.5">
+   618→                  <div className="rounded-xl border border-sky-100 bg-sky-50 p-2.5 text-center">
+   619→                    <p className="text-[10px] font-medium text-sky-600">Hojjetaa / Staff</p>
+   620→                    <p className="mt-0.5 text-xl font-bold text-sky-700">{viewItem.staffCount}</p>
+   621→                  </div>
+   622→                  <div className="rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-center">
+   623→                    <p className="text-[10px] font-medium text-violet-600">Siree / Beds</p>
+   624→                    <p className="mt-0.5 text-xl font-bold text-violet-700">{viewItem.bedCount}</p>
+   625→                  </div>
+   626→                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-2.5 text-center">
+   627→                    <p className="text-[10px] font-medium text-blue-600">Abbaa Qabuu / Ownership</p>
+   628→                    <p className="mt-1 truncate text-xs font-bold text-blue-700 leading-tight" title={viewItem.ownershipType}>{viewItem.ownershipType}</p>
+   629→                  </div>
+   630→                  <div className="rounded-xl border border-green-100 bg-green-50 p-2.5 text-center">
+   631→                    <p className="text-[10px] font-medium text-green-600">Tajaajila / Services</p>
+   632→                    <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1">{serviceChips(viewItem, 'lg')}</div>
+   633→                  </div>
+   634→                </div>
+   635→
+   636→                {/* License */}
+   637→                <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 p-3">
+   638→                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+   639→                    <FileBadge className="h-4 w-4" />
+   640→                  </div>
+   641→                  <div className="min-w-0">
+   642→                    <p className="text-[10px] font-medium text-muted-foreground">Lakofsaa Eyyeema / License No.</p>
+   643→                    <p className="truncate font-mono text-sm font-semibold">{viewItem.licenseNumber || '—'}</p>
+   644→                  </div>
+   645→                </div>
+   646→
+   647→                {/* Address */}
+   648→                <div>
+   649→                  <div className="mb-1.5 flex items-center gap-1.5">
+   650→                    <div className="h-1 w-1 rounded-full bg-sky-500" />
+   651→                    <h4 className="text-xs font-bold uppercase tracking-wide text-sky-700">Baka Addaa / Address</h4>
+   652→                  </div>
+   653→                  <p className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm leading-relaxed text-foreground/80">{viewItem.specificAddress}</p>
+   654→                </div>
+   655→
+   656→                {/* Services detail */}
+   657→                <div>
+   658→                  <div className="mb-1.5 flex items-center gap-1.5">
+   659→                    <div className="h-1 w-1 rounded-full bg-green-500" />
+   660→                    <h4 className="text-xs font-bold uppercase tracking-wide text-green-700">Tajaajila Fayyummaa / Health Services</h4>
+   661→                  </div>
+   662→                  <div className="rounded-lg border space-y-0 divide-y">
+   663→                    {[
+   664→                      { ok: viewItem.hasLaboratory, icon: FlaskConical, label: 'Laboratory — on-site diagnostic tests' },
+   665→                      { ok: viewItem.hasPharmacy, icon: Pill, label: 'Pharmacy — dispenses medicines' },
+   666→                      { ok: viewItem.hasMaternity, icon: Baby, label: 'Maternity — delivery & ANC services' },
+   667→                      { ok: viewItem.hasEmergency, icon: Siren, label: 'Emergency — open 24/7' },
+   668→                    ].map((svc) => (
+   669→                      <div key={svc.label} className="flex items-center justify-between px-3 py-2.5">
+   670→                        <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+   671→                          <svc.icon className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+   672→                          <span className="truncate">{svc.label}</span>
+   673→                        </span>
+   674→                        <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${svc.ok ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+   675→                          {svc.ok ? <><Check className="h-3 w-3" /> Yes / Eyee</> : <><X className="h-3 w-3" /> No / Lakki</>}
+   676→                        </span>
+   677→                      </div>
+   678→                    ))}
+   679→                  </div>
+   680→                </div>
+   681→
+   682→                {/* Contact */}
+   683→                <div>
+   684→                  <div className="mb-1.5 flex items-center gap-1.5">
+   685→                    <div className="h-1 w-1 rounded-full bg-blue-500" />
+   686→                    <h4 className="text-xs font-bold uppercase tracking-wide text-blue-700">Odeeffannoo Quunnamtii / Contact</h4>
+   687→                  </div>
+   688→                  <div className="rounded-lg border space-y-0 divide-y">
+   689→                    <div className="flex items-center justify-between px-3 py-2.5">
+   690→                      <span className="text-xs text-muted-foreground">Nama Quunnamtu / Contact Person</span>
+   691→                      <span className="text-sm font-semibold">{viewItem.contactName}</span>
+   692→                    </div>
+   693→                    <div className="flex items-center justify-between px-3 py-2.5">
+   694→                      <span className="text-xs text-muted-foreground">Bilbila / Phone</span>
+   695→                      <a href={`tel:${viewItem.contactPhone}`} className="inline-flex items-center gap-1 text-sm font-semibold text-sky-600 hover:underline">
+   696→                        <Phone className="h-3 w-3" />{viewItem.contactPhone}
+   697→                      </a>
+   698→                    </div>
+   699→                  </div>
+   700→                </div>
+   701→
+   702→                {/* Footer / Surveyor */}
+   703→                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
+   704→                  <span className="text-[10px] text-muted-foreground">Sakatta&#39;aa / Surveyor</span>
+   705→                  <span className="text-xs font-medium">{viewItem.surveyorName || '—'}</span>
+   706→                  <span className="text-[10px] text-muted-foreground">{fmtDate(viewItem.createdAt)}</span>
+   707→                </div>
+   708→              </div>
+   709→            </>
+   710→          )}
+   711→        </DialogContent>
+   712→      </Dialog>
+   713→
+   714→      {/* Edit Dialog */}
+   715→      <Dialog open={!!editItem} onOpenChange={(open) => !open && setEditItem(null)}>
+   716→        <DialogContent className="max-h-[85dvh] max-w-md overflow-y-auto">
+   717→          <DialogHeader>
+   718→            <DialogTitle className="flex items-center gap-2 text-base">
+   719→              <Pencil className="h-4 w-4 text-blue-600" />
+   720→              Edit Health Record
+   721→            </DialogTitle>
+   722→            <DialogDescription>Update health facility information</DialogDescription>
+   723→          </DialogHeader>
+   724→          {editForm && (
+   725→            <div className="space-y-4 pt-2">
+   726→              {/* Facility */}
+   727→              <div className="space-y-3 rounded-lg border p-3">
+   728→                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-sky-700">
+   729→                  <Stethoscope className="h-3.5 w-3.5" /> Odeeffannoo Manaa Yaalaa / Facility
+   730→                </h4>
+   731→                <div className="space-y-2">
+   732→                  <Label className="text-xs">Facility Name / Maqaa Manaa Yaalaa <span className="text-red-500">*</span></Label>
+   733→                  <Input value={editForm.facilityName} onChange={(e) => setEditForm({ ...editForm, facilityName: e.target.value })} className="text-sm" />
+   734→                </div>
+   735→                <div className="space-y-2">
+   736→                  <Label className="text-xs">Facility Type / Gosa <span className="text-red-500">*</span></Label>
+   737→                  <Select value={editForm.facilityType} onValueChange={(v) => setEditForm({ ...editForm, facilityType: v })}>
+   738→                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+   739→                    <SelectContent className="max-h-64">{HEALTH_FACILITY_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+   740→                  </Select>
+   741→                </div>
+   742→                <div className="grid grid-cols-2 gap-3">
+   743→                  <div className="space-y-2">
+   744→                    <Label className="text-xs">Sub-City / Kututtaa Maggalaa <span className="text-red-500">*</span></Label>
+   745→                    <Select value={editForm.subCity} onValueChange={(v) => { setEditForm({ ...editForm, subCity: v, area: '' }); handleEditSubCityChange(v); }}>
+   746→                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+   747→                      <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+   748→                    </Select>
+   749→                  </div>
+   750→                  <div className="space-y-2">
+   751→                    <Label className="text-xs">Werreda <span className="text-red-500">*</span></Label>
+   752→                    <Select value={editForm.area} onValueChange={(v) => setEditForm({ ...editForm, area: v })}>
+   753→                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+   754→                      <SelectContent>{editAreas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
+   755→                    </Select>
+   756→                  </div>
+   757→                </div>
+   758→                <div className="space-y-2">
+   759→                  <Label className="text-xs">Specific Address / Baka Addaa <span className="text-red-500">*</span></Label>
+   760→                  <Input value={editForm.specificAddress} onChange={(e) => setEditForm({ ...editForm, specificAddress: e.target.value })} className="text-sm" />
+   761→                </div>
+   762→              </div>
+   763→
+   764→              {/* Registration & capacity */}
+   765→              <div className="space-y-3 rounded-lg border p-3">
+   766→                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-blue-700">
+   767→                  <FileBadge className="h-3.5 w-3.5" /> Galmee fi Dandeettii / Registration &amp; Capacity
+   768→                </h4>
+   769→                <div className="grid grid-cols-2 gap-3">
+   770→                  <div className="space-y-2">
+   771→                    <Label className="text-xs">License Number</Label>
+   772→                    <Input value={editForm.licenseNumber} onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })} className="text-sm" />
+   773→                  </div>
+   774→                  <div className="space-y-2">
+   775→                    <Label className="text-xs">Ownership Type <span className="text-red-500">*</span></Label>
+   776→                    <Select value={editForm.ownershipType} onValueChange={(v) => setEditForm({ ...editForm, ownershipType: v })}>
+   777→                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+   778→                      <SelectContent>{HEALTH_OWNERSHIP_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
+   779→                    </Select>
+   780→                  </div>
+   781→                </div>
+   782→                <div className="grid grid-cols-2 gap-3">
+   783→                  <div className="space-y-2">
+   784→                    <Label className="text-xs">Staff Count <span className="text-red-500">*</span></Label>
+   785→                    <Input type="number" min="0" value={editForm.staffCount} onChange={(e) => setEditForm({ ...editForm, staffCount: e.target.value })} className="text-sm" />
+   786→                  </div>
+   787→                  <div className="space-y-2">
+   788→                    <Label className="text-xs">Inpatient Beds</Label>
+   789→                    <Input type="number" min="0" value={editForm.bedCount} onChange={(e) => setEditForm({ ...editForm, bedCount: e.target.value })} className="text-sm" />
+   790→                  </div>
+   791→                </div>
+   792→              </div>
+   793→
+   794→              {/* Services */}
+   795→              <div className="space-y-3 rounded-lg border p-3">
+   796→                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-green-700">
+   797→                  <FlaskConical className="h-3.5 w-3.5" /> Tajaajila / Services
+   798→                </h4>
+   799→                <div className="grid grid-cols-2 gap-3">
+   800→                  {SERVICE_FIELDS.map((svc) => (
+   801→                    <div key={svc.name} className="space-y-2">
+   802→                      <Label className="text-xs">{svc.label}</Label>
+   803→                      <Select value={editForm[svc.name as keyof EditForm]} onValueChange={(v) => setEditForm({ ...editForm, [svc.name]: v })}>
+   804→                        <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+   805→                        <SelectContent>
+   806→                          <SelectItem value="yes">Yes / Eyee</SelectItem>
+   807→                          <SelectItem value="no">No / Lakki</SelectItem>
+   808→                        </SelectContent>
+   809→                      </Select>
+   810→                    </div>
+   811→                  ))}
+   812→                </div>
+   813→              </div>
+   814→
+   815→              {/* Contact */}
+   816→              <div className="space-y-3 rounded-lg border p-3">
+   817→                <h4 className="flex items-center gap-1.5 text-sm font-semibold text-purple-700">
+   818→                  <Phone className="h-3.5 w-3.5" /> Quunnamtii / Contact
+   819→                </h4>
+   820→                <div className="grid grid-cols-2 gap-3">
+   821→                  <div className="space-y-2">
+   822→                    <Label className="text-xs">Contact Person <span className="text-red-500">*</span></Label>
+   823→                    <Input value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} className="text-sm" />
+   824→                  </div>
+   825→                  <div className="space-y-2">
+   826→                    <Label className="text-xs">Contact Phone <span className="text-red-500">*</span></Label>
+   827→                    <Input type="tel" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} className="text-sm" />
+   828→                  </div>
+   829→                </div>
+   830→              </div>
+   831→            </div>
+   832→          )}
+   833→          <DialogFooter className="gap-2 sm:gap-0">
+   834→            <Button variant="outline" onClick={() => setEditItem(null)} size="sm">Cancel</Button>
+   835→            <Button onClick={handleSave} disabled={saving} size="sm" className="bg-sky-600 hover:bg-sky-700">
+   836→              {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+   837→              {saving ? 'Saving...' : 'Save Changes'}
+   838→            </Button>
+   839→          </DialogFooter>
+   840→        </DialogContent>
+   841→      </Dialog>
+   842→
+   843→      {/* Bulk Import Dialog */}
+   844→      <Dialog open={showImport} onOpenChange={(open) => { setShowImport(open); if (!open) setImportResult(null); }}>
+   845→        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+   846→          <DialogHeader>
+   847→            <DialogTitle className="flex items-center gap-2">
+   848→              <Upload className="h-5 w-5 text-sky-600" />
+   849→              <span>Galmeessaa Keessaa / Bulk Import</span>
+   850→            </DialogTitle>
+   851→            <DialogDescription>Import health facility records from Excel file</DialogDescription>
+   852→          </DialogHeader>
+   853→          <div className="space-y-4 pt-2">
+   854→            <div className="rounded-lg border border-dashed border-sky-300 bg-sky-50/50 p-6 text-center">
+   855→              <Upload className="mx-auto h-10 w-10 text-sky-400" />
+   856→              <p className="mt-2 text-sm font-medium">Fiilii Excel Dabali / Drop Excel File</p>
+   857→              <p className="mt-1 text-xs text-muted-foreground">.xlsx files only</p>
+   858→              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+   859→              <Button variant="outline" size="sm" className="mt-3" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+   860→                {importing ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Importing...</> : <><Upload className="mr-1 h-4 w-4" /> Select File</>}
+   861→              </Button>
+   862→            </div>
+   863→            <Button variant="outline" size="sm" className="w-full" onClick={() => window.open('/api/healthcenters/import/template', '_blank')}>
+   864→              <Download className="mr-1 h-4 w-4" /> Download Template / Daawwii Mallatteessaa
+   865→            </Button>
+   866→            {importResult && (
+   867→              <div className={`rounded-lg border p-3 ${importResult.failed === 0 ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'}`}>
+   868→                <p className="text-sm font-semibold">
+   869→                  <span className="text-sky-700">{importResult.success} succeeded</span>
+   870→                  {importResult.failed > 0 && <span className="text-red-600 ml-2">{importResult.failed} failed</span>}
+   871→                </p>
+   872→                {importResult.errors.length > 0 && (
+   873→                  <div className="mt-2 max-h-24 overflow-y-auto">
+   874→                    {importResult.errors.slice(0, 10).map((err, i) => (
+   875→                      <p key={i} className="text-xs text-red-600">{err}</p>
+   876→                    ))}
+   877→                    {importResult.errors.length > 10 && <p className="text-xs text-muted-foreground">...and {importResult.errors.length - 10} more</p>}
+   878→                  </div>
+   879→                )}
+   880→              </div>
+   881→            )}
+   882→          </div>
+   883→        </DialogContent>
+   884→      </Dialog>
+   885→    </div>
+   886→  );
+   887→}
+   888→
