@@ -11,48 +11,48 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  username       String   @unique
-  password       String
-  name           String
-  role           String   @default("COLLECTOR") // ADMIN or COLLECTOR
+  id              String   @id @default(cuid())
+  username        String   @unique
+  password        String
+  name            String
+  role            String   @default("COLLECTOR") // ADMIN or COLLECTOR
   assignedSubCity String? // sub-city assignment for collectors (survey default)
-  assignedArea   String?  // woreda/area assignment for collectors (survey default)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  assignedArea    String? // woreda/area assignment for collectors (survey default)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  attendances       Attendance[]
+  attendances         Attendance[]
   industryAttendances IndustryAttendance[]
-  meetingAssignments CollectorAssignment[]
+  meetingAssignments  CollectorAssignment[]
 }
 
 model GuestHouse {
-  id               String   @id @default(cuid())
-  guestHouseName   String
-  organizationName String?
-  subCity          String
-  area             String
-  specificAddress  String
-  numberOfRooms    Int
-  licenseType      String
-  licenseLevel     String
-  licenseNumber    String?
-  serviceRating    Int
-  contactPhone     String?
-  contactName      String?
-  contactPhone2    String?
-  contactName2     String?
-  ownerName        String?
-  hasRestaurant    Boolean  @default(false)
-  hasParking       Boolean  @default(false)
-  hasWiFi          Boolean  @default(false)
-  hasHotWater      Boolean  @default(false)
+  id                 String   @id @default(cuid())
+  guestHouseName     String
+  organizationName   String?
+  subCity            String
+  area               String
+  specificAddress    String
+  numberOfRooms      Int
+  licenseType        String
+  licenseLevel       String
+  licenseNumber      String?
+  serviceRating      Int
+  contactPhone       String?
+  contactName        String?
+  contactPhone2      String?
+  contactName2       String?
+  ownerName          String?
+  hasRestaurant      Boolean  @default(false)
+  hasParking         Boolean  @default(false)
+  hasWiFi            Boolean  @default(false)
+  hasHotWater        Boolean  @default(false)
   additionalServices String?
-  surveyorName     String?
-  surveyorId       String?
-  signature        String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  surveyorName       String?
+  surveyorId         String?
+  signature          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   attendances Attendance[]
 }
@@ -65,8 +65,8 @@ model Meeting {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  attendances Attendance[]
-  assignments  CollectorAssignment[]
+  attendances         Attendance[]
+  assignments         CollectorAssignment[]
   industryAttendances IndustryAttendance[]
 }
 
@@ -195,36 +195,36 @@ model EducationCenter {
 
 // Agricultural establishment (Mana Qonnaa) — Bishoftu agriculture survey
 model AgricultureCenter {
-  id              String   @id @default(cuid())
-  farmName        String
-  farmType        String // Crop Production, Dairy Farming, Poultry, ...
-  ownershipType   String // Private, Cooperative, Government / Public, ...
-  subCity         String
-  area            String
-  specificAddress String
-  licenseNumber   String?
-  landSizeHectares Float  @default(0) // total land in hectares
-  workerCount     Int      @default(0) // permanent + temporary workers
-  maleWorkers     Int      @default(0) // workers by sex: male
-  femaleWorkers   Int      @default(0) // workers by sex: female
-  hasIrrigation   Boolean  @default(false) // irrigation system
-  hasGreenhouse   Boolean  @default(false) // greenhouse / protected farming
-  hasMachinery    Boolean  @default(false) // tractors & farm machinery
-  hasStorage      Boolean  @default(false) // on-site storage facility
-  contactName     String
-  contactPhone    String
-  surveyorName    String?
-  surveyorId      String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(cuid())
+  farmName         String
+  farmType         String // Crop Production, Dairy Farming, Poultry, ...
+  ownershipType    String // Private, Cooperative, Government / Public, ...
+  subCity          String
+  area             String
+  specificAddress  String
+  licenseNumber    String?
+  landSizeHectares Float    @default(0) // total land in hectares
+  workerCount      Int      @default(0) // permanent + temporary workers
+  maleWorkers      Int      @default(0) // workers by sex: male
+  femaleWorkers    Int      @default(0) // workers by sex: female
+  hasIrrigation    Boolean  @default(false) // irrigation system
+  hasGreenhouse    Boolean  @default(false) // greenhouse / protected farming
+  hasMachinery     Boolean  @default(false) // tractors & farm machinery
+  hasStorage       Boolean  @default(false) // on-site storage facility
+  contactName      String
+  contactPhone     String
+  surveyorName     String?
+  surveyorId       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 // Small enterprise (MSE — Micro & Small Enterprise) — Dhibayyuu initiative survey
 model SmallEnterprise {
   id              String   @id @default(cuid())
   enterpriseName  String
-  enterpriseType  String   // Manufacturing, Construction, Retail Trade, Services, ...
-  ownershipType   String   // Private, Cooperative, Government / Public, NGO, ...
+  enterpriseType  String // Manufacturing, Construction, Retail Trade, Services, ...
+  ownershipType   String // Private, Cooperative, Government / Public, NGO, ...
   subCity         String
   area            String
   specificAddress String
@@ -232,7 +232,7 @@ model SmallEnterprise {
   employeeCount   Int      @default(0) // total employees
   maleEmployees   Int      @default(0) // employees by sex: male
   femaleEmployees Int      @default(0) // employees by sex: female
-  startupCapital  Float?   // start-up / working capital in ETB
+  startupCapital  Float? // start-up / working capital in ETB
   hasPremises     Boolean  @default(false) // has own working premises / space
   hasTraining     Boolean  @default(false) // received MSE training or business support
   contactName     String
@@ -246,26 +246,26 @@ model SmallEnterprise {
 // Bussa Goonofa / Charity initiative — charitable organizations serving the
 // sub-city (NGOs, Iddir / community charities, faith-based, private charities).
 model CharityInitiative {
-  id               String   @id @default(cuid())
-  organizationName String
-  organizationType String   // Local NGO, International NGO, Community-Based (Iddir), Faith-Based, ...
-  charityType      String   // Orphan Support, Elderly Care, Health Support, Education Support, ...
-  subCity          String
-  area             String
-  specificAddress  String
-  registrationNumber String? // legal registration / license number (optional)
-  beneficiaryCount    Int    @default(0) // people served
-  maleBeneficiaries   Int    @default(0) // beneficiaries by sex: male
-  femaleBeneficiaries Int    @default(0) // beneficiaries by sex: female
-  volunteerCount   Int      @default(0) // active volunteers
-  annualBudget     Float?   // annual operating budget in ETB
-  hasLegalRegistration Boolean @default(false) // registered with the concerned authority
-  contactName      String
-  contactPhone     String
-  surveyorName     String?
-  surveyorId       String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  organizationName     String
+  organizationType     String // Local NGO, International NGO, Community-Based (Iddir), Faith-Based, ...
+  charityType          String // Orphan Support, Elderly Care, Health Support, Education Support, ...
+  subCity              String
+  area                 String
+  specificAddress      String
+  registrationNumber   String? // legal registration / license number (optional)
+  beneficiaryCount     Int      @default(0) // people served
+  maleBeneficiaries    Int      @default(0) // beneficiaries by sex: male
+  femaleBeneficiaries  Int      @default(0) // beneficiaries by sex: female
+  volunteerCount       Int      @default(0) // active volunteers
+  annualBudget         Float? // annual operating budget in ETB
+  hasLegalRegistration Boolean  @default(false) // registered with the concerned authority
+  contactName          String
+  contactPhone         String
+  surveyorName         String?
+  surveyorId           String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 // Official goal/target set on an initiative metric for a weekly, monthly or yearly
@@ -273,24 +273,112 @@ model CharityInitiative {
 model Goal {
   id          String   @id @default(cuid())
   module      String   @default("small-enterprise") // which initiative the goal belongs to
-  metric      String   // enterprises | employees | femaleEmployees | capital (see src/lib/goals.ts)
-  periodType  String   // weekly | monthly | yearly
+  metric      String // enterprises | employees | femaleEmployees | capital (see src/lib/goals.ts)
+  periodType  String // weekly | monthly | yearly
   periodStart DateTime // inclusive start of the target period
   periodEnd   DateTime // inclusive end of the target period
   targetValue Float
-  owner       String?  // responsible office / official
+  owner       String? // responsible office / official
   status      String   @default("ACTIVE") // ACTIVE | ARCHIVED
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
+// ============ Initiative Implementation & Performance Monitoring ============
+// Lets each sub-city register initiatives, set quantitative targets for the
+// responsible departments, receive the departments' daily achievement reports
+// and follow every initiative from establishment until it is fully
+// operational. Target-vs-actual attainment, performance gaps, delays and
+// completion rates are computed from these rows in real time.
+
+// A sub-city office / responsible department (e.g. Health Office, Water &
+// Energy Office) that initiatives are assigned to and that submits the daily
+// achievement reports.
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  initiatives Initiative[]
+}
+
+// One monitored initiative / project, from establishment until it becomes
+// fully operational. Status follows the follow-up lifecycle.
+model Initiative {
+  id                      String     @id @default(cuid())
+  name                    String
+  description             String?
+  category                String // Infrastructure, Social Services, Economic Development, Environment, Governance, Other
+  departmentId            String
+  department              Department @relation(fields: [departmentId], references: [id])
+  subCity                 String
+  area                    String?
+  status                  String     @default("PROPOSED") // PROPOSED | APPROVED | IN_PROGRESS | FULLY_OPERATIONAL | ON_HOLD | CANCELLED
+  establishmentDate       DateTime? // when the initiative was established / started
+  expectedOperationalDate DateTime? // planned date to be fully operational (deadline)
+  operationalDate         DateTime? // when it actually became fully operational
+  location                String?
+  contactName             String?
+  contactPhone            String?
+  surveyorName            String? // registered by
+  surveyorId              String?
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+
+  targets      InitiativeTarget[]
+  dailyReports InitiativeDailyReport[]
+}
+
+// A quantitative target set by the sub-city on an initiative metric for the
+// responsible department — e.g. "10 km of road, total, due 2027-03-31".
+model InitiativeTarget {
+  id           String     @id @default(cuid())
+  initiativeId String
+  initiative   Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  metric       String // what is measured, e.g. "Road constructed"
+  unit         String? // households, km, students, ETB, %, ...
+  targetValue  Float
+  periodType   String     @default("total") // daily | weekly | monthly | quarterly | yearly | total (project lifetime)
+  dueDate      DateTime? // when the target value must be reached
+  status       String     @default("ACTIVE") // ACTIVE | ARCHIVED
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  dailyReports InitiativeDailyReport[]
+}
+
+// The department's daily achievement report for one initiative — the daily
+// activity log the sub-city monitors. One report per initiative per day;
+// re-submitting the same day updates it.
+model InitiativeDailyReport {
+  id             String            @id @default(cuid())
+  initiativeId   String
+  initiative     Initiative        @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  targetId       String? // which target the achieved value counts toward (optional)
+  target         InitiativeTarget? @relation(fields: [targetId], references: [id], onDelete: SetNull)
+  reportDate     DateTime // the day being reported (UTC midnight)
+  activities     String // what was done that day (daily activity monitoring)
+  achievedValue  Float? // quantity achieved that day against the selected target
+  challenges     String?
+  supportNeeded  String?
+  reportedById   String? // who submitted (User id, no FK — surveyor convention)
+  reportedByName String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([initiativeId, reportDate]) // one daily report per initiative per day
+}
+
 // Admin-managed locations (sub-cities + woredas/areas) used across all survey forms
 model SubCity {
-  id        String        @id @default(cuid())
-  name      String        @unique
-  sortOrder Int           @default(0)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   areas SubCityArea[]
 }

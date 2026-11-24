@@ -2,15 +2,18 @@
 
 import * as React from 'react';
 import {
+  Activity,
   BarChart3,
   Building2,
   Calendar,
+  CalendarCheck,
   ClipboardList,
   CloudOff,
   Database,
   Factory,
   GraduationCap,
   HeartHandshake,
+  LineChart,
   LogOut,
   Menu,
   PieChart,
@@ -136,6 +139,18 @@ const NAV_GROUPS: NavGroup[] = [
       { tab: 'charityData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'charityStats', label: 'Stats', icon: BarChart3, adminOnly: true },
       { tab: 'charityGoals', label: 'Goals', icon: Target, adminOnly: true },
+    ],
+  },
+  {
+    key: 'performance-monitoring',
+    label: 'Performance Monitoring',
+    icon: Activity,
+    section: 'initiatives',
+    items: [
+      { tab: 'monEstablish', label: 'Establish Initiative', icon: Rocket },
+      { tab: 'monReports', label: 'Daily Report', icon: CalendarCheck },
+      { tab: 'monData', label: 'Initiative Records', icon: Database, adminOnly: true },
+      { tab: 'monDash', label: 'Performance Dashboard', icon: LineChart, adminOnly: true },
     ],
   },
   {

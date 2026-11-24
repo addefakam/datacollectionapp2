@@ -54,6 +54,10 @@ export async function GET() {
       'SubCity',
       'SubCityArea',
       'IndustryCategory',
+      'Department',
+      'Initiative',
+      'InitiativeTarget',
+      'InitiativeDailyReport',
     ];
     const tables: Record<string, boolean> = {};
     for (const t of required) tables[t] = existing.has(t);

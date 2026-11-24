@@ -42,6 +42,10 @@ import GoalManager from '@/components/smallenterprise/GoalManager';
 import CharitySurveyForm from '@/components/charity/CharitySurveyForm';
 import CharityList from '@/components/charity/CharityList';
 import CharityStats from '@/components/charity/CharityStats';
+import InitiativeSurveyForm from '@/components/monitor/InitiativeSurveyForm';
+import DailyReportForm from '@/components/monitor/DailyReportForm';
+import InitiativeList from '@/components/monitor/InitiativeList';
+import InitiativeDashboard from '@/components/monitor/InitiativeDashboard';
 import SettingsManager from '@/components/admin/SettingsManager';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import { AppSidebar, MobileSidebar } from '@/components/admin/ManageSidebar';
@@ -370,6 +374,31 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="charityGoals" className="mt-2 sm:mt-3">
               <GoalManager refreshTrigger={refreshTrigger} module="bussa-goonofa" />
+            </TabsContent>
+          )}
+
+          {/* ============ Initiative Implementation & Performance Monitoring ============ */}
+          <TabsContent value="monEstablish" className="mt-2 sm:mt-3">
+            <InitiativeSurveyForm
+              onSubmit={handleSurveySubmit}
+              surveyorName={userName || ''}
+              surveyorId={userId || ''}
+            />
+          </TabsContent>
+
+          <TabsContent value="monReports" className="mt-2 sm:mt-3">
+            <DailyReportForm onSubmit={handleSurveySubmit} userName={userName || ''} />
+          </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="monData" className="mt-2 sm:mt-3">
+              <InitiativeList refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="monDash" className="mt-2 sm:mt-3">
+              <InitiativeDashboard refreshTrigger={refreshTrigger} />
             </TabsContent>
           )}
 
