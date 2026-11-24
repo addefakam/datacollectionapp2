@@ -243,6 +243,31 @@ model SmallEnterprise {
   updatedAt       DateTime @updatedAt
 }
 
+// Bussa Goonofa / Charity initiative — charitable organizations serving the
+// sub-city (NGOs, Iddir / community charities, faith-based, private charities).
+model CharityInitiative {
+  id               String   @id @default(cuid())
+  organizationName String
+  organizationType String   // Local NGO, International NGO, Community-Based (Iddir), Faith-Based, ...
+  charityType      String   // Orphan Support, Elderly Care, Health Support, Education Support, ...
+  subCity          String
+  area             String
+  specificAddress  String
+  registrationNumber String? // legal registration / license number (optional)
+  beneficiaryCount    Int    @default(0) // people served
+  maleBeneficiaries   Int    @default(0) // beneficiaries by sex: male
+  femaleBeneficiaries Int    @default(0) // beneficiaries by sex: female
+  volunteerCount   Int      @default(0) // active volunteers
+  annualBudget     Float?   // annual operating budget in ETB
+  hasLegalRegistration Boolean @default(false) // registered with the concerned authority
+  contactName      String
+  contactPhone     String
+  surveyorName     String?
+  surveyorId       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 // Official goal/target set on an initiative metric for a weekly, monthly or yearly
 // period — progress is computed live from the recorded survey data.
 model Goal {

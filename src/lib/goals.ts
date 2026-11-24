@@ -1,7 +1,8 @@
 import { db } from '@/lib/db';
 
 /**
- * Goals & Targets engine for the Dhibayyuu initiative (Small Enterprise / MSE).
+ * Goals & Targets engine for the Dhibayyuu sub-city initiatives
+ * (Small Enterprise / MSE and Bussa Goonofa / Charity).
  *
  * Officials set weekly / monthly / yearly targets on initiative metrics;
  * progress is computed live from the recorded survey data, with
@@ -13,18 +14,34 @@ import { db } from '@/lib/db';
 // the recorded data within a period. Add new initiatives/metrics here.
 // ---------------------------------------------------------------------------
 
+export type GoalModule = 'small-enterprise' | 'bussa-goonofa';
+
+/** Initiative registry — drives the Goals UI and API validation. */
+export const GOAL_MODULES: { key: GoalModule; label: string; heroLabel: string }[] = [
+  { key: 'small-enterprise', label: 'Small Enterprise', heroLabel: 'Small Enterprise Initiative · Dhibayyuu Sub-City' },
+  { key: 'bussa-goonofa', label: 'Bussa Goonofa / Charity', heroLabel: 'Bussa Goonofa (Charity) Initiative · Dhibayyuu Sub-City' },
+];
+
+export function goalModuleLabel(module: string): string {
+  return GOAL_MODULES.find((m) => m.key === module)?.label ?? 'Initiative';
+}
+
 export interface MetricDef {
   key: string;
+  /** Initiative the metric belongs to — metrics are namespaced per initiative. */
+  module: GoalModule;
   label: string;
   shortLabel: string;
-  unit: 'enterprises' | 'jobs' | 'ETB';
+  unit: 'enterprises' | 'jobs' | 'ETB' | 'charities' | 'people';
   description: string;
   /** Sum of the actual value produced by records created within [start, end]. */
   compute: (start: Date, end: Date) => Promise<number>;
 }
 
 export const GOAL_METRICS: MetricDef[] = [
+  // --- Small Enterprise (MSE) initiative ---
   {
+    module: 'small-enterprise',
     key: 'enterprises',
     label: 'New Enterprises Registered',
     shortLabel: 'Enterprises',
@@ -34,6 +51,7 @@ export const GOAL_METRICS: MetricDef[] = [
       db.smallEnterprise.count({ where: { createdAt: { gte: start, lte: end } } }),
   },
   {
+    module: 'small-enterprise',
     key: 'employees',
     label: 'Jobs Created',
     shortLabel: 'Jobs',
@@ -48,6 +66,7 @@ export const GOAL_METRICS: MetricDef[] = [
         .then((r) => (r._sum.maleEmployees ?? 0) + (r._sum.femaleEmployees ?? 0)),
   },
   {
+    module: 'small-enterprise',
     key: 'femaleEmployees',
     label: 'Jobs Created for Women',
     shortLabel: 'Women jobs',
@@ -59,6 +78,7 @@ export const GOAL_METRICS: MetricDef[] = [
         .then((r) => r._sum.femaleEmployees ?? 0),
   },
   {
+    module: 'small-enterprise',
     key: 'capital',
     label: 'Start-up Capital Mobilized',
     shortLabel: 'Capital',
@@ -69,7 +89,63 @@ export const GOAL_METRICS: MetricDef[] = [
         .aggregate({ _sum: { startupCapital: true }, where: { createdAt: { gte: start, lte: end } } })
         .then((r) => r._sum.startupCapital ?? 0),
   },
+
+  // --- Bussa Goonofa / Charity initiative ---
+  {
+    module: 'bussa-goonofa',
+    key: 'charities',
+    label: 'New Charities Registered',
+    shortLabel: 'Charities',
+    unit: 'charities',
+    description: 'Count of charity organization records submitted in the period',
+    compute: (start, end) =>
+      db.charityInitiative.count({ where: { createdAt: { gte: start, lte: end } } }),
+  },
+  {
+    module: 'bussa-goonofa',
+    key: 'beneficiaries',
+    label: 'Beneficiaries Reached',
+    shortLabel: 'Beneficiaries',
+    unit: 'people',
+    description: 'Total male + female beneficiaries of charities registered in the period',
+    compute: (start, end) =>
+      db.charityInitiative
+        .aggregate({
+          _sum: { maleBeneficiaries: true, femaleBeneficiaries: true },
+          where: { createdAt: { gte: start, lte: end } },
+        })
+        .then((r) => (r._sum.maleBeneficiaries ?? 0) + (r._sum.femaleBeneficiaries ?? 0)),
+  },
+  {
+    module: 'bussa-goonofa',
+    key: 'femaleBeneficiaries',
+    label: 'Women Beneficiaries Reached',
+    shortLabel: 'Women reached',
+    unit: 'people',
+    description: 'Female beneficiaries of charities registered in the period',
+    compute: (start, end) =>
+      db.charityInitiative
+        .aggregate({ _sum: { femaleBeneficiaries: true }, where: { createdAt: { gte: start, lte: end } } })
+        .then((r) => r._sum.femaleBeneficiaries ?? 0),
+  },
+  {
+    module: 'bussa-goonofa',
+    key: 'budget',
+    label: 'Charity Budget Mobilized',
+    shortLabel: 'Budget',
+    unit: 'ETB',
+    description: 'Sum of annual budgets (ETB) of charities registered in the period',
+    compute: (start, end) =>
+      db.charityInitiative
+        .aggregate({ _sum: { annualBudget: true }, where: { createdAt: { gte: start, lte: end } } })
+        .then((r) => r._sum.annualBudget ?? 0),
+  },
 ];
+
+/** Metrics belonging to one initiative — drives the metric picker per module. */
+export function metricsForModule(module: string): MetricDef[] {
+  return GOAL_METRICS.filter((m) => m.module === module);
+}
 
 export function getMetric(key: string): MetricDef | undefined {
   return GOAL_METRICS.find((m) => m.key === key);

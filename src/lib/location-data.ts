@@ -134,6 +134,31 @@ export const SMALL_ENTERPRISE_OWNERSHIP_TYPES = [
   'Faith-Based',
 ];
 
+// Bussa Goonofa / Charity initiative data classification — Dhibayyuu survey
+export const CHARITY_TYPES = [
+  'Orphan & Vulnerable Children Support',
+  'Elderly Care',
+  'Health Support',
+  'Education Support',
+  'Food & Nutrition Aid',
+  'Disability Support',
+  'Water & Sanitation',
+  'Women & Youth Empowerment',
+  'Emergency Relief',
+  'Community Development',
+  'Environment & Clean-up',
+  'Other Charity Work',
+];
+
+export const CHARITY_ORGANIZATION_TYPES = [
+  'Local NGO',
+  'International NGO',
+  'Community-Based (Iddir)',
+  'Faith-Based',
+  'Private Charity',
+  'Government-Supported',
+];
+
 // Educational institution (Mana Barumsaa) data classification — Bishoftu education survey
 export const EDUCATION_INSTITUTION_TYPES = [
   'Kindergarten',

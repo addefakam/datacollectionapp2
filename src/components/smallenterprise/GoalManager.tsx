@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Coins,
   Gauge,
+  HeartHandshake,
   Loader2,
   Pencil,
   Plus,
@@ -81,14 +82,48 @@ interface Goal {
   progress: GoalProgress;
 }
 
-const METRICS = {
-  enterprises: { label: 'New Enterprises Registered', unit: 'enterprises', icon: Store },
-  employees: { label: 'Jobs Created', unit: 'jobs', icon: Users },
-  femaleEmployees: { label: 'Jobs Created for Women', unit: 'jobs', icon: UserRound },
-  capital: { label: 'Start-up Capital Mobilized', unit: 'ETB', icon: Coins },
-} as const;
+/** Per-initiative metric metadata (mirrors src/lib/goals.ts GOAL_METRICS). */
+export interface MetricMeta {
+  label: string;
+  unit: 'enterprises' | 'jobs' | 'ETB' | 'charities' | 'people';
+  icon: React.ComponentType<{ className?: string }>;
+}
 
-type MetricKey = keyof typeof METRICS;
+interface InitiativeGoals {
+  label: string;
+  heroLabel: string;
+  emptyText: string;
+  metrics: Record<string, MetricMeta>;
+}
+
+const MODULE_METRICS: Record<string, InitiativeGoals> = {
+  'small-enterprise': {
+    label: 'Small Enterprise',
+    heroLabel: 'Small Enterprise Initiative · Dhibayyuu Sub-City',
+    emptyText:
+      'Officials can set weekly, monthly or yearly targets for the Small Enterprise initiative — progress against each target is then tracked automatically from the survey data.',
+    metrics: {
+      enterprises: { label: 'New Enterprises Registered', unit: 'enterprises', icon: Store },
+      employees: { label: 'Jobs Created', unit: 'jobs', icon: Users },
+      femaleEmployees: { label: 'Jobs Created for Women', unit: 'jobs', icon: UserRound },
+      capital: { label: 'Start-up Capital Mobilized', unit: 'ETB', icon: Coins },
+    },
+  },
+  'bussa-goonofa': {
+    label: 'Bussa Goonofa / Charity',
+    heroLabel: 'Bussa Goonofa (Charity) Initiative · Dhibayyuu Sub-City',
+    emptyText:
+      'Officials can set weekly, monthly or yearly targets for the Bussa Goonofa (Charity) initiative — progress against each target is then tracked automatically from the survey data.',
+    metrics: {
+      charities: { label: 'New Charities Registered', unit: 'charities', icon: HeartHandshake },
+      beneficiaries: { label: 'Beneficiaries Reached', unit: 'people', icon: Users },
+      femaleBeneficiaries: { label: 'Women Beneficiaries Reached', unit: 'people', icon: UserRound },
+      budget: { label: 'Charity Budget Mobilized', unit: 'ETB', icon: Coins },
+    },
+  },
+};
+
+type MetricKey = string;
 
 const PERIOD_BADGE: Record<Goal['periodType'], string> = {
   weekly: 'bg-sky-100 text-sky-800 ring-sky-600/20',
@@ -139,10 +174,15 @@ const PERIOD_SECTION_LABEL: Record<Goal['periodType'], string> = {
   yearly: 'Yearly Goals',
 };
 
-function formatValue(unit: 'enterprises' | 'jobs' | 'ETB', v: number): string {
+function formatValue(unit: string, v: number): string {
   if (unit === 'ETB') return `ETB ${Math.round(v).toLocaleString()}`;
   const n = Math.round(v);
-  const word = unit === 'enterprises' ? (n === 1 ? 'enterprise' : 'enterprises') : n === 1 ? 'job' : unit;
+  const word =
+    unit === 'enterprises' ? (n === 1 ? 'enterprise' : 'enterprises')
+    : unit === 'charities' ? (n === 1 ? 'charity' : 'charities')
+    : unit === 'jobs' ? (n === 1 ? 'job' : 'jobs')
+    : unit === 'people' ? (n === 1 ? 'person' : 'people')
+    : unit;
   return `${n.toLocaleString()} ${word}`;
 }
 
@@ -186,11 +226,15 @@ interface GoalFormProps {
   onOpenChange: (v: boolean) => void;
   onSaved: () => void;
   editing: Goal | null;
+  /** Initiative the goal belongs to — drives the metric picker. */
+  module: string;
+  metricDefs: InitiativeGoals;
 }
 
-function GoalForm({ open, onOpenChange, onSaved, editing }: GoalFormProps) {
+function GoalForm({ open, onOpenChange, onSaved, editing, module, metricDefs }: GoalFormProps) {
   const { toast } = useToast();
-  const [metric, setMetric] = React.useState<MetricKey>('enterprises');
+  const metricKeys = Object.keys(metricDefs.metrics);
+  const [metric, setMetric] = React.useState<MetricKey>(metricKeys[0]);
   const [periodType, setPeriodType] = React.useState<Goal['periodType']>('monthly');
   const [refValue, setRefValue] = React.useState(currentMonthString());
   const [target, setTarget] = React.useState('');
@@ -206,7 +250,7 @@ function GoalForm({ open, onOpenChange, onSaved, editing }: GoalFormProps) {
         setTarget(String(editing.targetValue));
         setOwner(editing.owner ?? '');
       } else {
-        setMetric('enterprises');
+        setMetric(metricKeys[0]);
         setPeriodType('monthly');
         setRefValue(currentMonthString());
         setTarget('');
@@ -235,7 +279,7 @@ function GoalForm({ open, onOpenChange, onSaved, editing }: GoalFormProps) {
         body: JSON.stringify(
           editing
             ? { targetValue: targetNum, owner }
-            : { metric, periodType, refDate: refDateFrom(periodType, refValue), targetValue: targetNum, owner }
+            : { module, metric, periodType, refDate: refDateFrom(periodType, refValue), targetValue: targetNum, owner }
         ),
       });
       const data = await res.json();
@@ -244,7 +288,7 @@ function GoalForm({ open, onOpenChange, onSaved, editing }: GoalFormProps) {
         title: editing ? 'Goal updated' : 'Goal set',
         description: editing
           ? 'The target was updated — progress recalculated.'
-          : `${METRICS[metric].label} · ${periodType} target of ${targetNum.toLocaleString()}.`,
+          : `${metricDefs.metrics[metric]?.label ?? metric} · ${periodType} target of ${targetNum.toLocaleString()}.`,
       });
       onOpenChange(false);
       onSaved();
@@ -285,9 +329,9 @@ function GoalForm({ open, onOpenChange, onSaved, editing }: GoalFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(METRICS) as MetricKey[]).map((k) => (
+                {metricKeys.map((k) => (
                   <SelectItem key={k} value={k}>
-                    {METRICS[k].label}
+                    {metricDefs.metrics[k].label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -357,14 +401,14 @@ function GoalForm({ open, onOpenChange, onSaved, editing }: GoalFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="goal-target">
-              Target value ({METRICS[metric].unit === 'ETB' ? 'ETB' : METRICS[metric].unit})
+              Target value ({metricDefs.metrics[metric]?.unit === 'ETB' ? 'ETB' : metricDefs.metrics[metric]?.unit ?? 'count'})
             </Label>
             <Input
               id="goal-target"
               type="number"
               min="1"
-              step={metric === 'capital' ? '1000' : '1'}
-              placeholder={metric === 'capital' ? 'e.g., 500000' : 'e.g., 25'}
+              step={metricDefs.metrics[metric]?.unit === 'ETB' ? '1000' : '1'}
+              placeholder={metricDefs.metrics[metric]?.unit === 'ETB' ? 'e.g., 500000' : 'e.g., 25'}
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               required
@@ -404,13 +448,15 @@ function GoalCard({
   goal,
   onEdit,
   onDelete,
+  metricDefs,
 }: {
   goal: Goal;
   onEdit: (g: Goal) => void;
   onDelete: (g: Goal) => void;
+  metricDefs: InitiativeGoals;
 }) {
   const p = goal.progress;
-  const m = METRICS[goal.metric as MetricKey];
+  const m = metricDefs.metrics[goal.metric];
   const MetricIcon = m?.icon ?? Target;
   const sc = STATUS_CONFIG[p.status];
   const fill = Math.min(Math.max(p.achievementPct, p.actual > 0 ? 2 : 0), 100);
@@ -575,8 +621,9 @@ function GoalCard({
 // Main view — summary strip, set-goal action, goals grouped by period
 // ---------------------------------------------------------------------------
 
-export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
+export default function GoalManager({ refreshTrigger = 0, module = 'small-enterprise' }: { refreshTrigger?: number; module?: string }) {
   const { toast } = useToast();
+  const metricDefs = MODULE_METRICS[module] ?? MODULE_METRICS['small-enterprise'];
   const [goals, setGoals] = React.useState<Goal[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -587,7 +634,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
   const load = React.useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
     try {
-      const res = await fetch('/api/goals', { cache: 'no-store' });
+      const res = await fetch(`/api/goals?module=${encodeURIComponent(module)}`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load goals');
       setGoals(data.data ?? []);
@@ -603,7 +650,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
       setLoading(false);
       setRefreshing(false);
     }
-  }, [toast]);
+  }, [toast, module]);
 
   // Initial load + live refresh every 60 s (real-time progress tracking)
   React.useEffect(() => {
@@ -623,7 +670,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
       const res = await fetch(`/api/goals/${deleting.id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete goal');
-      toast({ title: 'Goal deleted', description: `${METRICS[deleting.metric as MetricKey]?.label ?? deleting.metric} · ${deleting.progress.label}` });
+      toast({ title: 'Goal deleted', description: `${metricDefs.metrics[deleting.metric]?.label ?? deleting.metric} · ${deleting.progress.label}` });
       setDeleting(null);
       load(true);
     } catch (err) {
@@ -672,7 +719,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-50/80">
                 <Target className="h-3.5 w-3.5" />
-                Small Enterprise Initiative · Dhibayyuu Sub-City
+                {metricDefs.heroLabel}
               </p>
               <h2 className="font-display mt-1 text-xl font-extrabold sm:text-2xl">Goals &amp; Targets</h2>
               <p className="mt-1 max-w-xl text-xs text-emerald-50/85 sm:text-sm">
@@ -746,8 +793,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
             </span>
             <p className="font-display text-base font-bold text-emerald-950">No goals set yet</p>
             <p className="max-w-sm text-sm text-muted-foreground">
-              Officials can set weekly, monthly or yearly targets for the Small Enterprise initiative —
-              progress against each target is then tracked automatically from the survey data.
+              {metricDefs.emptyText}
             </p>
             <Button
               className="mt-2 bg-brand-gradient text-white"
@@ -778,6 +824,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
                 <GoalCard
                   key={g.id}
                   goal={g}
+                  metricDefs={metricDefs}
                   onEdit={(goal) => {
                     setEditing(goal);
                     setFormOpen(true);
@@ -791,7 +838,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
       )}
 
       {/* New / edit dialog */}
-      <GoalForm open={formOpen} onOpenChange={setFormOpen} onSaved={() => load(true)} editing={editing} />
+      <GoalForm open={formOpen} onOpenChange={setFormOpen} onSaved={() => load(true)} editing={editing} module={module} metricDefs={metricDefs} />
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(v) => !v && setDeleting(null)}>
@@ -800,7 +847,7 @@ export default function GoalManager({ refreshTrigger = 0 }: { refreshTrigger?: n
             <AlertDialogTitle>Delete this goal?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleting &&
-                `${METRICS[deleting.metric as MetricKey]?.label ?? deleting.metric} for ${deleting.progress.label} will be removed. This cannot be undone.`}
+                `${metricDefs.metrics[deleting.metric]?.label ?? deleting.metric} for ${deleting.progress.label} will be removed. This cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

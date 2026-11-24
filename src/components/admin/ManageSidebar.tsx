@@ -9,6 +9,7 @@ import {
   Database,
   Factory,
   GraduationCap,
+  HeartHandshake,
   LogOut,
   Menu,
   PieChart,
@@ -122,6 +123,18 @@ const NAV_GROUPS: NavGroup[] = [
       { tab: 'mseData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'mseStats', label: 'Stats', icon: BarChart3, adminOnly: true },
       { tab: 'mseGoals', label: 'Goals', icon: Target, adminOnly: true },
+    ],
+  },
+  {
+    key: 'bussa-goonofa',
+    label: 'Bussa Goonofa / Charity',
+    icon: HeartHandshake,
+    section: 'initiatives',
+    items: [
+      { tab: 'charitySurvey', label: 'Survey', icon: ClipboardList },
+      { tab: 'charityData', label: 'Records', icon: Database, adminOnly: true },
+      { tab: 'charityStats', label: 'Stats', icon: BarChart3, adminOnly: true },
+      { tab: 'charityGoals', label: 'Goals', icon: Target, adminOnly: true },
     ],
   },
   {

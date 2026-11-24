@@ -5,14 +5,18 @@ import {
   analyzeGoal,
   getMetric,
   isPeriodType,
+  metricsForModule,
   periodRange,
 } from '@/lib/goals';
 
-// GET /api/goals — list goals with live progress analysis
-export async function GET() {
+// GET /api/goals?module=small-enterprise — list goals (optionally one initiative) with live progress analysis
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const module = searchParams.get('module');
+
     const goals = await db.goal.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', ...(module ? { module } : {}) },
       orderBy: [{ periodStart: 'desc' }, { createdAt: 'desc' }],
     });
 
@@ -42,9 +46,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { metric, periodType, refDate, targetValue, owner } = body;
 
-    if (!metric || !getMetric(String(metric))) {
+    // Initiative this goal belongs to — defaults to the original MSE module.
+    const goalModule = body.module ? String(body.module) : 'small-enterprise';
+    const metricDef = getMetric(String(metric));
+    if (!metric || !metricDef) {
+      const valid = metricsForModule(goalModule).map((m) => m.key).join(', ');
       return NextResponse.json(
-        { error: 'Unknown metric. Use one of: enterprises, employees, femaleEmployees, capital' },
+        { error: `Unknown metric. Use one of: ${valid}` },
+        { status: 400 }
+      );
+    }
+    if (metricDef.module !== goalModule) {
+      return NextResponse.json(
+        { error: `Metric "${metric}" does not belong to the "${goalModule}" initiative` },
         { status: 400 }
       );
     }
@@ -63,9 +77,9 @@ export async function POST(request: NextRequest) {
 
     const { start, end } = periodRange(String(periodType) as 'weekly' | 'monthly' | 'yearly', ref);
 
-    // No duplicate goals for the same metric & period
+    // No duplicate goals for the same module, metric & period
     const duplicate = await db.goal.findFirst({
-      where: { metric: String(metric), periodType: String(periodType), periodStart: start },
+      where: { module: goalModule, metric: String(metric), periodType: String(periodType), periodStart: start },
     });
     if (duplicate) {
       return NextResponse.json(
@@ -76,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     const goal = await db.goal.create({
       data: {
-        module: 'small-enterprise',
+        module: goalModule,
         metric: String(metric),
         periodType: String(periodType),
         periodStart: start,
