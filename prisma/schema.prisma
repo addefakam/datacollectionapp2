@@ -303,6 +303,9 @@ model Department {
   updatedAt   DateTime @updatedAt
 
   initiatives Initiative[]
+
+  campaignAssignments DonationCampaignAssignment[]
+  donationEntries     DonationEntry[]
 }
 
 // One monitored initiative / project, from establishment until it becomes
@@ -370,6 +373,72 @@ model InitiativeDailyReport {
   updatedAt      DateTime          @updatedAt
 
   @@unique([initiativeId, reportDate]) // one daily report per initiative per day
+}
+
+// ============ Bussa Goonofaa Charity — Donation Campaign Automation ============
+// The charity coordination office sets one campaign goal, distributes it as a
+// minimum collection amount across the responsible offices (tourism, land
+// management, ...), receives each office's donation achievement reports
+// (cash + in-kind) and presents the office-wise goal report to higher
+// officials. Attainment, pace and gaps are computed live from these rows.
+
+// One donation campaign: the overall goal the charity office must mobilize
+// (cash donations plus the estimated value of in-kind donations).
+model DonationCampaign {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  totalGoal     Float // overall minimum amount to collect (ETB)
+  currency      String   @default("ETB")
+  kindNote      String? // what in-kind donations are expected (food grains, clothes, ...)
+  startDate     DateTime
+  deadline      DateTime
+  status        String   @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  assignments DonationCampaignAssignment[]
+  donations   DonationEntry[]
+}
+
+// Distribution of the campaign goal to one responsible office: the minimum
+// amount that office must collect during the campaign.
+model DonationCampaignAssignment {
+  id            String           @id @default(cuid())
+  campaignId    String
+  campaign      DonationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  departmentId  String
+  department    Department       @relation(fields: [departmentId], references: [id])
+  minimumAmount Float
+  note          String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([campaignId, departmentId])
+}
+
+// One office's achievement record: the donations it received on a day —
+// cash amount plus in-kind contributions and their estimated value.
+model DonationEntry {
+  id             String           @id @default(cuid())
+  campaignId     String
+  campaign       DonationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  departmentId   String
+  department     Department       @relation(fields: [departmentId], references: [id])
+  reportDate     DateTime
+  cashAmount     Float            @default(0)
+  inKindValue    Float            @default(0)
+  inKindDetails  String? // what was donated in kind (e.g. "15 quintals teff, 20 blankets")
+  donorsCount    Int              @default(0)
+  notes          String?
+  reportedById   String?
+  reportedByName String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([campaignId, departmentId, reportDate])
 }
 
 // Admin-managed locations (sub-cities + woredas/areas) used across all survey forms

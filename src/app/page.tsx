@@ -42,6 +42,9 @@ import GoalManager from '@/components/smallenterprise/GoalManager';
 import CharitySurveyForm from '@/components/charity/CharitySurveyForm';
 import CharityList from '@/components/charity/CharityList';
 import CharityStats from '@/components/charity/CharityStats';
+import CampaignGoalForm from '@/components/charity/campaign/CampaignGoalForm';
+import CampaignAchievementForm from '@/components/charity/campaign/CampaignAchievementForm';
+import CampaignReport from '@/components/charity/campaign/CampaignReport';
 import InitiativeSurveyForm from '@/components/monitor/InitiativeSurveyForm';
 import DailyReportForm from '@/components/monitor/DailyReportForm';
 import InitiativeList from '@/components/monitor/InitiativeList';
@@ -357,6 +360,25 @@ export default function Home() {
               onOfflineSave={(data) => saveOffline(data, 'charity')}
             />
           </TabsContent>
+
+          {/* ============ Donation campaign: set goal & distribute (admin) ============ */}
+          {isAdmin && (
+            <TabsContent value="charityCampaignSet" className="mt-2 sm:mt-3">
+              <CampaignGoalForm refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {/* ============ Donation campaign: record office achievements ============ */}
+          <TabsContent value="charityAchievements" className="mt-2 sm:mt-3">
+            <CampaignAchievementForm onSubmit={handleSurveySubmit} userName={userName || ''} isAdmin={isAdmin} />
+          </TabsContent>
+
+          {/* ============ Donation campaign: office-wise goal report (admin) ============ */}
+          {isAdmin && (
+            <TabsContent value="charityOfficeReport" className="mt-2 sm:mt-3">
+              <CampaignReport refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="charityData" className="mt-2 sm:mt-3">

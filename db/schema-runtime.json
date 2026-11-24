@@ -425,6 +425,252 @@
     }
    ]
   },
+  "DonationCampaign": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"DonationCampaign\" (\n        \"id\" TEXT NOT NULL PRIMARY KEY,\n        \"name\" TEXT NOT NULL,\n        \"description\" TEXT,\n        \"totalGoal\" REAL NOT NULL,\n        \"currency\" TEXT NOT NULL DEFAULT 'ETB',\n        \"kindNote\" TEXT,\n        \"startDate\" DATETIME NOT NULL,\n        \"deadline\" DATETIME NOT NULL,\n        \"status\" TEXT NOT NULL DEFAULT 'ACTIVE',\n        \"createdById\" TEXT,\n        \"createdByName\" TEXT,\n        \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n        \"updatedAt\" DATETIME NOT NULL\n    )",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "name",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "description",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "totalGoal",
+     "type": "REAL",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "currency",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'ETB'",
+     "pk": false
+    },
+    {
+     "name": "kindNote",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "startDate",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "deadline",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "status",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'ACTIVE'",
+     "pk": false
+    },
+    {
+     "name": "createdById",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdByName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "DonationCampaignAssignment": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"DonationCampaignAssignment\" (\n        \"id\" TEXT NOT NULL PRIMARY KEY,\n        \"campaignId\" TEXT NOT NULL,\n        \"departmentId\" TEXT NOT NULL,\n        \"minimumAmount\" REAL NOT NULL,\n        \"note\" TEXT,\n        \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n        \"updatedAt\" DATETIME NOT NULL,\n        CONSTRAINT \"DonationCampaignAssignment_campaignId_fkey\" FOREIGN KEY (\"campaignId\") REFERENCES \"DonationCampaign\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE,\n        CONSTRAINT \"DonationCampaignAssignment_departmentId_fkey\" FOREIGN KEY (\"departmentId\") REFERENCES \"Department\" (\"id\") ON DELETE RESTRICT ON UPDATE CASCADE\n    )",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "campaignId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "departmentId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "minimumAmount",
+     "type": "REAL",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "note",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "DonationEntry": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"DonationEntry\" (\n        \"id\" TEXT NOT NULL PRIMARY KEY,\n        \"campaignId\" TEXT NOT NULL,\n        \"departmentId\" TEXT NOT NULL,\n        \"reportDate\" DATETIME NOT NULL,\n        \"cashAmount\" REAL NOT NULL DEFAULT 0,\n        \"inKindValue\" REAL NOT NULL DEFAULT 0,\n        \"inKindDetails\" TEXT,\n        \"donorsCount\" INTEGER NOT NULL DEFAULT 0,\n        \"notes\" TEXT,\n        \"reportedById\" TEXT,\n        \"reportedByName\" TEXT,\n        \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n        \"updatedAt\" DATETIME NOT NULL,\n        CONSTRAINT \"DonationEntry_campaignId_fkey\" FOREIGN KEY (\"campaignId\") REFERENCES \"DonationCampaign\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE,\n        CONSTRAINT \"DonationEntry_departmentId_fkey\" FOREIGN KEY (\"departmentId\") REFERENCES \"Department\" (\"id\") ON DELETE RESTRICT ON UPDATE CASCADE\n    )",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "campaignId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "departmentId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "reportDate",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "cashAmount",
+     "type": "REAL",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "inKindValue",
+     "type": "REAL",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "inKindDetails",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "donorsCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "notes",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "reportedById",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "reportedByName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
   "EducationCenter": {
    "createSql": "CREATE TABLE IF NOT EXISTS \"EducationCenter\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"institutionName\" TEXT NOT NULL,\n    \"institutionType\" TEXT NOT NULL,\n    \"ownershipType\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"licenseNumber\" TEXT,\n    \"studentCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleStudents\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleStudents\" INTEGER NOT NULL DEFAULT 0,\n    \"teacherCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleTeachers\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleTeachers\" INTEGER NOT NULL DEFAULT 0,\n    \"classroomCount\" INTEGER NOT NULL DEFAULT 0,\n    \"hasLibrary\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasLaboratory\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasComputerLab\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasFeedingProgram\" BOOLEAN NOT NULL DEFAULT false,\n    \"contactName\" TEXT NOT NULL,\n    \"contactPhone\" TEXT NOT NULL,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
    "columns": [
@@ -1602,6 +1848,8 @@
  "indexes": [
   "CREATE UNIQUE INDEX IF NOT EXISTS \"Attendance_meetingId_guestHouseId_key\" ON \"Attendance\"(\"meetingId\", \"guestHouseId\")",
   "CREATE UNIQUE INDEX IF NOT EXISTS \"CollectorAssignment_collectorId_meetingId_subCity_area_key\" ON \"CollectorAssignment\"(\"collectorId\", \"meetingId\", \"subCity\", \"area\")",
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"DonationCampaignAssignment_campaignId_departmentId_key\" ON \"DonationCampaignAssignment\"(\"campaignId\", \"departmentId\")",
+  "CREATE INDEX IF NOT EXISTS \"DonationEntry_campaignId_departmentId_reportDate_idx\" ON \"DonationEntry\"(\"campaignId\", \"departmentId\", \"reportDate\")",
   "CREATE UNIQUE INDEX IF NOT EXISTS \"IndustryAttendance_meetingId_industryId_key\" ON \"IndustryAttendance\"(\"meetingId\", \"industryId\")",
   "CREATE UNIQUE INDEX IF NOT EXISTS \"IndustryCategory_name_key\" ON \"IndustryCategory\"(\"name\")",
   "CREATE UNIQUE INDEX IF NOT EXISTS \"SubCityArea_subCityId_name_key\" ON \"SubCityArea\"(\"subCityId\", \"name\")",

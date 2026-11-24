@@ -58,6 +58,9 @@ export async function GET() {
       'Initiative',
       'InitiativeTarget',
       'InitiativeDailyReport',
+      'DonationCampaign',
+      'DonationCampaignAssignment',
+      'DonationEntry',
     ];
     const tables: Record<string, boolean> = {};
     for (const t of required) tables[t] = existing.has(t);
