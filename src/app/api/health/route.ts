@@ -11,7 +11,22 @@ import { db } from '@/lib/db';
  * (missing table) — the exact failure mode the startup self-heal
  * (db/runtime-migrate.mjs) exists to repair. 500s here mean the server can
  * not reach its database at all.
+ *
+ * The payload also reports the SHAPE of DATABASE_URL (never a credential —
+ * this project only ever uses file: paths) so a misconfigured runtime URL is
+ * visible in the response itself.
  */
+function describeDatabaseUrl(): Record<string, unknown> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return { present: false, note: 'DATABASE_URL is not set' };
+  return {
+    present: true,
+    startsWithFileProtocol: url.startsWith('file:'),
+    // file: URLs carry a path, not a secret — safe to show for diagnosis.
+    value: url.length > 120 ? `${url.slice(0, 120)}…` : url,
+  };
+}
+
 export async function GET() {
   try {
     const rows = await db.$queryRawUnsafe<{ name: string }[]>(
@@ -36,11 +51,23 @@ export async function GET() {
     for (const t of required) tables[t] = existing.has(t);
     const missing = required.filter((t) => !existing.has(t));
 
+    // hasUsers: login breaks if the runtime database is a fresh empty file
+    // (no accounts). A boolean only — never counts or account data.
+    let hasUsers: boolean | null = null;
+    if (tables.User) {
+      const u = await db.$queryRawUnsafe<{ n: number }[]>(
+        'SELECT COUNT(*) as n FROM "User"'
+      );
+      hasUsers = Number(u[0]?.n ?? 0) > 0;
+    }
+
     return NextResponse.json({
       status: missing.length === 0 ? 'ok' : 'degraded',
       database: 'ok',
+      databaseUrl: describeDatabaseUrl(),
       tables,
       missingTables: missing,
+      hasUsers,
       hint:
         missing.length === 0
           ? 'All module tables present.'
@@ -52,6 +79,7 @@ export async function GET() {
       {
         status: 'error',
         database: 'unreachable',
+        databaseUrl: describeDatabaseUrl(),
         message: error instanceof Error ? error.message : 'Unknown database error',
         time: new Date().toISOString(),
       },

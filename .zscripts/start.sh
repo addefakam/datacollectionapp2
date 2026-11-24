@@ -77,6 +77,16 @@ if [ -f "./next-service-dist/server.js" ]; then
     export HOSTNAME="${HOSTNAME:-0.0.0.0}"
     export DATABASE_URL="${DATABASE_URL:-$DEFAULT_PACKAGED_DATABASE_URL}"
 
+    # 平台可能注入裸路径（如 /app/db/custom.db）而非 file: 协议 URL，
+    # Prisma 会直接拒绝整个数据源（"URL must start with the protocol file:"），
+    # 所有 API 报 database unreachable。这里统一补上协议前缀。
+    case "$DATABASE_URL" in
+        file:*) ;;
+        *"://"*) echo "⚠️  DATABASE_URL 含非 file: 协议（$DATABASE_URL），sqlite 项目无法使用" ;;
+        *)  echo "🔧 DATABASE_URL 缺少 file: 前缀，自动补全: file:$DATABASE_URL"
+            export DATABASE_URL="file:$DATABASE_URL" ;;
+    esac
+
     if [ "$DATABASE_URL" = "$DEFAULT_PACKAGED_DATABASE_URL" ]; then
         if [ ! -f "$DEFAULT_PACKAGED_DB_PATH" ]; then
             echo "❌ 未找到打包后的数据库文件 $DEFAULT_PACKAGED_DB_PATH"

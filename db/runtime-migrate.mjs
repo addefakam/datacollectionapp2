@@ -49,6 +49,17 @@ async function main() {
     return;
   }
 
+  // Same normalization as src/lib/db.ts: the platform may inject a bare path
+  // ("/app/db/custom.db") — Prisma rejects URLs without the file: protocol.
+  if (
+    process.env.DATABASE_URL &&
+    !process.env.DATABASE_URL.startsWith('file:') &&
+    !process.env.DATABASE_URL.includes('://')
+  ) {
+    log(`DATABASE_URL lacks the file: protocol — normalizing "${process.env.DATABASE_URL}"`);
+    process.env.DATABASE_URL = `file:${process.env.DATABASE_URL}`;
+  }
+
   const db = new Client({
     datasources: process.env.DATABASE_URL
       ? { db: { url: process.env.DATABASE_URL } }
