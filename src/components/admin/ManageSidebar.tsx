@@ -6,6 +6,7 @@ import {
   Building2,
   Calendar,
   ClipboardList,
+  CloudOff,
   Database,
   Factory,
   GraduationCap,
@@ -384,18 +385,25 @@ export function AppSidebar({
             </p>
           </div>
         </div>
-        {pendingCount > 0 && isOnline && (
-          <button
-            type="button"
-            onClick={onSync}
-            disabled={isSyncing}
-            className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-50 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
-            <span>
-              {pendingCount} pending — Sync
-            </span>
-          </button>
+        {pendingCount > 0 && (
+          isOnline ? (
+            <button
+              type="button"
+              onClick={onSync}
+              disabled={isSyncing}
+              className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-50 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
+              <span>
+                {pendingCount} pending — Sync now
+              </span>
+            </button>
+          ) : (
+            <div className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-50 text-xs font-semibold text-amber-800">
+              <CloudOff className="h-3.5 w-3.5" />
+              <span>{pendingCount} pending — Offline</span>
+            </div>
+          )
         )}
         <button
           type="button"

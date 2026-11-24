@@ -86,7 +86,7 @@ export default function Home() {
         isOnline={isOnline}
         pendingCount={pendingCount}
         isSyncing={isSyncing}
-        onSync={() => syncPendingSurveys().then(() => setRefreshTrigger((t) => t + 1))}
+        onSync={() => syncPendingSurveys(true).then(() => setRefreshTrigger((t) => t + 1))}
       />
 
       {/* Main column */}
@@ -108,17 +108,27 @@ export default function Home() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {pendingCount > 0 && isOnline && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="relative h-8 border-amber-400 px-2 text-amber-700 hover:bg-amber-50"
-                onClick={() => syncPendingSurveys().then(() => setRefreshTrigger((t) => t + 1))}
-                disabled={isSyncing}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span className="ml-1 text-xs font-semibold">{pendingCount}</span>
-              </Button>
+            {pendingCount > 0 && (
+              isOnline ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="relative h-8 border-amber-400 px-2 text-amber-700 hover:bg-amber-50"
+                  onClick={() => syncPendingSurveys(true).then(() => setRefreshTrigger((t) => t + 1))}
+                  disabled={isSyncing}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span className="ml-1 text-xs font-semibold">{pendingCount}</span>
+                </Button>
+              ) : (
+                <span
+                  title="Saved on device — will sync when online"
+                  className="flex h-8 items-center gap-1 rounded-md border border-amber-400 bg-amber-50 px-2 text-xs font-semibold text-amber-700"
+                >
+                  <CloudOff className="h-3.5 w-3.5" />
+                  {pendingCount}
+                </span>
+              )
             )}
             <Button
               variant="ghost"

@@ -70,6 +70,25 @@ export async function getPendingCount(): Promise<number> {
   });
 }
 
+/** Bump the retry counter of a queued record (used when the server rejects it with 4xx). */
+export async function updatePendingSurveyRetry(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const record = req.result as PendingSurvey | undefined;
+      if (record) {
+        record.retryCount = (record.retryCount ?? 0) + 1;
+        store.put(record);
+      }
+      resolve();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function deletePendingSurvey(id: number): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {

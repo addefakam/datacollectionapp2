@@ -221,7 +221,15 @@ export default function AgricultureSurveyForm({
     if (isOnline) {
       try {
         const response = await fetch('/api/agriculturecenters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Failed to submit'); }
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          if (response.status >= 400 && response.status < 500) {
+            // Server permanently rejected the record (validation) — queueing it offline would never succeed.
+            toast({ title: 'Submission Rejected / Galmeen Morkame', description: err.error || 'Please correct the highlighted fields and submit again', variant: 'destructive' });
+            return;
+          }
+          throw new Error(err.error || 'Server unavailable');
+        }
         toast({ title: 'Survey Submitted! / Galma Qabame!', description: `${formData.farmName} recorded successfully / galmeen safiisan argame` });
         resetForm();
         onSubmit();
