@@ -126,6 +126,17 @@ export async function GET(request: NextRequest) {
     if (enterpriseType) where.enterpriseType = enterpriseType;
     // Click-through filters for the stats dimensions
     if (ownershipType) where.ownershipType = ownershipType;
+    // Establishment status filter — one status or a comma-separated list;
+    // `pending=1` → every stage not yet operational.
+    const status = searchParams.get('status');
+    if (status) {
+      const list = status.split(',').flatMap((s) => (isSmeStatus(s.trim()) ? [s.trim()] : []));
+      if (list.length === 1) where.status = list[0];
+      else if (list.length > 1) where.status = { in: list };
+    }
+    if (searchParams.get('pending') === '1') {
+      where.status = { ...(where.status as Record<string, unknown> | undefined), not: 'OPERATIONAL' };
+    }
     if (minEmployees !== null && minEmployees !== '') {
       where.employeeCount = { ...(where.employeeCount as Record<string, number> | undefined), gte: Number(minEmployees) };
     }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/api-auth';
 import {
   isSmePeriodType,
+  SME_STATUSES,
   smePeriodLabel,
   smePeriodPace,
   smePeriodRange,
@@ -187,6 +188,89 @@ export async function GET(request: NextRequest) {
       avgMembers: totals.standingTotal > 0 ? Math.round(totals.members / totals.standingTotal) : 0,
     };
 
+    // ------------------------------------------------------------------
+    // Enterprise-type breakdown — standing pipeline + period registrations
+    // per enterprise type (for the "By Enterprise Type" report).
+    // ------------------------------------------------------------------
+    const scopeWhere: { subCity?: string } = drillName ? { subCity: drillName } : {};
+    const [typeStanding, typeRegistered] = (await Promise.all([
+      db.smallEnterprise.groupBy({
+        by: ['enterpriseType', 'status'],
+        where: scopeWhere,
+        _count: { _all: true },
+        _sum: { employeeCount: true, femaleEmployees: true },
+      }),
+      db.smallEnterprise.groupBy({
+        by: ['enterpriseType'],
+        where: { ...scopeWhere, createdAt: { gte: start, lte: end } },
+        _count: { _all: true },
+      }),
+    ])) as [
+      Array<{
+        enterpriseType: string;
+        status: string;
+        _count: { _all: number };
+        _sum: { employeeCount: number | null; femaleEmployees: number | null };
+      }>,
+      Array<{ enterpriseType: string; _count: { _all: number } }>,
+    ];
+
+    const zeroStanding = (): Record<SmeStatus, number> => ({
+      REGISTERED: 0,
+      FULLY_LEGALIZED: 0,
+      AWAITING_OPERATION: 0,
+      OPERATIONAL: 0,
+    });
+    const typeMap = new Map<
+      string,
+      {
+        type: string;
+        standing: Record<SmeStatus, number>;
+        standingTotal: number;
+        registeredInPeriod: number;
+        members: number;
+        femaleMembers: number;
+      }
+    >();
+    for (const g of typeStanding) {
+      const row =
+        typeMap.get(g.enterpriseType) ??
+        {
+          type: g.enterpriseType,
+          standing: zeroStanding(),
+          standingTotal: 0,
+          registeredInPeriod: 0,
+          members: 0,
+          femaleMembers: 0,
+        };
+      const key = (SME_STATUSES as readonly string[]).includes(g.status)
+        ? (g.status as SmeStatus)
+        : 'REGISTERED';
+      row.standing[key] += g._count._all;
+      row.standingTotal += g._count._all;
+      row.members += g._sum.employeeCount ?? 0;
+      row.femaleMembers += g._sum.femaleEmployees ?? 0;
+      typeMap.set(g.enterpriseType, row);
+    }
+    for (const g of typeRegistered) {
+      const row = typeMap.get(g.enterpriseType);
+      if (row) {
+        row.registeredInPeriod = g._count._all;
+      } else {
+        typeMap.set(g.enterpriseType, {
+          type: g.enterpriseType,
+          standing: zeroStanding(),
+          standingTotal: 0,
+          registeredInPeriod: g._count._all,
+          members: 0,
+          femaleMembers: 0,
+        });
+      }
+    }
+    const byType = [...typeMap.values()].sort(
+      (a, b) => b.standingTotal - a.standingTotal || a.type.localeCompare(b.type)
+    );
+
     return NextResponse.json({
       period: {
         type: periodType,
@@ -204,6 +288,7 @@ export async function GET(request: NextRequest) {
       kpis,
       totals: { byStatus: totals.byStatus, standingTotal: totals.standingTotal },
       rows: rows.sort((a, b) => b.actual - a.actual || b.target - a.target || a.label.localeCompare(b.label)),
+      byType,
     });
   } catch (error) {
     console.error('Error computing SME performance:', error);

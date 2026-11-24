@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { isSmeStatus } from '@/lib/sme';
 
 // GET /api/smallenterprises/export — CSV export of small-enterprise records
 export async function GET(request: NextRequest) {
@@ -8,11 +9,13 @@ export async function GET(request: NextRequest) {
     const subCity = searchParams.get('subCity');
     const area = searchParams.get('area');
     const enterpriseType = searchParams.get('enterpriseType');
+    const status = searchParams.get('status');
 
     const where: Record<string, unknown> = {};
     if (subCity) where.subCity = subCity;
     if (area) where.area = area;
     if (enterpriseType) where.enterpriseType = enterpriseType;
+    if (status && isSmeStatus(status)) where.status = status;
 
     const smallEnterprises = await db.smallEnterprise.findMany({
       where,

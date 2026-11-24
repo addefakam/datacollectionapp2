@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search,
@@ -155,6 +156,12 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
   const [statusItem, setStatusItem] = useState<SmallEnterprise | null>(null);
   const [statusForm, setStatusForm] = useState<{ status: string; note: string }>({ status: 'REGISTERED', note: '' });
   const [savingStatus, setSavingStatus] = useState(false);
+
+  // Bulk establishment-status modification (select records → apply / advance)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<string>('FULLY_LEGALIZED');
+  const [bulkNote, setBulkNote] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = useCallback(async () => {
@@ -246,6 +253,43 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
       toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to update status', variant: 'destructive' });
     } finally {
       setSavingStatus(false);
+    }
+  };
+
+  /** Bulk-modify the establishment status of the selected records — set one
+   * status on all of them, or auto-advance each one stage along the lifecycle
+   * REGISTERED → FULLY_LEGALIZED → AWAITING_OPERATION → OPERATIONAL. The
+   * status date stamp is populated automatically by the API. */
+  const submitBulkStatus = async (advance: boolean) => {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/smallenterprises/bulk-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: [...selectedIds],
+          ...(advance ? { advance: true } : { status: bulkStatus }),
+          note: bulkNote || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Bulk update failed');
+      toast({
+        title: 'Status Updated',
+        description: `${json.updated} record(s) updated${json.unchanged ? `, ${json.unchanged} already at that stage` : ''}.`,
+      });
+      setSelectedIds(new Set());
+      setBulkNote('');
+      fetchData();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update records',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -429,6 +473,55 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
             </Button>
           </div>
 
+          {/* Bulk status modification bar */}
+          {selectedIds.size > 0 && (
+            <div className="space-y-2 rounded-xl border border-teal-200 bg-teal-50/70 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Badge variant="outline" className="bg-white text-teal-800">{selectedIds.size} record(s) selected</Badge>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setSelectedIds(new Set())}>
+                  Clear selection
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Set status to</Label>
+                  <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                    <SelectTrigger className="h-9 w-48 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SME_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          <span className="font-medium">{SME_STATUS_META[s].label}</span>
+                          <span className="block text-[10px] text-muted-foreground">{SME_STATUS_META[s].description}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="bulk-status-note" className="text-xs">Note</Label>
+                  <Input
+                    id="bulk-status-note"
+                    placeholder="Optional (e.g. license issued)"
+                    value={bulkNote}
+                    onChange={(e) => setBulkNote(e.target.value)}
+                    className="h-9 w-52 text-sm"
+                  />
+                </div>
+                <Button onClick={() => submitBulkStatus(false)} disabled={bulkBusy} className="h-9 bg-teal-700 text-white hover:bg-teal-800">
+                  {bulkBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRightCircle className="mr-1.5 h-4 w-4" />}
+                  Apply
+                </Button>
+                <Button variant="outline" onClick={() => submitBulkStatus(true)} disabled={bulkBusy} className="h-9 border-teal-300 text-teal-800 hover:bg-teal-100">
+                  {bulkBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRightCircle className="mr-1.5 h-4 w-4" />}
+                  Advance one stage
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Lifecycle: Registered → Fully Legalized → Awaiting Operation → Operational · the status date is stamped automatically on every change.
+              </p>
+            </div>
+          )}
+
           {/* Records */}
           {loading ? (
             <div className="space-y-2">
@@ -441,11 +534,49 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
               <p className="text-xs text-muted-foreground">Collect a survey, import Excel, or adjust your filters</p>
             </div>
           ) : (
+            <>
+            {/* Select-all for bulk status modification */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Checkbox
+                id="mse-select-all"
+                checked={data.length > 0 && data.every((i) => selectedIds.has(i.id))}
+                onCheckedChange={(v) => {
+                  setSelectedIds((prev) => {
+                    const next = new Set(prev);
+                    if (v) data.forEach((i) => next.add(i.id));
+                    else data.forEach((i) => next.delete(i.id));
+                    return next;
+                  });
+                }}
+              />
+              <label htmlFor="mse-select-all" className="cursor-pointer select-none">
+                Select all on this page
+              </label>
+            </div>
             <div className="space-y-2.5">
               {data.map((item) => (
-                <div key={item.id} className="rounded-xl border border-teal-100 bg-white p-3 transition-shadow hover:shadow-md">
+                <div
+                  key={item.id}
+                  className={`rounded-xl border bg-white p-3 transition-shadow hover:shadow-md ${
+                    selectedIds.has(item.id) ? 'border-teal-300 ring-1 ring-teal-200' : 'border-teal-100'
+                  }`}
+                >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                      <Checkbox
+                        className="mt-1"
+                        checked={selectedIds.has(item.id)}
+                        onCheckedChange={(v) => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (v) next.add(item.id);
+                            else next.delete(item.id);
+                            return next;
+                          });
+                        }}
+                        aria-label={`Select ${item.enterpriseName}`}
+                      />
+                      <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <p className="truncate text-sm font-semibold text-teal-950">{item.enterpriseName}</p>
                         <Badge
@@ -487,6 +618,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                         {item.hasTraining && <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 text-teal-700"><GraduationCap className="h-3 w-3" />Trained</span>}
                         {item.surveyorName && <span className="text-muted-foreground">by {item.surveyorName}</span>}
                       </div>
+                      </div>
                     </div>
                     <div className="flex shrink-0 flex-row gap-1">
                       <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setViewItem(item)} title="View">
@@ -506,6 +638,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                 </div>
               ))}
             </div>
+            </>
           )}
 
           {/* Pagination */}
