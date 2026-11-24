@@ -157,7 +157,7 @@ else
 fi
 agent-browser screenshot "$SHOTS/2-record-achievement.png" > /dev/null 2>&1
 
-# 3) Office Goal Report renders with office-wise rows
+# 3) Office Goal Report renders — graph view by default, click for detail
 for i in $(seq 1 5); do
   if agent-browser find text "Office Goal Report" click 2>/dev/null; then break; fi
   sleep 1
@@ -170,10 +170,10 @@ if grep -q "Office-wise Goal Report" "$SHOTS/3-text.txt"; then
 else
   echo "FAIL: Office-wise Goal Report missing"
 fi
-if grep -q "Campaign Total" "$SHOTS/3-text.txt"; then
-  echo "PASS: office table includes the campaign total row"
+if grep -q "Click an office" "$SHOTS/3-text.txt"; then
+  echo "PASS: graph view is the default (click-for-detail hint present)"
 else
-  echo "FAIL: office table missing total row"
+  echo "FAIL: graph view not shown by default"
 fi
 if grep -q "75,000 ETB" "$SHOTS/3-text.txt"; then
   echo "PASS: report shows collected total 75,000 ETB (60k cash + 15k in-kind)"
@@ -184,6 +184,38 @@ if grep -q "Achievement Records (1)" "$SHOTS/3-text.txt"; then
   echo "PASS: report shows the seeded achievement record"
 else
   echo "FAIL: achievement record missing from report"
+fi
+agent-browser screenshot "$SHOTS/3-office-report-graph.png" > /dev/null 2>&1
+
+# 3a) click an office chip -> its detail dialog opens with the records
+chip_ok=0
+for i in $(seq 1 5); do
+  if agent-browser find text "Office of the Sub-City Administrator" click 2>/dev/null; then chip_ok=1; break; fi
+  sleep 1
+done
+sleep 2
+agent-browser read > "$SHOTS/3-dialog.txt" 2>&1
+if [ "$chip_ok" = "1" ] && grep -q "Distributed minimum" "$SHOTS/3-dialog.txt" && grep -q "Achievement records (1)" "$SHOTS/3-dialog.txt"; then
+  echo "PASS: clicking an office opens its detail dialog with records"
+else
+  echo "FAIL: office detail dialog did not open with records"
+fi
+agent-browser screenshot "$SHOTS/3-office-dialog.png" > /dev/null 2>&1
+agent-browser find role button click --name "Close" 2>/dev/null || true
+sleep 1
+
+# 3b) switch to the table view -> campaign total row
+if agent-browser find role button click --name "Table view" 2>/dev/null; then
+  sleep 2
+  agent-browser read > "$SHOTS/3-table.txt" 2>&1
+  if grep -q "Campaign Total" "$SHOTS/3-table.txt"; then
+    echo "PASS: table view includes the campaign total row"
+  else
+    echo "FAIL: office table missing total row"
+  fi
+  agent-browser screenshot "$SHOTS/3-office-report-table.png" > /dev/null 2>&1
+else
+  echo "FAIL: Table view button not found"
 fi
 ERRS=$(agent-browser errors 2>/dev/null | head -1)
 if [ -z "$ERRS" ]; then
