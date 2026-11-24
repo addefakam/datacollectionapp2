@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +34,12 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { OWNERSHIP_TYPES } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+import {
+  SURVEY_FIELDS_DEFAULT,
+  surveyFieldEnabled,
+  surveyFieldRequired,
+  type IndustrySurveyFieldConfig,
+} from '@/lib/industry-survey-fields';
 
 interface IndustrySurveyFormProps {
   onSubmit: () => void;
@@ -50,6 +56,22 @@ const STEPS = [
   { id: 4, title: 'Review', titleOr: 'Mirkanaa', icon: Eye },
 ];
 
+/** Uniform question label: admin-managed English label + Afaan Oromoo sub-label + required star. */
+function FieldLabel({ id, en, or, required }: { id: string; en: string; or?: string; required?: boolean }) {
+  return (
+    <Label htmlFor={id} className="text-xs sm:text-sm">
+      {en}
+      {or ? (
+        <>
+          <br />
+          <span className="text-xs font-normal text-muted-foreground">{or}</span>
+        </>
+      ) : null}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </Label>
+  );
+}
+
 export default function IndustrySurveyForm({
   onSubmit,
   surveyorName,
@@ -64,6 +86,32 @@ export default function IndustrySurveyForm({
   const [selectedSubCity, setSelectedSubCity] = useState('');
   const [areas, setAreas] = useState<string[]>([]);
   const [dataConfirmed, setDataConfirmed] = useState('');
+  // Admin-managed questionnaire (Settings → Survey); registry defaults until it loads.
+  const [fields, setFields] = useState<IndustrySurveyFieldConfig[]>(
+    SURVEY_FIELDS_DEFAULT.map((f) => ({ ...f }))
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields) && d.fields.length > 0) setFields(d.fields);
+      })
+      .catch(() => {
+        // offline — keep registry defaults
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const shown = (key: string) => surveyFieldEnabled(fields, key);
+  const req = (key: string) => surveyFieldRequired(fields, key);
+  const label = (key: string) => {
+    const f = fields.find((x) => x.key === key);
+    return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
+  };
 
   const emptyForm = {
     establishmentName: '',
@@ -133,28 +181,41 @@ export default function IndustrySurveyForm({
     return true;
   };
 
+  /** First missing required field of a step (missing = empty AND questionnaire-required). */
+  const missingRequired = (keys: string[]): string | null => {
+    for (const key of keys) {
+      if (req(key) && !formData[key as keyof typeof formData]) return label(key).en;
+    }
+    return null;
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
-      case 1:
-        if (!formData.establishmentName || !formData.sector || !formData.subCity || !formData.area || !formData.specificAddress) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      case 1: {
+        const missing = missingRequired(['establishmentName', 'sector', 'subCity', 'area', 'specificAddress']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         return true;
-      case 2:
-        if (!formData.ownershipType) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Ownership type is required / Gosa abbaa qabuu barbaachisaadha', variant: 'destructive' });
+      }
+      case 2: {
+        const missing = missingRequired(['ownershipType']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         if (!formData.employeeCount || Number(formData.employeeCount) < 0) {
           toast({ title: 'Invalid Employees / Lakkoofsa Hojjetaa Dogoggora', description: 'Enter a valid employee count / Lakkoofsa hojjetaa sirrii galchi', variant: 'destructive' });
           return false;
         }
-        if (!validateSexPair(formData.maleEmployees, formData.femaleEmployees, formData.employeeCount, 'Employee Count')) return false;
+        if (shown('employeeSex') && !validateSexPair(formData.maleEmployees, formData.femaleEmployees, formData.employeeCount, 'Employee Count')) return false;
         return true;
-      case 3:
-        if (!formData.contactName || !formData.contactPhone) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Contact person and phone are required / Maqaa fi bilbila quunnamtii barbaachisa', variant: 'destructive' });
+      }
+      case 3: {
+        const missing = missingRequired(['contactName', 'contactPhone']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         {
@@ -166,6 +227,7 @@ export default function IndustrySurveyForm({
           }
         }
         return true;
+      }
       case 4:
         if (dataConfirmed !== 'yes') {
           toast({ title: 'Confirmation Required / Mirkanaa\u2019uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\u2019eef mirkanaadhu', variant: 'destructive' });
@@ -235,22 +297,23 @@ export default function IndustrySurveyForm({
     }
   };
 
+  /** Review step: only the questions the questionnaire shows. */
   const reviewItems = [
-    { label: 'Establishment / Indastrii', value: formData.establishmentName },
-    { label: 'Sector / Goossa', value: formData.sector },
-    { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
-    { label: 'Werreda', value: formData.area },
-    { label: 'Address / Baka Addaa', value: formData.specificAddress },
-    { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
-    { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
-    { label: 'EIA (Environmental Impact Assessment)', value: formData.hasEia === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'EMP (Environmental Management Plan)', value: formData.hasEmp === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Employees / Hojjetaa', value: formData.employeeCount },
-    { label: 'Male Employees / Dhiira', value: formData.maleEmployees === '' ? '—' : formData.maleEmployees },
-    { label: 'Female Employees / Dubartii', value: formData.femaleEmployees === '' ? '—' : formData.femaleEmployees },
-    { label: 'Startup Capital / Qabiyyee Jalqabaa', value: formData.startupCapital ? `${formData.startupCapital} ETB` : '—' },
-    { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
-  ];
+    shown('establishmentName') && { label: label('establishmentName').en, value: formData.establishmentName },
+    shown('sector') && { label: label('sector').en, value: formData.sector },
+    shown('subCity') && { label: label('subCity').en, value: formData.subCity },
+    shown('area') && { label: label('area').en, value: formData.area },
+    shown('specificAddress') && { label: label('specificAddress').en, value: formData.specificAddress },
+    shown('licenseNumber') && { label: label('licenseNumber').en, value: formData.licenseNumber || '—' },
+    shown('ownershipType') && { label: label('ownershipType').en, value: formData.ownershipType },
+    shown('hasEia') && { label: 'EIA (Environmental Impact Assessment)', value: formData.hasEia === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+    shown('hasEmp') && { label: 'EMP (Environmental Management Plan)', value: formData.hasEmp === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+    shown('employeeCount') && { label: label('employeeCount').en, value: formData.employeeCount },
+    shown('employeeSex') && { label: label('employeeSex').en, value: `${formData.maleEmployees || '—'} / ${formData.femaleEmployees || '—'}` },
+    shown('startupCapital') && { label: label('startupCapital').en, value: formData.startupCapital ? `${formData.startupCapital} ETB` : '—' },
+    shown('contactName') && { label: label('contactName').en, value: formData.contactName },
+    shown('contactPhone') && { label: label('contactPhone').en, value: formData.contactPhone },
+  ].filter(Boolean) as { label: string; value: string }[];
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -307,11 +370,11 @@ export default function IndustrySurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="establishmentName" className="text-xs sm:text-sm">Establishment Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Indastrii</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="establishmentName" en={label('establishmentName').en} or={label('establishmentName').or} required={req('establishmentName')} />
                   <Input id="establishmentName" name="establishmentName" placeholder="e.g., BISHOFTU FLOUR MILL" value={formData.establishmentName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="sector" className="text-xs sm:text-sm">Sector / Goossa Indastrii <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="sector" en={label('sector').en} or={label('sector').or} required={req('sector')} />
                   <Select value={formData.sector} onValueChange={(v) => handleSelectChange('sector', v)}>
                     <SelectTrigger id="sector" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                     <SelectContent className="max-h-64">{sectors.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
@@ -319,24 +382,26 @@ export default function IndustrySurveyForm({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="subCity" en={label('subCity').en} or={label('subCity').or} required={req('subCity')} />
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="area" en={label('area').en} or={label('area').or} required={req('area')} />
                     <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
                       <SelectTrigger id="area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
                       <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
-                  <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
-                </div>
+                {shown('specificAddress') && (
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <FieldLabel id="specificAddress" en={label('specificAddress').en} or={label('specificAddress').or} required={req('specificAddress')} />
+                    <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
+                  </div>
+                )}
               </CardContent>
             </>
           )}
@@ -352,78 +417,92 @@ export default function IndustrySurveyForm({
                 <CardDescription className="text-xs sm:text-sm">License, ownership and workforce details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyeema</span></Label>
-                  <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., BW/IC/2015/0234" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
-                </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="ownershipType" className="text-xs sm:text-sm">Ownership Type / Gosa Abbaa Qabuu <span className="text-red-500">*</span></Label>
-                  <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {OWNERSHIP_TYPES.map((t) => (
-                      <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
-                        <RadioGroupItem value={t} id={`ownership-${t}`} />
-                        <Label htmlFor={`ownership-${t}`} className="cursor-pointer text-xs sm:text-sm font-normal">{t}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
+                {shown('licenseNumber') && (
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <FieldLabel id="licenseNumber" en={label('licenseNumber').en} or={label('licenseNumber').or} required={req('licenseNumber')} />
+                    <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., BW/IC/2015/0234" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
+                  </div>
+                )}
+                {shown('ownershipType') && (
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <FieldLabel id="ownershipType" en={label('ownershipType').en} or={label('ownershipType').or} required={req('ownershipType')} />
+                    <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {OWNERSHIP_TYPES.map((t) => (
+                        <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                          <RadioGroupItem value={t} id={`ownership-${t}`} />
+                          <Label htmlFor={`ownership-${t}`} className="cursor-pointer text-xs sm:text-sm font-normal">{t}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="employeeCount" className="text-xs sm:text-sm">Employee Count<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Hojjetaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="employeeCount" en={label('employeeCount').en} or={label('employeeCount').or} required={req('employeeCount')} />
                     <Input id="employeeCount" name="employeeCount" type="number" min="0" placeholder="e.g., 25" value={formData.employeeCount} onChange={handleChange} required className="text-sm sm:text-base" />
                   </div>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="startupCapital" className="text-xs sm:text-sm">Startup Capital (ETB)<br /><span className="text-xs font-normal text-muted-foreground">Qabiyyee Jalqabaa</span></Label>
-                    <Input id="startupCapital" name="startupCapital" type="number" min="0" placeholder="e.g., 500000" value={formData.startupCapital} onChange={handleChange} className="text-sm sm:text-base" />
-                  </div>
-                </div>
-                {/* Employees by sex (male / female) */}
-                <div className="rounded-lg border border-teal-100 bg-teal-50/50 p-3 space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs sm:text-sm">Employees by Sex<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa Dhiira fi Dubartii</span></Label>
-                    <span className="shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-[9px] font-medium text-teal-700 sm:text-[10px]">Optional / Filannoo</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="maleEmployees" className="text-xs">Male / Dhiira</Label>
-                      <Input id="maleEmployees" name="maleEmployees" type="number" min="0" placeholder="e.g., 12" value={formData.maleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+                  {shown('startupCapital') && (
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <FieldLabel id="startupCapital" en={label('startupCapital').en} or={label('startupCapital').or} required={req('startupCapital')} />
+                      <Input id="startupCapital" name="startupCapital" type="number" min="0" placeholder="e.g., 500000" value={formData.startupCapital} onChange={handleChange} className="text-sm sm:text-base" />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="femaleEmployees" className="text-xs">Female / Dubartii</Label>
-                      <Input id="femaleEmployees" name="femaleEmployees" type="number" min="0" placeholder="e.g., 13" value={formData.femaleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+                  )}
+                </div>
+                {/* Employees by sex (male / female) — admin can hide this question */}
+                {shown('employeeSex') && (
+                  <div className="rounded-lg border border-teal-100 bg-teal-50/50 p-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <FieldLabel id="maleEmployees" en={label('employeeSex').en} or={label('employeeSex').or} />
+                      <span className="shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-[9px] font-medium text-teal-700 sm:text-[10px]">Optional / Filannoo</span>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="maleEmployees" className="text-xs">Male / Dhiira</Label>
+                        <Input id="maleEmployees" name="maleEmployees" type="number" min="0" placeholder="e.g., 12" value={formData.maleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="femaleEmployees" className="text-xs">Female / Dubartii</Label>
+                        <Input id="femaleEmployees" name="femaleEmployees" type="number" min="0" placeholder="e.g., 13" value={formData.femaleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Employee Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                   </div>
-                  <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Employee Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
-                </div>
-                {/* Environmental compliance */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <Label className="text-xs sm:text-sm">EIA — Environmental Impact Assessment<br /><span className="text-xs font-normal text-muted-foreground">Qorannoo Naannoo</span></Label>
-                    <RadioGroup value={formData.hasEia} onValueChange={(v) => handleSelectChange('hasEia', v)} className="flex gap-4">
-                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
-                        <RadioGroupItem value="yes" id="eia-yes" />
-                        <Label htmlFor="eia-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+                )}
+                {/* Environmental compliance — admin can hide either question */}
+                {(shown('hasEia') || shown('hasEmp')) && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                    {shown('hasEia') && (
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <FieldLabel id="eia-yes" en={label('hasEia').en} or={label('hasEia').or} />
+                        <RadioGroup value={formData.hasEia} onValueChange={(v) => handleSelectChange('hasEia', v)} className="flex gap-4">
+                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                            <RadioGroupItem value="yes" id="eia-yes" />
+                            <Label htmlFor="eia-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+                          </div>
+                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                            <RadioGroupItem value="no" id="eia-no" />
+                            <Label htmlFor="eia-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+                          </div>
+                        </RadioGroup>
                       </div>
-                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
-                        <RadioGroupItem value="no" id="eia-no" />
-                        <Label htmlFor="eia-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+                    )}
+                    {shown('hasEmp') && (
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <FieldLabel id="emp-yes" en={label('hasEmp').en} or={label('hasEmp').or} />
+                        <RadioGroup value={formData.hasEmp} onValueChange={(v) => handleSelectChange('hasEmp', v)} className="flex gap-4">
+                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                            <RadioGroupItem value="yes" id="emp-yes" />
+                            <Label htmlFor="emp-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+                          </div>
+                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                            <RadioGroupItem value="no" id="emp-no" />
+                            <Label htmlFor="emp-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+                          </div>
+                        </RadioGroup>
                       </div>
-                    </RadioGroup>
+                    )}
                   </div>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <Label className="text-xs sm:text-sm">EMP — Environmental Management Plan<br /><span className="text-xs font-normal text-muted-foreground">Karoora Naannoo</span></Label>
-                    <RadioGroup value={formData.hasEmp} onValueChange={(v) => handleSelectChange('hasEmp', v)} className="flex gap-4">
-                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
-                        <RadioGroupItem value="yes" id="emp-yes" />
-                        <Label htmlFor="emp-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
-                      </div>
-                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
-                        <RadioGroupItem value="no" id="emp-no" />
-                        <Label htmlFor="emp-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </>
           )}
@@ -440,11 +519,11 @@ export default function IndustrySurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Quunnamtu</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="contactName" en={label('contactName').en} or={label('contactName').or} required={req('contactName')} />
                   <Input id="contactName" name="contactName" placeholder="Full name of manager / owner" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="contactPhone" className="text-xs sm:text-sm">Contact Phone<br /><span className="text-xs font-normal text-muted-foreground">Bilbila Quunnamtii</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="contactPhone" en={label('contactPhone').en} or={label('contactPhone').or} required={req('contactPhone')} />
                   <Input id="contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>

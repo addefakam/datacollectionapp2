@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { loadSurveyFields } from '@/lib/industry-survey-server';
+import { surveyFieldRequired } from '@/lib/industry-survey-fields';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -31,10 +33,23 @@ export async function POST(request: NextRequest) {
       surveyorId,
     } = body;
 
-    // Validate required fields
-    if (!establishmentName || !sector || !subCity || !area || !specificAddress || !ownershipType || !contactName || !contactPhone) {
+    // Validate required fields — the required set follows the admin-managed
+    // questionnaire (Settings → Survey): locked fields are always required,
+    // configurable ones only when the questionnaire shows them as required.
+    const surveyFields = await loadSurveyFields();
+    const need = (key: string): boolean => surveyFieldRequired(surveyFields, key);
+    if (
+      !establishmentName ||
+      !sector ||
+      !subCity ||
+      !area ||
+      !contactName ||
+      !contactPhone ||
+      (need('specificAddress') && !specificAddress) ||
+      (need('ownershipType') && !ownershipType)
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields', missing: { establishmentName: !establishmentName, sector: !sector, subCity: !subCity, area: !area, specificAddress: !specificAddress, ownershipType: !ownershipType, contactName: !contactName, contactPhone: !contactPhone } },
+        { error: 'Missing required fields', missing: { establishmentName: !establishmentName, sector: !sector, subCity: !subCity, area: !area, specificAddress: need('specificAddress') && !specificAddress, ownershipType: need('ownershipType') && !ownershipType, contactName: !contactName, contactPhone: !contactPhone } },
         { status: 400 }
       );
     }
