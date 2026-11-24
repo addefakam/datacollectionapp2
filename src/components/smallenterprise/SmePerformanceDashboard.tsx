@@ -955,7 +955,7 @@ function UnitStatusChips({ row }: { row: PerfRow }) {
   );
 }
 
-/** Body of the "Registered enterprises" box (loading skeleton, list or empty state). */
+/** Body of the "Registered enterprises" box (loading skeleton, table or empty state). */
 function EnterpriseListBlock({
   loading,
   smes,
@@ -974,23 +974,45 @@ function EnterpriseListBlock({
   }
   if (smes && smes.length > 0) {
     return (
-      <div className="max-h-72 divide-y divide-teal-50 overflow-y-auto">
-        {smes.map((sme) => {
-          const meta = SME_STATUS_META[(sme.status as SmeStatus) in SME_STATUS_META ? (sme.status as SmeStatus) : 'REGISTERED'];
-          return (
-            <div key={sme.id} className="flex items-center justify-between gap-2 px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-teal-950">{sme.enterpriseName}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {sme.enterpriseType} · {fmt(sme.employeeCount)} members
-                  {sme.femaleEmployees > 0 ? ` (F ${fmt(sme.femaleEmployees)})` : ''}
-                  {' · '}{new Date(sme.createdAt).toLocaleDateString('en-GB')}
-                </p>
-              </div>
-              <Badge variant="outline" className={cn('shrink-0 text-[10px]', meta.badgeClass)}>{meta.label}</Badge>
-            </div>
-          );
-        })}
+      <div className="max-h-72 overflow-y-auto">
+        <table className="w-full min-w-[720px] text-left text-xs sm:text-sm">
+          <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#ccf1ea]">
+            <tr className="text-[10px] uppercase tracking-wide text-teal-900/60">
+              <th className="py-2 pl-3 pr-2 font-semibold">No.</th>
+              <th className="py-2 pr-2 font-semibold">Enterprise Name</th>
+              <th className="py-2 pr-2 font-semibold">Type</th>
+              <th className="py-2 pr-2 font-semibold">Sub-City</th>
+              <th className="py-2 pr-2 font-semibold">Woreda</th>
+              <th className="py-2 pr-2 text-right font-semibold">Members</th>
+              <th className="py-2 pr-2 text-right font-semibold">Registered</th>
+              <th className="py-2 pr-3 text-right font-semibold">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {smes.map((sme, i) => {
+              const meta = SME_STATUS_META[(sme.status as SmeStatus) in SME_STATUS_META ? (sme.status as SmeStatus) : 'REGISTERED'];
+              return (
+                <tr key={sme.id} className="border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60">
+                  <td className="py-2.5 pl-3 pr-2 text-muted-foreground">{i + 1}</td>
+                  <td className="max-w-[220px] truncate py-2.5 pr-2 font-semibold text-teal-950" title={sme.enterpriseName}>
+                    {sme.enterpriseName}
+                  </td>
+                  <td className="py-2.5 pr-2 text-slate-600">{sme.enterpriseType}</td>
+                  <td className="py-2.5 pr-2 text-slate-600">{sme.subCity || '—'}</td>
+                  <td className="py-2.5 pr-2 text-slate-600">{sme.area || '—'}</td>
+                  <td className="py-2.5 pr-2 text-right">
+                    {fmt(sme.employeeCount)}
+                    {sme.femaleEmployees > 0 ? <span className="text-[10px] text-muted-foreground"> (F {fmt(sme.femaleEmployees)})</span> : null}
+                  </td>
+                  <td className="py-2.5 pr-2 text-right text-muted-foreground">{new Date(sme.createdAt).toLocaleDateString('en-GB')}</td>
+                  <td className="py-2.5 pr-3 text-right">
+                    <Badge variant="outline" className={cn('inline-flex text-[10px]', meta.badgeClass)}>{meta.label}</Badge>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   }
