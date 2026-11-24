@@ -37,8 +37,6 @@ import AgricultureList from '@/components/agriculture/AgricultureList';
 import AgricultureStats from '@/components/agriculture/AgricultureStats';
 import SmallEnterpriseSurveyForm from '@/components/smallenterprise/SmallEnterpriseSurveyForm';
 import SmallEnterpriseList from '@/components/smallenterprise/SmallEnterpriseList';
-import SmallEnterpriseStats from '@/components/smallenterprise/SmallEnterpriseStats';
-import GoalManager from '@/components/smallenterprise/GoalManager';
 import SmeTargetManager from '@/components/smallenterprise/SmeTargetManager';
 import SmePerformanceDashboard from '@/components/smallenterprise/SmePerformanceDashboard';
 import CampaignGoalForm from '@/components/charity/campaign/CampaignGoalForm';
@@ -333,19 +331,6 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="mseData" className="mt-2 sm:mt-3">
               <SmallEnterpriseList refreshTrigger={refreshTrigger} />
-            </TabsContent>
-          )}
-
-          {isAdmin && (
-            <TabsContent value="mseStats" className="mt-2 sm:mt-3">
-              <SmallEnterpriseStats />
-            </TabsContent>
-          )}
-
-          {/* ============ Goals & Targets for the MSE initiative (admin) ============ */}
-          {isAdmin && (
-            <TabsContent value="mseGoals" className="mt-2 sm:mt-3">
-              <GoalManager refreshTrigger={refreshTrigger} module="small-enterprise" />
             </TabsContent>
           )}
 
