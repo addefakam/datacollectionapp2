@@ -61,6 +61,7 @@ import {
   Home,
   GraduationCap,
   ArrowRightCircle,
+  X,
 } from 'lucide-react';
 import { SMALL_ENTERPRISE_TYPES, SMALL_ENTERPRISE_OWNERSHIP_TYPES } from '@/lib/location-data';
 import { hasSexBreakdown } from '@/lib/sex-counts';
@@ -126,6 +127,11 @@ function fmtDate(value: string): string {
 function fmtMoney(value: number | null): string {
   if (value == null) return '—';
   return value.toLocaleString('en') + ' ETB';
+}
+
+/** Status metadata with a safe fallback for unknown status values. */
+function statusMetaOf(status: string) {
+  return SME_STATUS_META[(status as SmeStatus) in SME_STATUS_META ? (status as SmeStatus) : 'REGISTERED'];
 }
 
 export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
@@ -408,26 +414,34 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
   };
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-5xl">
       <Card className="rounded-2xl border-teal-100">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Store className="h-5 w-5 text-amber-600" />
+              <Store className="h-5 w-5 text-teal-700" />
               Small Enterprise Records
-              <Badge variant="secondary" className="bg-amber-100 text-amber-800">{total}</Badge>
+              <Badge variant="secondary" className="bg-teal-100 text-teal-800">{total}</Badge>
             </CardTitle>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               <Button variant="outline" size="sm" onClick={() => fetchData()} className="h-8 px-2">
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExport('csv')} disabled={exporting} className="h-8 px-2 text-xs">
+                {exporting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1 h-3.5 w-3.5" />}
+                CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExport('excel')} disabled={exporting} className="h-8 px-2 text-xs">
+                {exporting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />}
+                Excel
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="h-8 px-2 text-xs">
-                <Upload className="h-3.5 w-3.5" />
+                <Upload className="mr-1 h-3.5 w-3.5" />
                 Import
               </Button>
             </div>
           </div>
-          <CardDescription className="text-xs sm:text-sm">Manage all registered small enterprises (MSE)</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Browse, filter and manage all registered small enterprises (MSE)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Filters */}
@@ -460,18 +474,19 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Export buttons */}
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport('csv')} disabled={exporting} className="flex-1 text-xs sm:text-sm">
-              {exporting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}
-              CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport('excel')} disabled={exporting} className="flex-1 text-xs sm:text-sm">
-              {exporting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />}
-              Excel
-            </Button>
-          </div>
+          {(search || filterSubCity || filterArea || filterType || filterStatus) && (
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px] text-muted-foreground"
+                onClick={() => { setSearch(''); setFilterSubCity(''); setFilterArea(''); setFilterType(''); setFilterStatus(''); setAreas([]); setPage(1); }}
+              >
+                <X className="mr-1 h-3 w-3" />
+                Clear filters
+              </Button>
+            </div>
+          )}
 
           {/* Bulk status modification bar */}
           {selectedIds.size > 0 && (
@@ -554,10 +569,12 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
               </label>
             </div>
             <div className="space-y-2.5">
-              {data.map((item) => (
+              {data.map((item) => {
+                const meta = statusMetaOf(item.status);
+                return (
                 <div
                   key={item.id}
-                  className={`rounded-xl border bg-white p-3 transition-shadow hover:shadow-md ${
+                  className={`rounded-xl border bg-white p-3.5 transition-shadow hover:shadow-md ${
                     selectedIds.has(item.id) ? 'border-teal-300 ring-1 ring-teal-200' : 'border-teal-100'
                   }`}
                 >
@@ -577,47 +594,24 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                         aria-label={`Select ${item.enterpriseName}`}
                       />
                       <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <p className="truncate text-sm font-semibold text-teal-950">{item.enterpriseName}</p>
-                        <Badge
-                          variant="outline"
-                          className={"text-[10px] " + (SME_STATUS_META[(item.status as SmeStatus) in SME_STATUS_META ? (item.status as SmeStatus) : 'REGISTERED'].badgeClass)}
-                        >
-                          {SME_STATUS_META[(item.status as SmeStatus) in SME_STATUS_META ? (item.status as SmeStatus) : 'REGISTERED'].label}
-                        </Badge>
-                        <Badge variant="secondary" className="bg-amber-100 text-[10px] text-amber-800">{item.enterpriseType}</Badge>
-                        <Badge variant="outline" className="text-[10px]">{item.ownershipType}</Badge>
-                        {item.licenseNumber && (
-                          <Badge variant="outline" className="gap-1 text-[10px] text-teal-700"><FileBadge className="h-2.5 w-2.5" />{item.licenseNumber}</Badge>
-                        )}
-                      </div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{item.subCity} · {item.area}</span>
-                        <span>{item.specificAddress}</span>
-                        <a href={`tel:${item.contactPhone}`} className="flex items-center gap-1 font-medium text-amber-600 hover:underline">
-                          <Phone className="h-3 w-3" />{item.contactName}
-                        </a>
-                        <span className="text-teal-900/40">{fmtDate(item.createdAt)}</span>
-                      </div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 font-medium text-teal-800">
-                          <Store className="h-3 w-3" />{item.employeeCount} employees
-                        </span>
-                        {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
-                          <>
-                            <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-teal-700">M {item.maleEmployees}</span>
-                            <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700">F {item.femaleEmployees}</span>
-                          </>
-                        )}
-                        {item.startupCapital != null && (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
-                            <Coins className="h-3 w-3" />{fmtMoney(item.startupCapital)}
-                          </span>
-                        )}
-                        {item.hasPremises && <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 text-teal-700"><Home className="h-3 w-3" />Premises</span>}
-                        {item.hasTraining && <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 text-teal-700"><GraduationCap className="h-3 w-3" />Trained</span>}
-                        {item.surveyorName && <span className="text-muted-foreground">by {item.surveyorName}</span>}
-                      </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="truncate text-sm font-semibold text-teal-950">{item.enterpriseName}</p>
+                          <Badge variant="outline" className={`text-[10px] ${meta.badgeClass}`}>{meta.label}</Badge>
+                          {item.licenseNumber && (
+                            <Badge variant="outline" className="gap-1 text-[10px] text-teal-700"><FileBadge className="h-2.5 w-2.5" />{item.licenseNumber}</Badge>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <Badge variant="secondary" className="bg-slate-100 text-[10px] font-medium text-slate-700">{item.enterpriseType}</Badge>
+                          <Badge variant="outline" className="text-[10px] text-slate-500">{item.ownershipType}</Badge>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{item.subCity} · {item.area}{item.specificAddress ? ` · ${item.specificAddress}` : ''}</span>
+                          <a href={`tel:${item.contactPhone}`} className="flex items-center gap-1 font-medium text-amber-600 hover:underline">
+                            <Phone className="h-3 w-3" />{item.contactName}
+                          </a>
+                          <span className="text-teal-900/40">{fmtDate(item.createdAt)}{item.surveyorName ? ` · by ${item.surveyorName}` : ''}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-row gap-1">
@@ -635,19 +629,43 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                       </Button>
                     </div>
                   </div>
+                  {/* Quick facts */}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-teal-50 pt-2 text-[11px]">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 font-medium text-teal-800">
+                      <Store className="h-3 w-3" />{item.employeeCount} employees
+                    </span>
+                    {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
+                      <>
+                        <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-slate-600">M {item.maleEmployees}</span>
+                        <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700">F {item.femaleEmployees}</span>
+                      </>
+                    )}
+                    {item.startupCapital != null && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
+                        <Coins className="h-3 w-3" />{fmtMoney(item.startupCapital)}
+                      </span>
+                    )}
+                    {item.hasPremises && (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-teal-100 px-1.5 py-0.5 text-teal-700"><Home className="h-3 w-3" />Premises</span>
+                    )}
+                    {item.hasTraining && (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-teal-100 px-1.5 py-0.5 text-teal-700"><GraduationCap className="h-3 w-3" />Trained</span>
+                    )}
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             </>
           )}
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
                 <ChevronLeft className="h-4 w-4" /> Prev
               </Button>
-              <span className="text-xs text-muted-foreground">Page {page} of {totalPages} · {total} records</span>
+              <span className="text-xs text-muted-foreground">Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(total, page * PAGE_SIZE)} of {total} · Page {page} of {totalPages}</span>
               <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
                 Next <ChevronRight className="h-4 w-4" />
               </Button>
@@ -663,14 +681,25 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Store className="h-5 w-5 text-amber-600" />
+                  <Store className="h-5 w-5 text-teal-700" />
                   {viewItem.enterpriseName}
                 </DialogTitle>
                 <DialogDescription>{viewItem.enterpriseType} · {viewItem.ownershipType}</DialogDescription>
               </DialogHeader>
+              {/* Establishment status banner */}
+              <div className="rounded-lg border border-teal-100 bg-teal-50/60 px-3 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Badge variant="outline" className={`text-[10px] ${statusMetaOf(viewItem.status).badgeClass}`}>{statusMetaOf(viewItem.status).label}</Badge>
+                  {viewItem.statusUpdatedAt && (
+                    <span className="text-[10px] text-muted-foreground">since {fmtDate(viewItem.statusUpdatedAt)}</span>
+                  )}
+                </div>
+                {viewItem.statusNote && (
+                  <p className="mt-1 text-[11px] italic text-teal-900/70">{viewItem.statusNote}</p>
+                )}
+              </div>
               <div className="rounded-lg border bg-slate-50 text-sm">
                 {[
-                  { label: 'Current Status / Sadarkaa', value: SME_STATUS_META[(viewItem.status as SmeStatus) in SME_STATUS_META ? (viewItem.status as SmeStatus) : 'REGISTERED'].label },
                   { label: 'Sub-City / Kututtaa Maggalaa', value: viewItem.subCity },
                   { label: 'Werreda', value: viewItem.area },
                   { label: 'Specific Address / Baka Addaa', value: viewItem.specificAddress },
@@ -707,12 +736,13 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Pencil className="h-5 w-5 text-amber-600" />
+                  <Pencil className="h-5 w-5 text-teal-700" />
                   Edit Small Enterprise
                 </DialogTitle>
                 <DialogDescription>{editItem.enterpriseName}</DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">Identity &amp; Location</p>
                 <div className="space-y-1.5">
                   <Label htmlFor="edit-enterpriseName" className="text-xs">Enterprise Name</Label>
                   <Input id="edit-enterpriseName" value={editForm.enterpriseName} onChange={(e) => setEditForm({ ...editForm, enterpriseName: e.target.value })} className="text-sm" />
@@ -753,6 +783,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                   <Label htmlFor="edit-specificAddress" className="text-xs">Specific Address</Label>
                   <Input id="edit-specificAddress" value={editForm.specificAddress} onChange={(e) => setEditForm({ ...editForm, specificAddress: e.target.value })} className="text-sm" />
                 </div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">License, People &amp; Capital</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-licenseNumber" className="text-xs">License Number</Label>
@@ -777,6 +808,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                     <Input id="edit-femaleEmployees" type="number" min="0" value={editForm.femaleEmployees} onChange={(e) => setEditForm({ ...editForm, femaleEmployees: e.target.value })} className="text-sm" />
                   </div>
                 </div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">Program &amp; Contact</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Own Premises</Label>
@@ -823,7 +855,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => { setEditItem(null); setEditForm(null); }}>Cancel</Button>
-                <Button onClick={handleSave} disabled={saving} className="bg-amber-600 text-white hover:bg-amber-700">
+                <Button onClick={handleSave} disabled={saving} className="bg-teal-700 text-white hover:bg-teal-800">
                   {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
                   Save
                 </Button>
@@ -904,7 +936,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-amber-600" />
+              <Upload className="h-5 w-5 text-teal-700" />
               Bulk Import / Galmeessaa Keessaa
             </DialogTitle>
             <DialogDescription>
