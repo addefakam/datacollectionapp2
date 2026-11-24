@@ -53,9 +53,9 @@ cd "$BUILD_DIR" || exit 1
 
 ls -lah
 
-DEFAULT_PACKAGED_DB_PATH="/app/db/custom.db"
-DEFAULT_PACKAGED_DATABASE_URL="file:$DEFAULT_PACKAGED_DB_PATH"
-export PACKAGED_DB_PATH="$DEFAULT_PACKAGED_DB_PATH"
+# 本应用已迁移到平台托管的 PostgreSQL（运行时注入 postgresql:// DATABASE_URL，
+# 构建期 prisma db push 已把 schema 同步到同一数据库）。SQLite 打包库仅为
+# 兼容保留在产物里，不再作为数据源。
 
 # Python 依赖在构建阶段安装进部署产物，不复用 Sandbox 的 /home/z/.venv。
 # Next.js 及其启动的子进程都会继承这组路径。
@@ -76,39 +76,14 @@ if [ -f "./next-service-dist/server.js" ]; then
     export NODE_ENV=production
     export PORT="${PORT:-3000}"
     export HOSTNAME="${HOSTNAME:-0.0.0.0}"
-    export DATABASE_URL="${DATABASE_URL:-$DEFAULT_PACKAGED_DATABASE_URL}"
 
-    # 平台可能注入两类本 SQLite 应用无法使用的值：
-    #   1. 裸路径（如 /app/db/custom.db）→ 补上 file: 前缀
-    #   2. 完整的非 file: URL（如平台托管 Postgres postgresql://…）→ 本项目
-    #      没有 postgres schema，直接改用打包数据库（实例持久卷上的
-    #      /app/db/custom.db，其结构由下面的自愈步骤同步到最新）。
-    case "$DATABASE_URL" in
-        file:*) ;;
-        *"://"*)    echo "🔧 DATABASE_URL 是非 SQLite 协议（postgresql 等托管数据库），本项目为 SQLite 应用 — 改用打包数据库 $DEFAULT_PACKAGED_DATABASE_URL"
-                    export DATABASE_URL="$DEFAULT_PACKAGED_DATABASE_URL" ;;
-        *)  echo "🔧 DATABASE_URL 缺少 file: 前缀，自动补全: file:$DATABASE_URL"
-            export DATABASE_URL="file:$DATABASE_URL" ;;
-    esac
-
-    if [ "$DATABASE_URL" = "$DEFAULT_PACKAGED_DATABASE_URL" ]; then
-        if [ ! -f "$DEFAULT_PACKAGED_DB_PATH" ]; then
-            echo "❌ 未找到打包后的数据库文件 $DEFAULT_PACKAGED_DB_PATH"
-            echo "   为避免生产环境启动到空数据库，启动已终止"
-            exit 1
-        fi
-
-        echo "🗄️  当前使用打包数据库: $DEFAULT_PACKAGED_DB_PATH"
-    else
-        echo "🗄️  当前使用外部指定数据库: $DATABASE_URL"
+    # 本应用使用平台托管的 PostgreSQL：运行时必须注入 DATABASE_URL
+    # （postgresql://…）。缺失则无法工作，直接失败并给出明确日志。
+    if [ -z "$DATABASE_URL" ]; then
+        echo "❌ DATABASE_URL 未设置 — 本应用运行在平台托管 PostgreSQL 上，需要平台注入的数据库地址"
+        exit 1
     fi
-
-    # 数据库结构自愈：把运行时数据库同步到构建期 schema 快照（幂等）。
-    # 外部注入的 DATABASE_URL 可能指向缺少新模块表的旧库，导致所有模块 API
-    # 返回 500（前端表现为 Failed to load data / 调查卡在 waiting for sync）。
-    # 此步骤只建缺失的表/列/索引并填充空引用表，绝不改动用户数据；失败不阻塞启动。
-    echo "🗄️  同步运行时数据库结构（幂等，失败不阻塞）..."
-    bun "$PWD/../db/runtime-migrate.mjs" || echo "⚠️  运行时数据库迁移未完成（忽略，继续启动）"
+    echo "🗄️  使用平台托管数据库: $(echo "$DATABASE_URL" | sed 's|://[^@]*@|://***@|')"
 
     # 后台启动 Next.js
     bun server.js &

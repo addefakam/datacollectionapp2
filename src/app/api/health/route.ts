@@ -5,16 +5,16 @@ import { db } from '@/lib/db';
  * GET /api/health — deployment diagnostic.
  *
  * Unauthenticated by design: it exposes NO user data, only whether the
- * runtime database is reachable and which module tables exist. Purpose:
- * when data collectors report "Failed to load data" / sync failures, this
- * endpoint immediately shows whether the runtime database predates a module
- * (missing table) — the exact failure mode the startup self-heal
- * (db/runtime-migrate.mjs) exists to repair. 500s here mean the server can
- * not reach its database at all.
+ * runtime PostgreSQL database is reachable, which module tables exist and
+ * whether any user account does. Purpose: when data collectors report
+ * "Failed to load data" / sync failures, this endpoint immediately shows
+ * whether the runtime database predates a module (missing table). 500s here
+ * mean the server can not reach its database at all.
  *
- * The payload also reports the SHAPE of DATABASE_URL with credentials masked,
- * so a misconfigured runtime URL is visible in the response itself.
+ * The DATABASE_URL value is reported with credentials masked (user:pass@ →
+ * ***@) so misconfiguration is visible without leaking secrets.
  */
+
 /** Hide userinfo credentials in URLs (user:pass@host) — never echo secrets. */
 function maskUrl(url: string): string {
   return url.replace(/:\/\/[^@/\s]+@/, '://***@');
@@ -25,19 +25,17 @@ function describeDatabaseUrl(): Record<string, unknown> {
   if (!url) return { present: false, note: 'DATABASE_URL is not set' };
   return {
     present: true,
-    startsWithFileProtocol: url.startsWith('file:'),
-    isSqlite: url.startsWith('file:'),
-    // Masked — file paths carry no credentials, remote URLs might.
+    isPostgres: url.startsWith('postgresql://') || url.startsWith('postgres://'),
     value: maskUrl(url.length > 120 ? `${url.slice(0, 120)}…` : url),
   };
 }
 
 export async function GET() {
   try {
-    const rows = await db.$queryRawUnsafe<{ name: string }[]>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    const rows = await db.$queryRawUnsafe<{ table_name: string }[]>(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     );
-    const existing = new Set(rows.map((r) => r.name));
+    const existing = new Set(rows.map((r) => r.table_name));
     const required = [
       'User',
       'GuestHouse',
@@ -56,11 +54,11 @@ export async function GET() {
     for (const t of required) tables[t] = existing.has(t);
     const missing = required.filter((t) => !existing.has(t));
 
-    // hasUsers: login breaks if the runtime database is a fresh empty file
-    // (no accounts). A boolean only — never counts or account data.
+    // hasUsers: login breaks if the runtime database has no accounts.
+    // A boolean only — never counts or account data.
     let hasUsers: boolean | null = null;
     if (tables.User) {
-      const u = await db.$queryRawUnsafe<{ n: number }[]>(
+      const u = await db.$queryRawUnsafe<{ n: bigint }[]>(
         'SELECT COUNT(*) as n FROM "User"'
       );
       hasUsers = Number(u[0]?.n ?? 0) > 0;
@@ -76,7 +74,7 @@ export async function GET() {
       hint:
         missing.length === 0
           ? 'All module tables present.'
-          : 'Runtime database predates these modules. Restarting the server should trigger the startup self-heal (db/runtime-migrate.mjs) to create them.',
+          : 'Runtime database predates these modules — run `prisma db push` against it (the build does this automatically).',
       time: new Date().toISOString(),
     });
   } catch (error) {

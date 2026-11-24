@@ -5,29 +5,18 @@ set -euo pipefail
 PROJECT_DIR="${PROJECT_DIR:-/home/z/my-project}"
 BUILD_DIR="${BUILD_DIR:?BUILD_DIR is required}"
 SOURCE_DB_DIR="$PROJECT_DIR/db"
-SOURCE_DB_PATH="$SOURCE_DB_DIR/custom.db"
 TARGET_DB_DIR="$BUILD_DIR/db"
-TARGET_DB_PATH="$TARGET_DB_DIR/custom.db"
 
+# 本应用已迁移到平台托管 PostgreSQL：数据库结构与数据都在托管库中
+# （构建期 npm run build 里的 prisma db push 负责同步 schema），SQLite
+# 文件不再是数据源。这里仅原样携带 db/ 目录（历史脚本/排查用），不再
+# 对打包库执行任何 prisma 操作。
 mkdir -p "$TARGET_DB_DIR"
-
-if [ -f "$SOURCE_DB_PATH" ]; then
-    echo "🗄️  复制 Preview 数据库到构建产物..."
+if [ -d "$SOURCE_DB_DIR" ]; then
+    echo "🗄️  携带 db/ 目录到构建产物（非数据源，仅存档）..."
     cp -a "$SOURCE_DB_DIR/." "$TARGET_DB_DIR/"
 else
-    echo "ℹ️  未找到 Preview 数据库 db/custom.db，将初始化空的生产数据库"
+    echo "ℹ️  未找到 db/ 目录，跳过"
 fi
 
-echo "🗄️  同步构建产物中的数据库结构..."
-(
-    cd "$PROJECT_DIR"
-    DATABASE_URL="file:$TARGET_DB_PATH" bun run db:push
-)
-
-if [ ! -f "$TARGET_DB_PATH" ]; then
-    echo "❌ 数据库初始化命令执行成功，但未生成 $TARGET_DB_PATH"
-    exit 1
-fi
-
-echo "✅ 构建产物数据库已准备完成"
-ls -lah "$TARGET_DB_DIR"
+echo "✅ 构建产物数据库处理完成（PostgreSQL 由运行时 DATABASE_URL 指定）"
