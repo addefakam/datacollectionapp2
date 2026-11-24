@@ -4,15 +4,20 @@ import { db } from '@/lib/db';
 /**
  * GET /api/health — deployment diagnostic.
  *
- * Unauthenticated by design: it exposes NO user data, only whether the
- * runtime PostgreSQL database is reachable, which module tables exist and
- * whether any user account does. Purpose: when data collectors report
- * "Failed to load data" / sync failures, this endpoint immediately shows
- * whether the runtime database predates a module (missing table). 500s here
- * mean the server can not reach its database at all.
+ * Unauthenticated by design: it exposes NO personal data — only whether the
+ * runtime PostgreSQL database is reachable, which module tables exist, how
+ * many records each module table holds and whether any user account does.
+ * Purpose: when data collectors report "Failed to load data" / sync
+ * failures, this endpoint immediately shows whether the runtime database
+ * predates a module (missing table) or lost records (zero counts). 500s
+ * here mean the server can not reach its database at all.
  *
  * The DATABASE_URL value is reported with credentials masked (user:pass@ →
  * ***@) so misconfiguration is visible without leaking secrets.
+ *
+ * Record counts are aggregate-only sector statistics requested by the app
+ * owner ("show the records in health") — no row content is ever returned.
+ * User accounts stay count-free: hasUsers is a boolean only.
  */
 
 /** Hide userinfo credentials in URLs (user:pass@host) — never echo secrets. */
@@ -55,7 +60,7 @@ export async function GET() {
     const missing = required.filter((t) => !existing.has(t));
 
     // hasUsers: login breaks if the runtime database has no accounts.
-    // A boolean only — never counts or account data.
+    // A boolean only — never user counts or account data.
     let hasUsers: boolean | null = null;
     if (tables.User) {
       const u = await db.$queryRawUnsafe<{ n: bigint }[]>(
@@ -64,6 +69,26 @@ export async function GET() {
       hasUsers = Number(u[0]?.n ?? 0) > 0;
     }
 
+    // records: how many rows each module table currently holds — lets the
+    // app owner confirm collected data is intact (e.g. after a database
+    // migration) from the same endpoint they already check. Aggregate
+    // counts only, never row content. Tables are from the fixed `required`
+    // list above, so the identifiers can not be user input.
+    const records: Record<string, number> = {};
+    let totalRecords = 0;
+    for (const t of required) {
+      let n = 0;
+      if (existing.has(t)) {
+        const c = await db.$queryRawUnsafe<{ n: bigint }[]>(
+          `SELECT COUNT(*) as n FROM "${t}"`
+        );
+        n = Number(c[0]?.n ?? 0);
+      }
+      records[t] = n;
+      totalRecords += n;
+    }
+    records.total = totalRecords;
+
     return NextResponse.json({
       status: missing.length === 0 ? 'ok' : 'degraded',
       database: 'ok',
@@ -71,6 +96,7 @@ export async function GET() {
       tables,
       missingTables: missing,
       hasUsers,
+      records,
       hint:
         missing.length === 0
           ? 'All module tables present.'
