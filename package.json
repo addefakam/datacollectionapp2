@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "prisma db push --accept-data-loss && next build",
-    "vercel-build": "prisma db push --accept-data-loss && prisma generate && next build",
+    "build": "npm run db:push:deploy && next build",
+    "vercel-build": "npm run db:push:deploy && prisma generate && next build",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "postinstall": "prisma generate",
     "db:push": "prisma db push --accept-data-loss",
+    "db:push:deploy": "DATABASE_URL=file:../db/custom.db prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset"
