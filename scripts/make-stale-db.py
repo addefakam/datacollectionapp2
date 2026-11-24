@@ -5,6 +5,23 @@ tables (SmallEnterprise, Goal, Charity, SubCity...) absent — mirroring the
 hypothesised deployed runtime database."""
 import os
 import sqlite3
+import sys
+
+# Use the REAL admin password hash from the preview database so the sim's
+# login flow behaves exactly like production (a placeholder hash would make
+# credentials.login fail and invalidate the authenticated sweep).
+real_hash = None
+try:
+    rc = sqlite3.connect("/home/z/my-project/db/custom.db")
+    row = rc.execute("SELECT password FROM User WHERE username='admin'").fetchone()
+    rc.close()
+    if row and row[0]:
+        real_hash = row[0]
+except Exception:
+    pass
+admin_hash = real_hash or "$2b$10$placeholderhashvalue0000000000000000000000000000"
+if not real_hash:
+    print("WARNING: no real admin hash available; login will fail", file=sys.stderr)
 
 ROOT = "/tmp/stale-sim"
 os.makedirs(f"{ROOT}/db", exist_ok=True)
@@ -13,7 +30,7 @@ if os.path.exists(dbp):
     os.remove(dbp)
 
 con = sqlite3.connect(dbp)
-con.executescript("""
+con.executescript(f"""
 CREATE TABLE User (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE,
@@ -44,7 +61,7 @@ CREATE TABLE GuestHouse (
   surveyorName TEXT,
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-INSERT INTO User VALUES ('u1','admin','$2b$10$placeholderhashvalue0000000000000000000000000000','Administrator','ADMIN',NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO User VALUES ('u1','admin','{admin_hash}','Administrator','ADMIN',NULL,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 INSERT INTO GuestHouse (id,guestHouseName,organizationName,subCity,area,specificAddress,numberOfRooms,licenseType,licenseLevel,serviceRating,hasRestaurant,hasParking,hasHotWater)
  VALUES ('gh1','OLD TOWN LODGE','Old Town','Dukam','Odaa Nabee','main st',12,'Hotel','Level 1',4,1,0,1);
 """)

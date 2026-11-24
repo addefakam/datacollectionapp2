@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "npm run db:push:deploy && python3 scripts/generate-runtime-schema.py && next build",
+    "build": "npm run db:push:deploy && (python3 scripts/generate-runtime-schema.py || bun scripts/generate-runtime-schema-bun.mjs) && next build",
     "vercel-build": "npm run db:push:deploy && prisma generate && next build",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",

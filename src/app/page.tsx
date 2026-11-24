@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,10 +55,39 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('survey');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { isOnline, pendingCount, isSyncing, syncPendingSurveys, saveOffline } = useOfflineSync();
+  const { toast } = useToast();
 
   const handleSurveySubmit = () => {
     setRefreshTrigger((t) => t + 1);
   };
+
+  /** Manual "Sync now" — always reports the outcome so a failing server is
+   * never mistaken for "still offline" (the queue badge alone is ambiguous). */
+  const runManualSync = useCallback(() => {
+    syncPendingSurveys(true).then(({ synced, errors }) => {
+      if (synced > 0 && errors === 0) {
+        toast({
+          title: 'Synced / Dhiheesse',
+          description: `${synced} record${synced > 1 ? 's' : ''} saved to the database.`,
+        });
+      } else if (synced === 0 && errors > 0) {
+        toast({
+          title: 'Sync failed / Dhiheenyun hin milkoofne',
+          description:
+            `${errors} record${errors > 1 ? 's' : ''} could not reach the server. ` +
+            'They are safe on this device and will keep retrying automatically.',
+          variant: 'destructive',
+        });
+      } else if (synced > 0 && errors > 0) {
+        toast({
+          title: 'Partially synced',
+          description: `${synced} synced, ${errors} still waiting — retrying automatically.`,
+          variant: 'destructive',
+        });
+      }
+      setRefreshTrigger((t) => t + 1);
+    });
+  }, [syncPendingSurveys, toast]);
 
   if (status === 'loading') {
     return (
@@ -86,7 +116,7 @@ export default function Home() {
         isOnline={isOnline}
         pendingCount={pendingCount}
         isSyncing={isSyncing}
-        onSync={() => syncPendingSurveys(true).then(() => setRefreshTrigger((t) => t + 1))}
+        onSync={runManualSync}
       />
 
       {/* Main column */}
@@ -114,7 +144,7 @@ export default function Home() {
                   variant="outline"
                   size="sm"
                   className="relative h-8 border-amber-400 px-2 text-amber-700 hover:bg-amber-50"
-                  onClick={() => syncPendingSurveys(true).then(() => setRefreshTrigger((t) => t + 1))}
+                  onClick={runManualSync}
                   disabled={isSyncing}
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
