@@ -140,12 +140,23 @@ interface SidebarNavProps {
   isAdmin: boolean;
 }
 
-/** Vertical list of ALL management pages — collapsible groups, expanded by default.
- *  Styled for the light porcelain sidebar surface. */
+/** Vertical list of ALL management pages — collapsible groups, folded at load.
+ *  Only the group holding the active tab starts open; navigating into another
+ *  module expands that group automatically. Styled for the light porcelain sidebar. */
 export function SidebarNav({ activeTab, onSelect, isAdmin }: SidebarNavProps) {
   const groups = React.useMemo(() => visibleGroups(isAdmin), [isAdmin]);
-  const [openGroups, setOpenGroups] = React.useState<string[]>(() => groups.map((g) => g.key));
   const activeGroupKey = groups.find((g) => g.items.some((i) => i.tab === activeTab))?.key;
+  // Start folded: only the active module's group is open at load time.
+  const [openGroups, setOpenGroups] = React.useState<string[]>(() =>
+    activeGroupKey ? [activeGroupKey] : []
+  );
+
+  // When navigation lands on a tab inside a folded group, unfold that group.
+  // Runs only when the active group changes, so manual collapsing still sticks.
+  React.useEffect(() => {
+    if (!activeGroupKey) return;
+    setOpenGroups((prev) => (prev.includes(activeGroupKey) ? prev : [...prev, activeGroupKey]));
+  }, [activeGroupKey]);
 
   return (
     <Accordion type="multiple" value={openGroups} onValueChange={setOpenGroups} className="w-full">
