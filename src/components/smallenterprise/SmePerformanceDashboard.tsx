@@ -5,10 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -276,11 +273,6 @@ export default function SmePerformanceDashboard() {
   }
 
   const isCityOverview = data.scope.level === 'city';
-  const statusChartData = (Object.keys(data.totals.byStatus) as SmeStatus[]).map((s) => ({
-    name: SME_STATUS_META[s].label,
-    value: data.totals.byStatus[s],
-    color: SME_STATUS_META[s].color,
-  }));
   const targetChartData = data.rows.map((r) => ({
     label: r.label,
     Target: r.target,
@@ -524,7 +516,7 @@ export default function SmePerformanceDashboard() {
         <>
           {/* ============ Charts ============ */}
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="card-lift rounded-2xl border-teal-100">
+            <Card className="card-lift rounded-2xl border-teal-100 lg:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Target vs Registered</CardTitle>
                 <CardDescription>
@@ -571,26 +563,6 @@ export default function SmePerformanceDashboard() {
                     onClose={() => setChartRow(null)}
                   />
                 )}
-              </CardContent>
-            </Card>
-
-            <Card className="card-lift rounded-2xl border-teal-100">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Overall Establishment Pipeline</CardTitle>
-                <CardDescription>Current standing of all registered SMEs in scope</CardDescription>
-              </CardHeader>
-              <CardContent className="flex h-64 items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={statusChartData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={82} paddingAngle={3} strokeWidth={0}>
-                      {statusChartData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => [`${v} enterprises`, 'Count']} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
               </CardContent>
             </Card>
 
