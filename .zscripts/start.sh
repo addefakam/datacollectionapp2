@@ -88,7 +88,14 @@ if [ -f "./next-service-dist/server.js" ]; then
     else
         echo "🗄️  当前使用外部指定数据库: $DATABASE_URL"
     fi
-    
+
+    # 数据库结构自愈：把运行时数据库同步到构建期 schema 快照（幂等）。
+    # 外部注入的 DATABASE_URL 可能指向缺少新模块表的旧库，导致所有模块 API
+    # 返回 500（前端表现为 Failed to load data / 调查卡在 waiting for sync）。
+    # 此步骤只建缺失的表/列/索引并填充空引用表，绝不改动用户数据；失败不阻塞启动。
+    echo "🗄️  同步运行时数据库结构（幂等，失败不阻塞）..."
+    bun "$PWD/../db/runtime-migrate.mjs" || echo "⚠️  运行时数据库迁移未完成（忽略，继续启动）"
+
     # 后台启动 Next.js
     bun server.js &
     NEXT_PID=$!

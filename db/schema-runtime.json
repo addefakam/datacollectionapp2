@@ -1,0 +1,1804 @@
+{
+ "generatedFrom": "db/custom.db (schema snapshot for runtime self-heal)",
+ "tables": {
+  "AgricultureCenter": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"AgricultureCenter\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"farmName\" TEXT NOT NULL,\n    \"farmType\" TEXT NOT NULL,\n    \"ownershipType\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"licenseNumber\" TEXT,\n    \"landSizeHectares\" REAL NOT NULL DEFAULT 0,\n    \"workerCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleWorkers\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleWorkers\" INTEGER NOT NULL DEFAULT 0,\n    \"hasIrrigation\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasGreenhouse\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasMachinery\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasStorage\" BOOLEAN NOT NULL DEFAULT false,\n    \"contactName\" TEXT NOT NULL,\n    \"contactPhone\" TEXT NOT NULL,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "farmName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "farmType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "ownershipType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "specificAddress",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseNumber",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "landSizeHectares",
+     "type": "REAL",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "workerCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "maleWorkers",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "femaleWorkers",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "hasIrrigation",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasGreenhouse",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasMachinery",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasStorage",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "contactName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorId",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "AppSetting": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"AppSetting\" (\n    \"key\" TEXT NOT NULL PRIMARY KEY,\n    \"value\" TEXT NOT NULL,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "key",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "value",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "Attendance": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"Attendance\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"meetingId\" TEXT NOT NULL,\n    \"guestHouseId\" TEXT NOT NULL,\n    \"collectorId\" TEXT NOT NULL,\n    \"status\" TEXT NOT NULL DEFAULT 'ABSENT',\n    \"markedAt\" DATETIME NOT NULL,\n    CONSTRAINT \"Attendance_meetingId_fkey\" FOREIGN KEY (\"meetingId\") REFERENCES \"Meeting\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE,\n    CONSTRAINT \"Attendance_guestHouseId_fkey\" FOREIGN KEY (\"guestHouseId\") REFERENCES \"GuestHouse\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE,\n    CONSTRAINT \"Attendance_collectorId_fkey\" FOREIGN KEY (\"collectorId\") REFERENCES \"User\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "meetingId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "guestHouseId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "collectorId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "status",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'ABSENT'",
+     "pk": false
+    },
+    {
+     "name": "markedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "CharityInitiative": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"CharityInitiative\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"organizationName\" TEXT NOT NULL,\n    \"organizationType\" TEXT NOT NULL,\n    \"charityType\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"registrationNumber\" TEXT,\n    \"beneficiaryCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleBeneficiaries\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleBeneficiaries\" INTEGER NOT NULL DEFAULT 0,\n    \"volunteerCount\" INTEGER NOT NULL DEFAULT 0,\n    \"annualBudget\" REAL,\n    \"hasLegalRegistration\" BOOLEAN NOT NULL DEFAULT false,\n    \"contactName\" TEXT NOT NULL,\n    \"contactPhone\" TEXT NOT NULL,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "organizationName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "organizationType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "charityType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "specificAddress",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "registrationNumber",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "beneficiaryCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "maleBeneficiaries",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "femaleBeneficiaries",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "volunteerCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "annualBudget",
+     "type": "REAL",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "hasLegalRegistration",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "contactName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorId",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "CollectorAssignment": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"CollectorAssignment\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"collectorId\" TEXT NOT NULL,\n    \"meetingId\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    CONSTRAINT \"CollectorAssignment_collectorId_fkey\" FOREIGN KEY (\"collectorId\") REFERENCES \"User\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE,\n    CONSTRAINT \"CollectorAssignment_meetingId_fkey\" FOREIGN KEY (\"meetingId\") REFERENCES \"Meeting\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "collectorId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "meetingId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    }
+   ]
+  },
+  "EducationCenter": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"EducationCenter\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"institutionName\" TEXT NOT NULL,\n    \"institutionType\" TEXT NOT NULL,\n    \"ownershipType\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"licenseNumber\" TEXT,\n    \"studentCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleStudents\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleStudents\" INTEGER NOT NULL DEFAULT 0,\n    \"teacherCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleTeachers\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleTeachers\" INTEGER NOT NULL DEFAULT 0,\n    \"classroomCount\" INTEGER NOT NULL DEFAULT 0,\n    \"hasLibrary\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasLaboratory\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasComputerLab\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasFeedingProgram\" BOOLEAN NOT NULL DEFAULT false,\n    \"contactName\" TEXT NOT NULL,\n    \"contactPhone\" TEXT NOT NULL,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "institutionName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "institutionType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "ownershipType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "specificAddress",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseNumber",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "studentCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "maleStudents",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "femaleStudents",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "teacherCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "maleTeachers",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "femaleTeachers",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "classroomCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "hasLibrary",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasLaboratory",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasComputerLab",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasFeedingProgram",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "contactName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorId",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "Goal": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"Goal\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"module\" TEXT NOT NULL DEFAULT 'small-enterprise',\n    \"metric\" TEXT NOT NULL,\n    \"periodType\" TEXT NOT NULL,\n    \"periodStart\" DATETIME NOT NULL,\n    \"periodEnd\" DATETIME NOT NULL,\n    \"targetValue\" REAL NOT NULL,\n    \"owner\" TEXT,\n    \"status\" TEXT NOT NULL DEFAULT 'ACTIVE',\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "module",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'small-enterprise'",
+     "pk": false
+    },
+    {
+     "name": "metric",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "periodType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "periodStart",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "periodEnd",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "targetValue",
+     "type": "REAL",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "owner",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "status",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'ACTIVE'",
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "GuestHouse": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"GuestHouse\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"guestHouseName\" TEXT NOT NULL,\n    \"organizationName\" TEXT,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"numberOfRooms\" INTEGER NOT NULL,\n    \"licenseType\" TEXT NOT NULL,\n    \"licenseLevel\" TEXT NOT NULL,\n    \"licenseNumber\" TEXT,\n    \"serviceRating\" INTEGER NOT NULL,\n    \"contactPhone\" TEXT,\n    \"contactName\" TEXT,\n    \"ownerName\" TEXT,\n    \"hasRestaurant\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasParking\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasWiFi\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasHotWater\" BOOLEAN NOT NULL DEFAULT false,\n    \"additionalServices\" TEXT,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n, \"contactName2\" TEXT, \"contactPhone2\" TEXT, \"signature\" TEXT)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "guestHouseName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "organizationName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "specificAddress",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "numberOfRooms",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseLevel",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseNumber",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "serviceRating",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "ownerName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "hasRestaurant",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasParking",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasWiFi",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasHotWater",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "additionalServices",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorId",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactName2",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone2",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "signature",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "HealthCenter": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"HealthCenter\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"facilityName\" TEXT NOT NULL,\n    \"facilityType\" TEXT NOT NULL,\n    \"ownershipType\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"licenseNumber\" TEXT,\n    \"staffCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleStaff\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleStaff\" INTEGER NOT NULL DEFAULT 0,\n    \"bedCount\" INTEGER NOT NULL DEFAULT 0,\n    \"hasLaboratory\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasPharmacy\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasMaternity\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasEmergency\" BOOLEAN NOT NULL DEFAULT false,\n    \"contactName\" TEXT NOT NULL,\n    \"contactPhone\" TEXT NOT NULL,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "facilityName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "facilityType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "ownershipType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "specificAddress",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseNumber",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "staffCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "maleStaff",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "femaleStaff",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "bedCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "hasLaboratory",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasPharmacy",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasMaternity",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasEmergency",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "contactName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorId",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "Industry": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"Industry\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"establishmentName\" TEXT NOT NULL,\n    \"sector\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"licenseNumber\" TEXT,\n    \"ownershipType\" TEXT NOT NULL,\n    \"hasEia\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasEmp\" BOOLEAN NOT NULL DEFAULT false,\n    \"employeeCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleEmployees\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleEmployees\" INTEGER NOT NULL DEFAULT 0,\n    \"startupCapital\" REAL,\n    \"contactName\" TEXT NOT NULL,\n    \"contactPhone\" TEXT NOT NULL,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "establishmentName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "sector",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "specificAddress",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseNumber",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "ownershipType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "hasEia",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasEmp",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "employeeCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "maleEmployees",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "femaleEmployees",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "startupCapital",
+     "type": "REAL",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorId",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "IndustryAttendance": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"IndustryAttendance\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"meetingId\" TEXT NOT NULL,\n    \"industryId\" TEXT NOT NULL,\n    \"collectorId\" TEXT NOT NULL,\n    \"status\" TEXT NOT NULL DEFAULT 'ABSENT',\n    \"markedAt\" DATETIME NOT NULL,\n    CONSTRAINT \"IndustryAttendance_meetingId_fkey\" FOREIGN KEY (\"meetingId\") REFERENCES \"Meeting\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE,\n    CONSTRAINT \"IndustryAttendance_industryId_fkey\" FOREIGN KEY (\"industryId\") REFERENCES \"Industry\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE,\n    CONSTRAINT \"IndustryAttendance_collectorId_fkey\" FOREIGN KEY (\"collectorId\") REFERENCES \"User\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "meetingId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "industryId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "collectorId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "status",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'ABSENT'",
+     "pk": false
+    },
+    {
+     "name": "markedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "IndustryCategory": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"IndustryCategory\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"name\" TEXT NOT NULL,\n    \"sortOrder\" INTEGER NOT NULL DEFAULT 0,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "name",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "sortOrder",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "Meeting": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"Meeting\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"title\" TEXT NOT NULL,\n    \"date\" DATETIME NOT NULL,\n    \"status\" TEXT NOT NULL DEFAULT 'ACTIVE',\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "title",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "date",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "status",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'ACTIVE'",
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "SmallEnterprise": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"SmallEnterprise\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"enterpriseName\" TEXT NOT NULL,\n    \"enterpriseType\" TEXT NOT NULL,\n    \"ownershipType\" TEXT NOT NULL,\n    \"subCity\" TEXT NOT NULL,\n    \"area\" TEXT NOT NULL,\n    \"specificAddress\" TEXT NOT NULL,\n    \"licenseNumber\" TEXT,\n    \"employeeCount\" INTEGER NOT NULL DEFAULT 0,\n    \"maleEmployees\" INTEGER NOT NULL DEFAULT 0,\n    \"femaleEmployees\" INTEGER NOT NULL DEFAULT 0,\n    \"startupCapital\" REAL,\n    \"hasPremises\" BOOLEAN NOT NULL DEFAULT false,\n    \"hasTraining\" BOOLEAN NOT NULL DEFAULT false,\n    \"contactName\" TEXT NOT NULL,\n    \"contactPhone\" TEXT NOT NULL,\n    \"surveyorName\" TEXT,\n    \"surveyorId\" TEXT,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "enterpriseName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "enterpriseType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "ownershipType",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "subCity",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "area",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "specificAddress",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "licenseNumber",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "employeeCount",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "maleEmployees",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "femaleEmployees",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "startupCapital",
+     "type": "REAL",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "hasPremises",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "hasTraining",
+     "type": "BOOLEAN",
+     "notnull": true,
+     "dflt": "false",
+     "pk": false
+    },
+    {
+     "name": "contactName",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "contactPhone",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorName",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "surveyorId",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "SubCity": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"SubCity\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"name\" TEXT NOT NULL,\n    \"sortOrder\" INTEGER NOT NULL DEFAULT 0,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "name",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "sortOrder",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  },
+  "SubCityArea": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"SubCityArea\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"subCityId\" TEXT NOT NULL,\n    \"name\" TEXT NOT NULL,\n    \"sortOrder\" INTEGER NOT NULL DEFAULT 0,\n    CONSTRAINT \"SubCityArea_subCityId_fkey\" FOREIGN KEY (\"subCityId\") REFERENCES \"SubCity\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE\n)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "subCityId",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "name",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "sortOrder",
+     "type": "INTEGER",
+     "notnull": true,
+     "dflt": "0",
+     "pk": false
+    }
+   ]
+  },
+  "User": {
+   "createSql": "CREATE TABLE IF NOT EXISTS \"User\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"username\" TEXT NOT NULL,\n    \"password\" TEXT NOT NULL,\n    \"name\" TEXT NOT NULL,\n    \"role\" TEXT NOT NULL DEFAULT 'COLLECTOR',\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL\n, \"assignedArea\" TEXT, \"assignedSubCity\" TEXT)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": true
+    },
+    {
+     "name": "username",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "password",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "name",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "role",
+     "type": "TEXT",
+     "notnull": true,
+     "dflt": "'COLLECTOR'",
+     "pk": false
+    },
+    {
+     "name": "createdAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": "CURRENT_TIMESTAMP",
+     "pk": false
+    },
+    {
+     "name": "updatedAt",
+     "type": "DATETIME",
+     "notnull": true,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "assignedArea",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    },
+    {
+     "name": "assignedSubCity",
+     "type": "TEXT",
+     "notnull": false,
+     "dflt": null,
+     "pk": false
+    }
+   ]
+  }
+ },
+ "indexes": [
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"Attendance_meetingId_guestHouseId_key\" ON \"Attendance\"(\"meetingId\", \"guestHouseId\")",
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"CollectorAssignment_collectorId_meetingId_subCity_area_key\" ON \"CollectorAssignment\"(\"collectorId\", \"meetingId\", \"subCity\", \"area\")",
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"IndustryAttendance_meetingId_industryId_key\" ON \"IndustryAttendance\"(\"meetingId\", \"industryId\")",
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"IndustryCategory_name_key\" ON \"IndustryCategory\"(\"name\")",
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"SubCityArea_subCityId_name_key\" ON \"SubCityArea\"(\"subCityId\", \"name\")",
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"SubCity_name_key\" ON \"SubCity\"(\"name\")",
+  "CREATE UNIQUE INDEX IF NOT EXISTS \"User_username_key\" ON \"User\"(\"username\")"
+ ],
+ "seeds": {
+  "SubCity": [
+   {
+    "id": "cmwoul11m0000purva8qia7tq",
+    "name": "Dukam",
+    "sortOrder": 0,
+    "createdAt": 1795171202698,
+    "updatedAt": 1795171202698
+   },
+   {
+    "id": "cmwoul11n0005purvc8p08779",
+    "name": "Chelaleka",
+    "sortOrder": 1,
+    "createdAt": 1795171202700,
+    "updatedAt": 1795171202700
+   },
+   {
+    "id": "cmwoul11p0009purvmw6sho2q",
+    "name": "Debaayyuu",
+    "sortOrder": 2,
+    "createdAt": 1795171202701,
+    "updatedAt": 1795171202701
+   }
+  ],
+  "SubCityArea": [
+   {
+    "id": "cmwoul11m0001purvtj00cf18",
+    "subCityId": "cmwoul11m0000purva8qia7tq",
+    "name": "Odaa Nabee",
+    "sortOrder": 0
+   },
+   {
+    "id": "cmwoul11m0002purvuq38k88m",
+    "subCityId": "cmwoul11m0000purva8qia7tq",
+    "name": "Xaddachaa",
+    "sortOrder": 1
+   },
+   {
+    "id": "cmwoul11m0003purvs9wmmfcr",
+    "subCityId": "cmwoul11m0000purva8qia7tq",
+    "name": "Malkaa",
+    "sortOrder": 2
+   },
+   {
+    "id": "cmwoul11m0004purv1ft9vsnl",
+    "subCityId": "cmwoul11m0000purva8qia7tq",
+    "name": "Abbuu Seeraa",
+    "sortOrder": 3
+   },
+   {
+    "id": "cmwoul11n0006purvxraeqx7v",
+    "subCityId": "cmwoul11n0005purvc8p08779",
+    "name": "Erere",
+    "sortOrder": 0
+   },
+   {
+    "id": "cmwoul11n0007purvz9tsjkag",
+    "subCityId": "cmwoul11n0005purvc8p08779",
+    "name": "Arsadee",
+    "sortOrder": 1
+   },
+   {
+    "id": "cmwoul11n0008purvz81rr9oy",
+    "subCityId": "cmwoul11n0005purvc8p08779",
+    "name": "Kilolee",
+    "sortOrder": 2
+   },
+   {
+    "id": "cmwoul11p000apurvmzecqgxw",
+    "subCityId": "cmwoul11p0009purvmw6sho2q",
+    "name": "Dhakaa Boora",
+    "sortOrder": 0
+   },
+   {
+    "id": "cmwoul11p000bpurvfit6unbh",
+    "subCityId": "cmwoul11p0009purvmw6sho2q",
+    "name": "Dirree",
+    "sortOrder": 1
+   },
+   {
+    "id": "cmwoul11p000cpurvwap75vue",
+    "subCityId": "cmwoul11p0009purvmw6sho2q",
+    "name": "Horaa",
+    "sortOrder": 2
+   },
+   {
+    "id": "cmwoul11p000dpurvej7ksov7",
+    "subCityId": "cmwoul11p0009purvmw6sho2q",
+    "name": "Biiftuu",
+    "sortOrder": 3
+   }
+  ],
+  "IndustryCategory": [
+   {
+    "id": "cmwoul11r000epurvk1an0mz1",
+    "name": "Food & Beverage Processing",
+    "sortOrder": 0,
+    "createdAt": 1795171202703,
+    "updatedAt": 1795171202703
+   },
+   {
+    "id": "cmwoul11s000fpurvwe129kti",
+    "name": "Agro-Processing",
+    "sortOrder": 1,
+    "createdAt": 1795171202704,
+    "updatedAt": 1795171202704
+   },
+   {
+    "id": "cmwoul11t000gpurvemetbb1u",
+    "name": "Textile & Garment",
+    "sortOrder": 2,
+    "createdAt": 1795171202705,
+    "updatedAt": 1795171202705
+   },
+   {
+    "id": "cmwoul121000hpurvc8wlmrhn",
+    "name": "Leather & Leather Products",
+    "sortOrder": 3,
+    "createdAt": 1795171202714,
+    "updatedAt": 1795171202714
+   },
+   {
+    "id": "cmwoul122000ipurv4s30q3di",
+    "name": "Wood & Furniture",
+    "sortOrder": 4,
+    "createdAt": 1795171202714,
+    "updatedAt": 1795171202714
+   },
+   {
+    "id": "cmwoul123000jpurvc1qvqt4e",
+    "name": "Metal Works & Fabrication",
+    "sortOrder": 5,
+    "createdAt": 1795171202715,
+    "updatedAt": 1795171202715
+   },
+   {
+    "id": "cmwoul124000kpurvmknhy5ix",
+    "name": "Construction Materials",
+    "sortOrder": 6,
+    "createdAt": 1795171202716,
+    "updatedAt": 1795171202716
+   },
+   {
+    "id": "cmwoul125000lpurv2xs79g55",
+    "name": "Chemicals & Plastics",
+    "sortOrder": 7,
+    "createdAt": 1795171202717,
+    "updatedAt": 1795171202717
+   },
+   {
+    "id": "cmwoul126000mpurv0pyb38cd",
+    "name": "Bottling & Water",
+    "sortOrder": 8,
+    "createdAt": 1795171202718,
+    "updatedAt": 1795171202718
+   },
+   {
+    "id": "cmwoul126000npurvcxoubzj3",
+    "name": "Flour Mill & Grain Processing",
+    "sortOrder": 9,
+    "createdAt": 1795171202719,
+    "updatedAt": 1795171202719
+   },
+   {
+    "id": "cmwoul127000opurv7xic6rfj",
+    "name": "Garage & Auto Repair",
+    "sortOrder": 10,
+    "createdAt": 1795171202720,
+    "updatedAt": 1795171202720
+   },
+   {
+    "id": "cmwoul128000ppurv3lihd6lr",
+    "name": "Mining & Quarrying",
+    "sortOrder": 11,
+    "createdAt": 1795171202720,
+    "updatedAt": 1795171202720
+   },
+   {
+    "id": "cmwoul129000qpurv3svpjzyz",
+    "name": "Energy & Utilities",
+    "sortOrder": 12,
+    "createdAt": 1795171202721,
+    "updatedAt": 1795171202721
+   },
+   {
+    "id": "cmwoul12a000rpurvl4xptzpq",
+    "name": "Other Manufacturing",
+    "sortOrder": 13,
+    "createdAt": 1795171202722,
+    "updatedAt": 1795171202722
+   }
+  ]
+ }
+}
