@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 
 /**
  * Goals & Targets engine for the Dhibayyuu sub-city initiatives
- * (Small Enterprise / MSE and Bussa Goonofa / Charity).
+ * (Small Enterprise / MSE).
  *
  * Officials set weekly / monthly / yearly targets on initiative metrics;
  * progress is computed live from the recorded survey data, with
@@ -14,12 +14,11 @@ import { db } from '@/lib/db';
 // the recorded data within a period. Add new initiatives/metrics here.
 // ---------------------------------------------------------------------------
 
-export type GoalModule = 'small-enterprise' | 'bussa-goonofa';
+export type GoalModule = 'small-enterprise';
 
 /** Initiative registry — drives the Goals UI and API validation. */
 export const GOAL_MODULES: { key: GoalModule; label: string; heroLabel: string }[] = [
   { key: 'small-enterprise', label: 'Small Enterprise', heroLabel: 'Small Enterprise Initiative · Dhibayyuu Sub-City' },
-  { key: 'bussa-goonofa', label: 'Bussa Goonofa / Charity', heroLabel: 'Bussa Goonofa (Charity) Initiative · Dhibayyuu Sub-City' },
 ];
 
 export function goalModuleLabel(module: string): string {
@@ -32,7 +31,7 @@ export interface MetricDef {
   module: GoalModule;
   label: string;
   shortLabel: string;
-  unit: 'enterprises' | 'jobs' | 'ETB' | 'charities' | 'people';
+  unit: 'enterprises' | 'jobs' | 'ETB';
   description: string;
   /** Sum of the actual value produced by records created within [start, end]. */
   compute: (start: Date, end: Date) => Promise<number>;
@@ -88,57 +87,6 @@ export const GOAL_METRICS: MetricDef[] = [
       db.smallEnterprise
         .aggregate({ _sum: { startupCapital: true }, where: { createdAt: { gte: start, lte: end } } })
         .then((r) => r._sum.startupCapital ?? 0),
-  },
-
-  // --- Bussa Goonofa / Charity initiative ---
-  {
-    module: 'bussa-goonofa',
-    key: 'charities',
-    label: 'New Charities Registered',
-    shortLabel: 'Charities',
-    unit: 'charities',
-    description: 'Count of charity organization records submitted in the period',
-    compute: (start, end) =>
-      db.charityInitiative.count({ where: { createdAt: { gte: start, lte: end } } }),
-  },
-  {
-    module: 'bussa-goonofa',
-    key: 'beneficiaries',
-    label: 'Beneficiaries Reached',
-    shortLabel: 'Beneficiaries',
-    unit: 'people',
-    description: 'Total male + female beneficiaries of charities registered in the period',
-    compute: (start, end) =>
-      db.charityInitiative
-        .aggregate({
-          _sum: { maleBeneficiaries: true, femaleBeneficiaries: true },
-          where: { createdAt: { gte: start, lte: end } },
-        })
-        .then((r) => (r._sum.maleBeneficiaries ?? 0) + (r._sum.femaleBeneficiaries ?? 0)),
-  },
-  {
-    module: 'bussa-goonofa',
-    key: 'femaleBeneficiaries',
-    label: 'Women Beneficiaries Reached',
-    shortLabel: 'Women reached',
-    unit: 'people',
-    description: 'Female beneficiaries of charities registered in the period',
-    compute: (start, end) =>
-      db.charityInitiative
-        .aggregate({ _sum: { femaleBeneficiaries: true }, where: { createdAt: { gte: start, lte: end } } })
-        .then((r) => r._sum.femaleBeneficiaries ?? 0),
-  },
-  {
-    module: 'bussa-goonofa',
-    key: 'budget',
-    label: 'Charity Budget Mobilized',
-    shortLabel: 'Budget',
-    unit: 'ETB',
-    description: 'Sum of annual budgets (ETB) of charities registered in the period',
-    compute: (start, end) =>
-      db.charityInitiative
-        .aggregate({ _sum: { annualBudget: true }, where: { createdAt: { gte: start, lte: end } } })
-        .then((r) => r._sum.annualBudget ?? 0),
   },
 ];
 

@@ -7,7 +7,6 @@ import {
   CalendarDays,
   Coins,
   Gauge,
-  HeartHandshake,
   Loader2,
   Pencil,
   Plus,
@@ -85,7 +84,7 @@ interface Goal {
 /** Per-initiative metric metadata (mirrors src/lib/goals.ts GOAL_METRICS). */
 export interface MetricMeta {
   label: string;
-  unit: 'enterprises' | 'jobs' | 'ETB' | 'charities' | 'people';
+  unit: 'enterprises' | 'jobs' | 'ETB';
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -107,18 +106,6 @@ const MODULE_METRICS: Record<string, InitiativeGoals> = {
       employees: { label: 'Jobs Created', unit: 'jobs', icon: Users },
       femaleEmployees: { label: 'Jobs Created for Women', unit: 'jobs', icon: UserRound },
       capital: { label: 'Start-up Capital Mobilized', unit: 'ETB', icon: Coins },
-    },
-  },
-  'bussa-goonofa': {
-    label: 'Bussa Goonofa / Charity',
-    heroLabel: 'Bussa Goonofa (Charity) Initiative · Dhibayyuu Sub-City',
-    emptyText:
-      'Officials can set weekly, monthly or yearly targets for the Bussa Goonofa (Charity) initiative — progress against each target is then tracked automatically from the survey data.',
-    metrics: {
-      charities: { label: 'New Charities Registered', unit: 'charities', icon: HeartHandshake },
-      beneficiaries: { label: 'Beneficiaries Reached', unit: 'people', icon: Users },
-      femaleBeneficiaries: { label: 'Women Beneficiaries Reached', unit: 'people', icon: UserRound },
-      budget: { label: 'Charity Budget Mobilized', unit: 'ETB', icon: Coins },
     },
   },
 };
@@ -179,9 +166,7 @@ function formatValue(unit: string, v: number): string {
   const n = Math.round(v);
   const word =
     unit === 'enterprises' ? (n === 1 ? 'enterprise' : 'enterprises')
-    : unit === 'charities' ? (n === 1 ? 'charity' : 'charities')
     : unit === 'jobs' ? (n === 1 ? 'job' : 'jobs')
-    : unit === 'people' ? (n === 1 ? 'person' : 'people')
     : unit;
   return `${n.toLocaleString()} ${word}`;
 }

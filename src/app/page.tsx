@@ -39,9 +39,6 @@ import SmallEnterpriseSurveyForm from '@/components/smallenterprise/SmallEnterpr
 import SmallEnterpriseList from '@/components/smallenterprise/SmallEnterpriseList';
 import SmallEnterpriseStats from '@/components/smallenterprise/SmallEnterpriseStats';
 import GoalManager from '@/components/smallenterprise/GoalManager';
-import CharitySurveyForm from '@/components/charity/CharitySurveyForm';
-import CharityList from '@/components/charity/CharityList';
-import CharityStats from '@/components/charity/CharityStats';
 import CampaignGoalForm from '@/components/charity/campaign/CampaignGoalForm';
 import CampaignAchievementForm from '@/components/charity/campaign/CampaignAchievementForm';
 import CampaignReport from '@/components/charity/campaign/CampaignReport';
@@ -350,16 +347,7 @@ export default function Home() {
             </TabsContent>
           )}
 
-          {/* ============ Bussa Goonofa / Charity initiative ============ */}
-          <TabsContent value="charitySurvey" className="mt-2 sm:mt-3">
-            <CharitySurveyForm
-              onSubmit={handleSurveySubmit}
-              surveyorName={userName || ''}
-              surveyorId={userId || ''}
-              isOnline={isOnline}
-              onOfflineSave={(data) => saveOffline(data, 'charity')}
-            />
-          </TabsContent>
+          {/* ============ Bussa Goonofa / Charity initiative — donation campaign ============ */}
 
           {/* ============ Donation campaign: set goal & distribute (admin) ============ */}
           {isAdmin && (
@@ -377,25 +365,6 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="charityOfficeReport" className="mt-2 sm:mt-3">
               <CampaignReport refreshTrigger={refreshTrigger} />
-            </TabsContent>
-          )}
-
-          {isAdmin && (
-            <TabsContent value="charityData" className="mt-2 sm:mt-3">
-              <CharityList refreshTrigger={refreshTrigger} />
-            </TabsContent>
-          )}
-
-          {isAdmin && (
-            <TabsContent value="charityStats" className="mt-2 sm:mt-3">
-              <CharityStats />
-            </TabsContent>
-          )}
-
-          {/* ============ Goals & Targets for the Bussa Goonofa / Charity initiative (admin) ============ */}
-          {isAdmin && (
-            <TabsContent value="charityGoals" className="mt-2 sm:mt-3">
-              <GoalManager refreshTrigger={refreshTrigger} module="bussa-goonofa" />
             </TabsContent>
           )}
 

@@ -137,13 +137,9 @@ const NAV_GROUPS: NavGroup[] = [
     icon: HeartHandshake,
     section: 'initiatives',
     items: [
-      { tab: 'charitySurvey', label: 'Survey', icon: ClipboardList },
       { tab: 'charityCampaignSet', label: 'Set Goal & Distribute', icon: Target, adminOnly: true },
       { tab: 'charityAchievements', label: 'Record Achievement', icon: HandCoins },
       { tab: 'charityOfficeReport', label: 'Office Goal Report', icon: FileBarChart2, adminOnly: true },
-      { tab: 'charityData', label: 'Records', icon: Database, adminOnly: true },
-      { tab: 'charityStats', label: 'Stats', icon: BarChart3, adminOnly: true },
-      { tab: 'charityGoals', label: 'Goals', icon: Target, adminOnly: true },
     ],
   },
   {
