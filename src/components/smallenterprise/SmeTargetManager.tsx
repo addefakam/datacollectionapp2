@@ -103,6 +103,25 @@ const LEVEL_OPTIONS: { value: SmeTargetLevel; label: string; hint: string }[] = 
 
 const fmt = (n: number) => n.toLocaleString('en');
 
+/** Roll-up of a group of targets (city / sub-city / woreda) for the section band. */
+interface GroupAggregate {
+  target: number;
+  actual: number;
+  pct: number;
+  onTrack: number;
+  achieved: number;
+  behind: number;
+}
+
+function aggregateOf(list: SmeTarget[]): GroupAggregate {
+  const target = list.reduce((s, t) => s + t.targetValue, 0);
+  const actual = list.reduce((s, t) => s + t.progress.actual, 0);
+  const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
+  const achieved = list.filter((t) => t.progress.unitStatus === 'achieved').length;
+  const behind = list.filter((t) => t.progress.unitStatus === 'behind' || t.progress.unitStatus === 'missed').length;
+  return { target, actual, pct, achieved, behind, onTrack: list.length - achieved - behind };
+}
+
 export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerProps) {
   const { toast } = useToast();
   const { subCities, areasFor } = useSettings();
@@ -350,7 +369,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
         <CardContent className="space-y-4">
           {loading ? (
             <div className="space-y-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 w-full rounded-xl" />)}
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-44 w-full rounded-2xl" />)}
             </div>
           ) : targets.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -376,7 +395,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
 
               {grouped.city.length > 0 && (
                 <div className="space-y-2.5">
-                  <GroupHeading icon={<Target className="h-3.5 w-3.5 text-teal-700" />} label="City-wide targets" count={grouped.city.length} hint="the overall goal for the whole city" />
+                  <GroupHeading icon={<Target className="h-3.5 w-3.5 text-teal-700" />} label="City-wide targets" count={grouped.city.length} hint="the overall goal for the whole city" aggregate={grouped.city.length > 1 ? aggregateOf(grouped.city) : undefined} />
                   {grouped.city.map((t) => (
                     <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
                   ))}
@@ -384,7 +403,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
               )}
               {grouped.subCity.length > 0 && (
                 <div className="space-y-2.5">
-                  <GroupHeading icon={<MapPin className="h-3.5 w-3.5 text-blue-600" />} label="Sub-city targets" count={grouped.subCity.length} hint="shares distributed from the city target" />
+                  <GroupHeading icon={<MapPin className="h-3.5 w-3.5 text-blue-600" />} label="Sub-city targets" count={grouped.subCity.length} hint="shares distributed from the city target" aggregate={grouped.subCity.length > 1 ? aggregateOf(grouped.subCity) : undefined} />
                   {grouped.subCity.map((t) => (
                     <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
                   ))}
@@ -392,7 +411,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
               )}
               {grouped.woreda.length > 0 && (
                 <div className="space-y-2.5">
-                  <GroupHeading icon={<ChevronRight className="h-3.5 w-3.5 text-violet-600" />} label="Woreda targets" count={grouped.woreda.length} hint="assigned by sub-cities" />
+                  <GroupHeading icon={<ChevronRight className="h-3.5 w-3.5 text-violet-600" />} label="Woreda targets" count={grouped.woreda.length} hint="assigned by sub-cities" aggregate={grouped.woreda.length > 1 ? aggregateOf(grouped.woreda) : undefined} />
                   {grouped.woreda.map((t) => (
                     <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
                   ))}
@@ -616,109 +635,189 @@ function TargetCard({
 }) {
   const statusMeta = SME_UNIT_STATUS_META[t.progress.unitStatus];
   const canDistribute = t.level === 'CITY' || t.level === 'SUB_CITY';
+  const standing = t.progress.standing;
+
+  // Visual identity per administrative level (icon chip) …
+  const levelChip =
+    t.level === 'CITY'
+      ? { icon: <Target className="h-4 w-4 text-teal-700" />, chip: 'bg-teal-50' }
+      : t.level === 'SUB_CITY'
+        ? { icon: <MapPin className="h-4 w-4 text-blue-600" />, chip: 'bg-blue-50' }
+        : { icon: <ChevronRight className="h-4 w-4 text-violet-600" />, chip: 'bg-violet-50' };
+  // … and per live status (left accent + progress fill).
+  const accent =
+    t.progress.unitStatus === 'achieved' ? 'bg-emerald-500'
+      : t.progress.unitStatus === 'on_track' ? 'bg-teal-500'
+        : t.progress.unitStatus === 'behind' ? 'bg-red-400'
+          : t.progress.unitStatus === 'missed' ? 'bg-orange-400'
+            : t.progress.unitStatus === 'upcoming' ? 'bg-indigo-400'
+              : 'bg-slate-300';
+  const barFill =
+    t.progress.unitStatus === 'achieved' ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+      : t.progress.unitStatus === 'behind' || t.progress.unitStatus === 'missed' ? 'bg-gradient-to-r from-red-500 to-orange-400'
+        : t.progress.unitStatus === 'upcoming' ? 'bg-gradient-to-r from-indigo-500 to-indigo-400'
+          : 'bg-gradient-to-r from-teal-600 to-emerald-400';
+
+  const compositionTotal = standing.total ?? 0;
+  const STATUSES: SmeStatus[] = ['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'];
+
   return (
-    <div className="rounded-xl border border-teal-100 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge
-              variant="secondary"
-              className={cn(
-                'text-[10px]',
-                t.level === 'CITY' && 'bg-teal-100 text-teal-800',
-                t.level === 'SUB_CITY' && 'bg-blue-50 text-blue-700',
-                t.level === 'WOREDA' && 'bg-violet-50 text-violet-700'
-              )}
-            >
-              {t.level === 'CITY' ? 'City-wide' : t.level === 'SUB_CITY' ? 'Sub-city' : 'Woreda'}
-            </Badge>
-            <p className="truncate text-sm font-semibold text-teal-950">
-              {smeTargetScopeLabel(t.level, t.subCity, t.area)}
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1', accent)} />
+      <div className="space-y-3 p-4 pl-5">
+        {/* Scope header + actions */}
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', levelChip.chip)}>
+              {levelChip.icon}
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {smeTargetScopeLabel(t.level, t.subCity, t.area)}
+                </p>
+                <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5">
+                  <CalendarDays className="h-3 w-3 text-slate-400" />
+                  {t.periodLabel} · {t.periodType}
+                </span>
+                {t.createdByName && <span>set by {t.createdByName}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-row gap-1">
+            {canDistribute && (
+              <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => onDistribute(t)}>
+                <Share2 className="mr-1 h-3 w-3" />
+                {t.level === 'CITY' ? 'Distribute' : 'Assign to woredas'}
+              </Button>
+            )}
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onEdit(t)} title="Edit target">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50" onClick={() => onDelete(t.id)} title="Delete target">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Target vs registered vs achievement */}
+        <div className="grid grid-cols-3 divide-x divide-slate-100 rounded-xl border border-slate-100 bg-slate-50/60">
+          <div className="px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Target</p>
+            <p className="mt-1 text-base font-bold leading-none text-teal-950">
+              {fmt(t.targetValue)}
+              <span className="ml-1 text-[10px] font-medium text-muted-foreground">ent.</span>
             </p>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{t.periodLabel} · {t.periodType}</span>
-            <span className="font-semibold text-teal-900">Target {fmt(t.targetValue)} enterprises</span>
-            {t.createdByName && <span>set by {t.createdByName}</span>}
+          <div className="px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Registered</p>
+            <p className="mt-1 text-base font-bold leading-none text-slate-900">
+              {fmt(t.progress.actual)}
+              <span className="ml-1 text-[10px] font-medium text-muted-foreground">ent.</span>
+            </p>
+          </div>
+          <div className="px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Achievement</p>
+            <p className={cn('mt-1 text-base font-bold leading-none', t.progress.achievementPct >= 100 ? 'text-emerald-600' : 'text-teal-800')}>
+              {t.progress.achievementPct}%
+            </p>
           </div>
         </div>
-        <div className="flex shrink-0 flex-row gap-1">
-          {canDistribute && (
-            <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => onDistribute(t)}>
-              <Share2 className="mr-1 h-3 w-3" />
-              {t.level === 'CITY' ? 'Distribute' : 'Assign to woredas'}
-            </Button>
-          )}
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onEdit(t)} title="Edit target">
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50" onClick={() => onDelete(t.id)} title="Delete target">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
 
-      {/* Live progress */}
-      <div className="mt-3 rounded-lg bg-slate-50/70 px-3 py-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-600">
-            <span className="text-lg font-bold leading-none text-teal-900">{fmt(t.progress.actual)}</span>
-            <span className="ml-1 text-muted-foreground">of {fmt(t.targetValue)} registered</span>
-          </p>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-teal-800">{t.progress.achievementPct}%</span>
-            <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
+        {/* Progress against the period */}
+        <div>
+          <div className="relative h-2.5 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={cn('absolute inset-y-0 left-0 rounded-full', barFill)}
+              style={{ width: `${Math.min(t.progress.achievementPct, 100)}%` }}
+            />
+            {/* pace marker */}
+            <div className="absolute inset-y-0 w-0.5 bg-amber-500/90" style={{ left: `${Math.min(t.progress.pacePct, 100)}%` }} title="Expected pace for today" />
           </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            <span aria-hidden className="mr-1 inline-block h-2 w-0.5 translate-y-0.5 bg-amber-500" />
+            {t.progress.pacePct}% of the period elapsed — the amber marker shows the expected pace for today.
+          </p>
         </div>
-        <div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-white">
-          <div
-            className={cn(
-              'absolute inset-y-0 left-0 rounded-full',
-              t.progress.unitStatus === 'achieved' ? 'bg-emerald-500'
-                : t.progress.unitStatus === 'behind' || t.progress.unitStatus === 'missed' ? 'bg-red-400'
-                  : 'bg-teal-500'
+
+        {/* Composition of registered enterprises */}
+        {compositionTotal > 0 && (
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100" title="Composition of registered enterprises">
+            {STATUSES.map((s) =>
+              (standing[s] ?? 0) > 0 ? (
+                <div key={s} style={{ width: `${((standing[s] ?? 0) / compositionTotal) * 100}%`, backgroundColor: SME_STATUS_META[s].color }} />
+              ) : null
             )}
-            style={{ width: `${Math.min(t.progress.achievementPct, 100)}%` }}
-          />
-          {/* pace marker */}
-          <div className="absolute inset-y-0 w-0.5 bg-amber-500/80" style={{ left: `${Math.min(t.progress.pacePct, 100)}%` }} title="Expected pace for today" />
-        </div>
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          {t.progress.pacePct}% of the period elapsed — the amber marker shows the expected pace for today.
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200/70 pt-2">
-          {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
-            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-slate-600">
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {STATUSES.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SME_STATUS_META[s].color }} />
-              {SME_STATUS_META[s].label} {fmt(t.progress.standing[s] ?? 0)}
+              {SME_STATUS_META[s].label} <span className="font-semibold text-slate-800">{fmt(standing[s] ?? 0)}</span>
             </span>
           ))}
-          <span className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-            <Users className="h-3 w-3" />{fmt(t.progress.standing.members ?? 0)} members
+          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+            <Users className="h-3 w-3" />{fmt(standing.members ?? 0)} members
           </span>
         </div>
+
+        {t.note && (
+          <p className="border-l-2 border-teal-200 pl-2 text-[11px] italic text-muted-foreground">{t.note}</p>
+        )}
       </div>
-      {t.note && (
-        <p className="mt-2 flex items-start gap-1.5 text-[11px] italic text-muted-foreground">
-          <span aria-hidden="true" className="leading-none text-teal-400">“</span>
-          <span>{t.note}</span>
-        </p>
-      )}
     </div>
   );
 }
 
 /** Section heading for one administrative level of the target hierarchy. */
-function GroupHeading({ icon, label, count, hint }: { icon: React.ReactNode; label: string; count: number; hint?: string }) {
+function GroupHeading({ icon, label, count, hint, aggregate }: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  hint?: string;
+  aggregate?: GroupAggregate;
+}) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-teal-100 pb-1.5">
-      <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
-        {icon}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50/80 via-white to-white px-3 py-2">
+      <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-teal-900/80">
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-sm">{icon}</span>
         {label}
       </span>
-      <Badge variant="secondary" className="bg-teal-50 text-[10px] text-teal-700">{count}</Badge>
-      {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+      <Badge variant="secondary" className="bg-white text-[10px] text-teal-700 shadow-sm">{count}</Badge>
+      {hint && <span className="hidden text-[10px] text-muted-foreground sm:inline">{hint}</span>}
+      {aggregate && (
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <AggChip label="Target" value={fmt(aggregate.target)} />
+          <AggChip label="Registered" value={fmt(aggregate.actual)} />
+          <AggChip label="Overall" value={`${aggregate.pct}%`} tone={aggregate.pct >= 100 ? 'emerald' : 'teal'} />
+          <span className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] text-slate-500 shadow-sm">
+            {aggregate.onTrack > 0 && (
+              <span><span className="font-semibold text-teal-700">{aggregate.onTrack}</span> on track</span>
+            )}
+            {aggregate.behind > 0 && (
+              <span>· <span className="font-semibold text-red-600">{aggregate.behind}</span> behind</span>
+            )}
+            {aggregate.achieved > 0 && (
+              <span>· <span className="font-semibold text-emerald-600">{aggregate.achieved}</span> achieved</span>
+            )}
+          </span>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Small label:value chip used in the group heading band. */
+function AggChip({ label, value, tone }: { label: string; value: string; tone?: 'teal' | 'emerald' }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] text-slate-500 shadow-sm">
+      {label}
+      <span className={cn('font-semibold', tone === 'emerald' ? 'text-emerald-600' : 'text-teal-800')}>{value}</span>
+    </span>
   );
 }
 
