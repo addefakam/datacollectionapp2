@@ -77,7 +77,9 @@ sleep 1
 agent-browser read > "$SHOTS/1-sidebar.txt" 2>&1
 agent-browser screenshot "$SHOTS/1-sidebar.png" > /dev/null 2>&1
 
-for t in "Survey" "Records" "Set Targets" "Performance Dashboard" "Stats" "Goals"; do
+# Stats and Goals were removed from the SME sidebar (dashboard is the view);
+# Manage is the admin workspace child added under every main group.
+for t in "Survey" "Records" "Set Targets" "Performance Dashboard" "Manage"; do
   if grep -q "$t" "$SHOTS/1-sidebar.txt"; then
     echo "PASS: sidebar has '$t'"
   else
@@ -133,7 +135,7 @@ agent-browser eval "Array.from(document.querySelectorAll('button')).filter(b => 
 sleep 2
 agent-browser wait --load networkidle
 agent-browser read > "$SHOTS/2-targets-created.txt" 2>&1
-if grep -q "City-wide (all sub-cities)" "$SHOTS/2-targets-created.txt" && grep -q "Target 24 enterprises" "$SHOTS/2-targets-created.txt"; then
+if grep -q "City-wide (all sub-cities)" "$SHOTS/2-targets-created.txt" && grep -q "24ent\." "$SHOTS/2-targets-created.txt"; then
   echo "PASS: city-wide yearly target created via UI (24 enterprises)"
 else
   echo "FAIL: city-wide target card not found after creation"
@@ -141,7 +143,10 @@ fi
 agent-browser screenshot "$SHOTS/2-target-created.png" > /dev/null 2>&1
 
 # --- distribute the city target to sub-cities -------------------------------
-agent-browser eval "Array.from(document.querySelectorAll('button')).filter(b => b.textContent.trim().startsWith('Distribute')).length > 0 ? (Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Distribute').click(), 'open') : 'no-button'" > "$SHOTS/distribute-open.txt" 2>&1
+# Scope the click to the card whose period is 2027 (the test target) — the
+# first Distribute button on the page otherwise hits the REAL city-wide card
+# and rewrites production sub-city shares (this once mutated a live target).
+agent-browser eval "var btn=Array.from(document.querySelectorAll('button')).filter(b => b.textContent.trim().startsWith('Distribute')).find(b => { var c = b.closest('div.overflow-hidden'); return c && c.textContent.includes('2027'); }); btn ? (btn.click(),'open-2027') : 'no-2027-distribute'" > "$SHOTS/distribute-open.txt" 2>&1
 sleep 1
 agent-browser read > "$SHOTS/3-distribute.txt" 2>&1
 if grep -q "Distribute to Sub-Cities" "$SHOTS/3-distribute.txt"; then
@@ -228,7 +233,10 @@ click_item "Performance Dashboard"
 sleep 4
 agent-browser wait --load networkidle
 UNIT_LABEL=$(agent-browser eval "var x=new XMLHttpRequest();x.open('GET','/api/sme/performance?periodType=yearly',false);x.send();var j=JSON.parse(x.responseText);var r=(j.rows||[]).find(r=>r.actual>=3);r?r.subCity:'NONE'" 2>/dev/null | unq)
-agent-browser eval "var trs=Array.from(document.querySelectorAll('tbody tr'));var tr=trs.find(t=>t.textContent.includes('$UNIT_LABEL'));tr? (tr.click(),'clicked') : 'no-row'" > "$SHOTS/detail-open.txt" 2>&1
+# Click the row inside the accountability table only — the page also holds a
+# Custom Report table whose rows contain the same unit names but do not open
+# the click-through dialog.
+agent-browser eval "var tbl=Array.from(document.querySelectorAll('table')).find(t => t.textContent.includes('Status') && t.textContent.includes('Details'));var tr=tbl ? Array.from(tbl.querySelectorAll('tbody tr')).find(t => t.textContent.includes('$UNIT_LABEL')) : null;tr ? (tr.click(),'clicked') : 'no-row'" > "$SHOTS/detail-open.txt" 2>&1
 sleep 2
 agent-browser read > "$SHOTS/5-detail.txt" 2>&1
 if grep -q "Performance detail" "$SHOTS/5-detail.txt" && grep -q "Registered enterprises" "$SHOTS/5-detail.txt" && grep -q "E2E TEST SME Alpha" "$SHOTS/5-detail.txt"; then

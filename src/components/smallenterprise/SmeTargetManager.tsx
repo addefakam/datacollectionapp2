@@ -304,7 +304,34 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
 
   const stats = React.useMemo(() => {
     const targetSum = targets.reduce((s, t) => s + t.targetValue, 0);
-    const actualSum = targets.reduce((s, t) => s + t.progress.actual, 0);
+    // Registrations must be counted ONCE. Target scopes nest (city ⊃
+    // sub-city ⊃ woreda), so summing every card's own `actual` multi-counts
+    // the same enterprises — e.g. city 2 + its sub-city 2 + its woreda 2
+    // showed "Registered 6" for 2 real records. For each distinct period take
+    // the widest level present: a city target already covers its sub-cities
+    // and their woredas; woreda targets only add registrations when their
+    // sub-city has no sub-city target in that period.
+    const byPeriod = new Map<string, SmeTarget[]>();
+    for (const t of targets) {
+      const key = `${t.periodStart}..${t.periodEnd}`;
+      const list = byPeriod.get(key) ?? [];
+      list.push(t);
+      byPeriod.set(key, list);
+    }
+    let actualSum = 0;
+    byPeriod.forEach((list) => {
+      const city = list.find((t) => t.level === 'CITY');
+      if (city) {
+        actualSum += city.progress.actual;
+        return;
+      }
+      const subCityTargets = list.filter((t) => t.level === 'SUB_CITY');
+      const coveredSubCities = new Set(subCityTargets.map((t) => t.subCity));
+      actualSum += subCityTargets.reduce((s, t) => s + t.progress.actual, 0);
+      actualSum += list
+        .filter((t) => t.level === 'WOREDA' && !coveredSubCities.has(t.subCity))
+        .reduce((s, t) => s + t.progress.actual, 0);
+    });
     return {
       city: targets.filter((t) => t.level === 'CITY').length,
       subCity: targets.filter((t) => t.level === 'SUB_CITY').length,
@@ -312,8 +339,9 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
       achieved: targets.filter((t) => t.progress.unitStatus === 'achieved').length,
       targetSum,
       actualSum,
-      // Same rounding as the API's achievementPct, so the strip matches the cards.
-      overallPct: targetSum > 0 ? Math.round((actualSum / targetSum) * 1000) / 100 : 0,
+      // Same rounding as the API's achievementPct (one decimal), so the strip
+      // matches the cards — /100 here displayed 0.03% where the API says 0.1%.
+      overallPct: targetSum > 0 ? Math.round((actualSum / targetSum) * 1000) / 10 : 0,
     };
   }, [targets]);
 
