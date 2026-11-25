@@ -86,7 +86,10 @@ for t in "Survey" "Records" "Set Targets" "Performance Dashboard" "Stats" "Goals
 done
 
 # --- baseline target ids (for cleanup) ------------------------------------
-agent-browser eval "var x=new XMLHttpRequest();x.open('GET','/api/sme-targets',false);x.send();x.responseText.slice(0,4000)" > "$SHOTS/baseline.json" 2>&1
+# FULL response (no truncation): a truncated payload once parsed as an empty
+# baseline, so the cleanup step deleted EVERY production target. The cleanup
+# below also refuses to run when the baseline is empty (fail-safe).
+agent-browser eval "var x=new XMLHttpRequest();x.open('GET','/api/sme-targets',false);x.send();x.responseText.slice(0,500000)" > "$SHOTS/baseline.json" 2>&1
 BASELINE_IDS=$(python3 - <<'PY'
 import json
 raw = open('/tmp/sme-monitor-shots/baseline.json').read().strip()
@@ -105,6 +108,8 @@ print(','.join(t['id'] for t in data if isinstance(t, dict) and 'id' in t))
 PY
 )
 echo "baseline targets: ${BASELINE_IDS:-none}"
+TARGET_CLEANUP=1
+[ -n "$BASELINE_IDS" ] || { echo "WARN: empty baseline — target cleanup will be SKIPPED (fail-safe)"; TARGET_CLEANUP=0; }
 
 # --- Set Targets page: create a city-wide yearly target --------------------
 click_item "Set Targets"
@@ -118,6 +123,10 @@ grep -q "SME Establishment Targets" "$SHOTS/2-targets.txt" \
 agent-browser eval "Array.from(document.querySelectorAll('button')).filter(b => b.textContent.trim() === 'Set Target')[0].click(); 'open'" > /dev/null 2>&1
 sleep 1
 agent-browser fill "#sme-target-value" "24" > /dev/null 2>&1
+# Yearly period of 2027 — never collides with the real production targets
+# (which live in 2026), so the duplicate guard cannot reject the test target.
+# React-controlled input: set the value through the native setter + events.
+agent-browser eval "var el=document.querySelector('#sme-ref-date');var st=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;st.call(el,'2027-01-15');el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));'ref-set'" > /dev/null 2>&1
 sleep 0.5
 # submit: the dialog footer "Set Target" button (last match in DOM)
 agent-browser eval "Array.from(document.querySelectorAll('button')).filter(b => b.textContent.trim() === 'Set Target').pop().click(); 'saved'" > /dev/null 2>&1
@@ -154,6 +163,11 @@ agent-browser screenshot "$SHOTS/3-distributed.png" > /dev/null 2>&1
 # --- Performance Dashboard ---------------------------------------------------
 click_item "Performance Dashboard"
 sleep 4
+agent-browser wait --load networkidle
+# Point the dashboard at the test period (yearly 2027) so the 24-enterprise
+# target created above is the one shown as the city-wide target.
+agent-browser eval "var el=document.querySelector('#sme-perf-ref');var st=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;st.call(el,'2027-01-15');el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));'ref-set'" > /dev/null 2>&1
+sleep 3
 agent-browser wait --load networkidle
 agent-browser read > "$SHOTS/4-dashboard.txt" 2>&1
 for t in "SME Performance Dashboard" "Assigned Target" "Target vs Registered" "Accountability per Sub-City" "City-wide target: 24 enterprises"; do
@@ -267,8 +281,16 @@ fi
 agent-browser screenshot "$SHOTS/7-survey.png" > /dev/null 2>&1
 
 # --- cleanup: remove targets + SME records created by this test ---------------
-CLEANUP=$(agent-browser eval "var keep='$BASELINE_IDS'.split(',').filter(Boolean);var x=new XMLHttpRequest();x.open('GET','/api/sme-targets',false);x.send();var ts=JSON.parse(x.responseText).data||[];var dt=0;for(var i=0;i<ts.length;i++){if(keep.indexOf(ts[i].id)<0){var d=new XMLHttpRequest();d.open('DELETE','/api/sme-targets/'+ts[i].id,false);d.send();dt++;}}var y=new XMLHttpRequest();y.open('GET','/api/smallenterprises?search=E2E%20TEST%20SME&limit=100',false);y.send();var ss=JSON.parse(y.responseText).data||[];var ds=0;for(var j=0;j<ss.length;j++){var e=new XMLHttpRequest();e.open('DELETE','/api/smallenterprises/'+ss[j].id,false);e.send();ds++;}'deleted targets:'+dt+', smes:'+ds" 2>/dev/null | unq)
-echo "cleanup: $CLEANUP"
+# Target deletion only runs when a non-empty baseline was captured; production
+# targets must never be touched by a test run.
+if [ "$TARGET_CLEANUP" = "1" ]; then
+  CLEANUP=$(agent-browser eval "var keep='$BASELINE_IDS'.split(',').filter(Boolean);var x=new XMLHttpRequest();x.open('GET','/api/sme-targets',false);x.send();var ts=JSON.parse(x.responseText).data||[];var dt=0;for(var i=0;i<ts.length;i++){if(keep.indexOf(ts[i].id)<0){var d=new XMLHttpRequest();d.open('DELETE','/api/sme-targets/'+ts[i].id,false);d.send();dt++;}}var y=new XMLHttpRequest();y.open('GET','/api/smallenterprises?search=E2E%20TEST%20SME&limit=100',false);y.send();var ss=JSON.parse(y.responseText).data||[];var ds=0;for(var j=0;j<ss.length;j++){var e=new XMLHttpRequest();e.open('DELETE','/api/smallenterprises/'+ss[j].id,false);e.send();ds++;}'deleted targets:'+dt+', smes:'+ds" 2>/dev/null | unq)
+  echo "cleanup: $CLEANUP"
+else
+  echo "cleanup: SKIPPED target deletion (empty baseline fail-safe); removing only E2E test SMEs"
+  CLEANUP=$(agent-browser eval "var y=new XMLHttpRequest();y.open('GET','/api/smallenterprises?search=E2E%20TEST%20SME&limit=100',false);y.send();var ss=JSON.parse(y.responseText).data||[];var ds=0;for(var j=0;j<ss.length;j++){var e=new XMLHttpRequest();e.open('DELETE','/api/smallenterprises/'+ss[j].id,false);e.send();ds++;}'deleted smes:'+ds" 2>/dev/null | unq)
+  echo "cleanup: $CLEANUP"
+fi
 
 ERRS=$(agent-browser errors 2>/dev/null | head -1)
 if [ -z "$ERRS" ]; then

@@ -123,7 +123,17 @@ export async function computeSmeTargetProgress(t: {
     achievementPct: target > 0 ? Math.round((actual / target) * 1000) / 10 : 0,
     pacePct: smePeriodPace(t.periodStart, t.periodEnd, now),
     unitStatus: smeUnitStatus(target, actual, t.periodStart, t.periodEnd, now),
-    standing,
+    // Flat status counts + member totals — the shape the UI contract
+    // (SmeTargetManager TargetProgress) declares: standing[s] per status,
+    // standing.members / standing.femaleMembers / standing.total on top.
+    // (Returning the nested { byStatus, ... } object made every status chip
+    // on the target cards read `undefined ?? 0` — i.e. always zero.)
+    standing: {
+      ...standing.byStatus,
+      total: standing.total,
+      members: standing.members,
+      femaleMembers: standing.femaleMembers,
+    },
     pending,
     operationalRate:
       standing.total > 0
