@@ -213,12 +213,11 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Industry manage workspace: records + stats + survey questionnaire
-              + stats attribution — everything for this module in one place (admin) */}
+          {/* Industry manage workspace: stats + survey questionnaire + stats
+              attribution — records live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="indManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
-                <IndustryList refreshTrigger={refreshTrigger} />
                 <IndustryStats />
                 <IndustryQuestionnaireSection />
                 <IndustryStatsConditionSection />
@@ -249,11 +248,10 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Hotel manage workspace: records + dashboard in one place (admin) */}
+          {/* Hotel manage workspace: dashboard — records live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="hotelManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
-                <DataList refreshTrigger={refreshTrigger} />
                 <Dashboard />
               </div>
             </TabsContent>
@@ -282,11 +280,10 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Health manage workspace: records + stats in one place (admin) */}
+          {/* Health manage workspace: stats — records live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="healthManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
-                <HealthList refreshTrigger={refreshTrigger} />
                 <HealthStats />
               </div>
             </TabsContent>
@@ -315,11 +312,10 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Education manage workspace: records + stats in one place (admin) */}
+          {/* Education manage workspace: stats — records live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="eduManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
-                <EducationList refreshTrigger={refreshTrigger} />
                 <EducationStats />
               </div>
             </TabsContent>
@@ -348,11 +344,10 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Agriculture manage workspace: records + stats in one place (admin) */}
+          {/* Agriculture manage workspace: stats — records live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="agriManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
-                <AgricultureList refreshTrigger={refreshTrigger} />
                 <AgricultureStats />
               </div>
             </TabsContent>
@@ -381,11 +376,11 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Small Enterprise manage workspace: records + performance dashboard in one place (admin) */}
+          {/* Small Enterprise manage workspace: performance dashboard — records
+              live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="mseManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
-                <SmallEnterpriseList refreshTrigger={refreshTrigger} />
                 <SmePerformanceDashboard />
               </div>
             </TabsContent>
