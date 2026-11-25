@@ -116,7 +116,8 @@ interface GroupAggregate {
 function aggregateOf(list: SmeTarget[]): GroupAggregate {
   const target = list.reduce((s, t) => s + t.targetValue, 0);
   const actual = list.reduce((s, t) => s + t.progress.actual, 0);
-  const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
+  // Same rounding as the API's achievementPct, so chips match the cards.
+  const pct = target > 0 ? Math.round((actual / target) * 1000) / 100 : 0;
   const achieved = list.filter((t) => t.progress.unitStatus === 'achieved').length;
   const behind = list.filter((t) => t.progress.unitStatus === 'behind' || t.progress.unitStatus === 'missed').length;
   return { target, actual, pct, achieved, behind, onTrack: list.length - achieved - behind };
@@ -322,12 +323,20 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
     };
   }, [targets]);
 
-  const stats = React.useMemo(() => ({
-    city: targets.filter((t) => t.level === 'CITY').length,
-    subCity: targets.filter((t) => t.level === 'SUB_CITY').length,
-    woreda: targets.filter((t) => t.level === 'WOREDA').length,
-    achieved: targets.filter((t) => t.progress.unitStatus === 'achieved').length,
-  }), [targets]);
+  const stats = React.useMemo(() => {
+    const targetSum = targets.reduce((s, t) => s + t.targetValue, 0);
+    const actualSum = targets.reduce((s, t) => s + t.progress.actual, 0);
+    return {
+      city: targets.filter((t) => t.level === 'CITY').length,
+      subCity: targets.filter((t) => t.level === 'SUB_CITY').length,
+      woreda: targets.filter((t) => t.level === 'WOREDA').length,
+      achieved: targets.filter((t) => t.progress.unitStatus === 'achieved').length,
+      targetSum,
+      actualSum,
+      // Same rounding as the API's achievementPct, so the strip matches the cards.
+      overallPct: targetSum > 0 ? Math.round((actualSum / targetSum) * 1000) / 100 : 0,
+    };
+  }, [targets]);
 
   const handleDistribute = async () => {
     if (!distributeTarget) return;
@@ -385,12 +394,34 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
             </div>
           ) : (
             <>
-              {/* Overview strip */}
+              {/* Overview strip — the same figures as the target cards:
+                  Target / Registered / Achievement, plus the level breakdown */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <SummaryStat icon={<Target className="h-3 w-3 text-teal-600" />} label="City-wide" value={stats.city} hint="overall target(s)" />
-                <SummaryStat icon={<MapPin className="h-3 w-3 text-blue-600" />} label="Sub-city" value={stats.subCity} hint="distributed shares" />
-                <SummaryStat icon={<ChevronRight className="h-3 w-3 text-violet-600" />} label="Woreda" value={stats.woreda} hint="assigned targets" />
-                <SummaryStat icon={<CheckCircle2 className="h-3 w-3 text-emerald-600" />} label="Achieved" value={`${stats.achieved}/${targets.length}`} hint="targets already reached" />
+                <SummaryStat
+                  icon={<Store className="h-3 w-3 text-teal-600" />}
+                  label="Targets"
+                  value={targets.length}
+                  hint={`${stats.city} city-wide · ${stats.subCity} sub-city · ${stats.woreda} woreda`}
+                />
+                <SummaryStat
+                  icon={<Target className="h-3 w-3 text-teal-600" />}
+                  label="Target enterprises"
+                  value={fmt(stats.targetSum)}
+                  hint="sum of every set target"
+                />
+                <SummaryStat
+                  icon={<Users className="h-3 w-3 text-teal-600" />}
+                  label="Registered"
+                  value={fmt(stats.actualSum)}
+                  hint="live from registrations"
+                />
+                <SummaryStat
+                  icon={<CheckCircle2 className="h-3 w-3 text-emerald-600" />}
+                  label="Overall progress"
+                  value={`${stats.overallPct}%`}
+                  hint={`${stats.achieved} of ${targets.length} targets fully achieved`}
+                  progressPct={stats.overallPct}
+                />
               </div>
 
               {grouped.city.length > 0 && (
@@ -822,11 +853,26 @@ function AggChip({ label, value, tone }: { label: string; value: string; tone?: 
 }
 
 /** Compact overview stat for the strip above the target list. */
-function SummaryStat({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: React.ReactNode; hint: string }) {
+function SummaryStat({ icon, label, value, hint, progressPct }: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  hint: string;
+  /** Optional 0–100 figure rendered as a slim bar so the strip matches the cards. */
+  progressPct?: number;
+}) {
   return (
     <div className="rounded-xl border border-teal-100 bg-white px-3 py-2.5">
       <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">{icon}{label}</p>
       <p className="mt-1 text-xl font-bold leading-none text-teal-950">{value}</p>
+      {typeof progressPct === 'number' && (
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className={cn('h-full rounded-full', progressPct >= 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-teal-600 to-emerald-400')}
+            style={{ width: `${Math.min(progressPct, 100)}%` }}
+          />
+        </div>
+      )}
       <p className="mt-1 text-[10px] text-muted-foreground">{hint}</p>
     </div>
   );
