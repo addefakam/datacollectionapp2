@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic';
 //   SUB_CITY target → one WOREDA target per woreda of that sub-city
 // Body: { parentId, items: [{ subCity?, area?, targetValue }] }
 // Existing targets for the same scope & period are updated (upsert).
+// Scenario: the shares together may leave part of the parent unallocated but
+// can never exceed it, and units with a zero share receive no target.
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAdmin();
@@ -37,9 +39,10 @@ export async function POST(request: NextRequest) {
     }
 
     const childLevel = parent.level === 'CITY' ? 'SUB_CITY' : 'WOREDA';
-    const results: { scope: string; targetValue: number }[] = [];
 
-    for (const item of items) {
+    // Parse and validate every share before touching the database.
+    const shares: { subCity: string; area: string; value: number }[] = [];
+    for (const item of items as { subCity?: unknown; area?: unknown; targetValue?: unknown }[]) {
       const value = Number(item?.targetValue);
       if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
         return NextResponse.json(
@@ -47,36 +50,56 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+      shares.push({
+        subCity: String(item?.subCity || '').trim(),
+        area: String(item?.area || '').trim(),
+        value,
+      });
+    }
 
-      let childSubCity = '';
-      let childArea = '';
+    // The scenario: children share the parent's enterprises — their total
+    // may leave part of the parent unallocated, but can never exceed it.
+    const requestedTotal = shares.reduce((s, sh) => s + sh.value, 0);
+    if (requestedTotal > parent.targetValue) {
+      return NextResponse.json(
+        {
+          error: `Distributed total (${requestedTotal}) exceeds the ${parent.level === 'CITY' ? 'city-wide' : 'sub-city'} target (${parent.targetValue}) — reduce the shares first`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const results: { scope: string; targetValue: number }[] = [];
+
+    for (const share of shares) {
+      // A zero share means "no target for this unit" — skip it entirely.
+      if (share.value === 0) continue;
 
       if (childLevel === 'SUB_CITY') {
-        childSubCity = String(item?.subCity || '').trim();
-        if (!childSubCity) {
+        if (!share.subCity) {
           return NextResponse.json({ error: 'Every item needs a sub-city name' }, { status: 400 });
         }
-        const sc = await db.subCity.findUnique({ where: { name: childSubCity } });
+        const sc = await db.subCity.findUnique({ where: { name: share.subCity } });
         if (!sc) {
-          return NextResponse.json({ error: `Unknown sub-city "${childSubCity}"` }, { status: 400 });
+          return NextResponse.json({ error: `Unknown sub-city "${share.subCity}"` }, { status: 400 });
         }
       } else {
-        childSubCity = parent.subCity;
-        childArea = String(item?.area || '').trim();
-        if (!childArea) {
+        if (!share.area) {
           return NextResponse.json({ error: 'Every item needs a woreda name' }, { status: 400 });
         }
         const woreda = await db.subCityArea.findFirst({
-          where: { name: childArea, subCity: { name: childSubCity } },
+          where: { name: share.area, subCity: { name: parent.subCity } },
         });
         if (!woreda) {
           return NextResponse.json(
-            { error: `"${childArea}" is not a woreda of "${childSubCity}"` },
+            { error: `"${share.area}" is not a woreda of "${parent.subCity}"` },
             { status: 400 }
           );
         }
       }
 
+      const childSubCity = childLevel === 'SUB_CITY' ? share.subCity : parent.subCity;
+      const childArea = childLevel === 'SUB_CITY' ? '' : share.area;
       const upserted = await db.smeTarget.upsert({
         where: {
           level_subCity_area_periodType_periodStart: {
@@ -87,7 +110,7 @@ export async function POST(request: NextRequest) {
             periodStart: parent.periodStart,
           },
         },
-        update: { targetValue: value, status: 'ACTIVE', updatedAt: new Date() },
+        update: { targetValue: share.value, status: 'ACTIVE', updatedAt: new Date() },
         create: {
           level: childLevel,
           subCity: childSubCity,
@@ -95,7 +118,7 @@ export async function POST(request: NextRequest) {
           periodType: parent.periodType,
           periodStart: parent.periodStart,
           periodEnd: parent.periodEnd,
-          targetValue: value,
+          targetValue: share.value,
           note: `Distributed from ${parent.level === 'CITY' ? 'city-wide' : parent.subCity + ' sub-city'} target`,
           createdByName: auth.user.name || auth.user.username || null,
         },

@@ -95,12 +95,6 @@ interface SmeTargetManagerProps {
   refreshTrigger: number;
 }
 
-const LEVEL_OPTIONS: { value: SmeTargetLevel; label: string; hint: string }[] = [
-  { value: 'CITY', label: 'City-wide', hint: 'Overall establishment target for the whole city' },
-  { value: 'SUB_CITY', label: 'Sub-city', hint: "One sub-city's establishment target" },
-  { value: 'WOREDA', label: 'Woreda', hint: "One woreda's establishment target (assigned by the sub-city)" },
-];
-
 const fmt = (n: number) => n.toLocaleString('en');
 
 /** Roll-up of a group of targets (city / sub-city / woreda) for the section band. */
@@ -133,12 +127,10 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [distributing, setDistributing] = React.useState(false);
 
-  // New / edit target form
+  // New / edit target form — only city-wide targets are created directly;
+  // sub-city shares and woreda targets come from distribution.
   const [formOpen, setFormOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<SmeTarget | null>(null);
-  const [level, setLevel] = React.useState<SmeTargetLevel>('CITY');
-  const [formSubCity, setFormSubCity] = React.useState('');
-  const [formArea, setFormArea] = React.useState('');
   const [periodType, setPeriodType] = React.useState<SmePeriodType>('yearly');
   const [refDate, setRefDate] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [targetValue, setTargetValue] = React.useState('');
@@ -165,9 +157,6 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
 
   const openCreate = () => {
     setEditTarget(null);
-    setLevel('CITY');
-    setFormSubCity('');
-    setFormArea('');
     setPeriodType('yearly');
     setRefDate(new Date().toISOString().slice(0, 10));
     setTargetValue('');
@@ -206,14 +195,6 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
       return;
     }
 
-    if (level !== 'CITY' && !formSubCity) {
-      toast({ title: 'Field Missing', description: 'Select the sub-city for this target', variant: 'destructive' });
-      return;
-    }
-    if (level === 'WOREDA' && !formArea) {
-      toast({ title: 'Field Missing', description: 'Select the woreda for this target', variant: 'destructive' });
-      return;
-    }
     if (!targetValue || Number(targetValue) <= 0) {
       toast({ title: 'Invalid Target', description: 'Enter a positive number of enterprises', variant: 'destructive' });
       return;
@@ -225,9 +206,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          level,
-          subCity: level === 'CITY' ? undefined : formSubCity,
-          area: level === 'WOREDA' ? formArea : undefined,
+          level: 'CITY',
           periodType,
           refDate,
           targetValue: Number(targetValue),
@@ -464,7 +443,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
             <DialogDescription>
               {editTarget
                 ? 'Adjust the target value or note — scope and period are fixed.'
-                : 'How many small enterprises should be established in this scope and period?'}
+                : 'How many small enterprises should be established city-wide this period? Sub-cities will share this target.'}
             </DialogDescription>
           </DialogHeader>
           {editTarget ? (
@@ -484,38 +463,14 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Administrative Level *</Label>
-                <Select value={level} onValueChange={(v) => { setLevel(v as SmeTargetLevel); setFormSubCity(''); setFormArea(''); }}>
-                  <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {LEVEL_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        <span className="font-medium">{o.label}</span>
-                        <span className="block text-[10px] text-muted-foreground">{o.hint}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="rounded-lg border border-teal-100 bg-teal-50/60 px-3 py-2 text-xs text-teal-900">
+                <p className="font-semibold">City-wide target — the source of all shares</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed">
+                  Set the overall goal for the whole city here. Sub-cities then receive
+                  their shares via the <span className="font-medium">Distribute</span> button,
+                  and each sub-city assigns targets to its woredas from its own share.
+                </p>
               </div>
-              {level !== 'CITY' && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Sub-City *</Label>
-                  <Select value={formSubCity} onValueChange={(v) => { setFormSubCity(v); setFormArea(''); }}>
-                    <SelectTrigger className="text-sm"><SelectValue placeholder="Select sub-city" /></SelectTrigger>
-                    <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
-                  </Select>
-                </div>
-              )}
-              {level === 'WOREDA' && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Woreda *</Label>
-                  <Select value={formArea} onValueChange={setFormArea} disabled={!formSubCity}>
-                    <SelectTrigger className="text-sm"><SelectValue placeholder={formSubCity ? 'Select woreda' : 'Select sub-city first'} /></SelectTrigger>
-                    <SelectContent>{areasFor(formSubCity).map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
-                  </Select>
-                </div>
-              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Period Type *</Label>
@@ -622,7 +577,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDistributeTarget(null)}>Cancel</Button>
-            <Button onClick={handleDistribute} disabled={distributing || childUnits.length === 0} className="bg-teal-700 text-white hover:bg-teal-800">
+            <Button onClick={handleDistribute} disabled={distributing || childUnits.length === 0 || distributeRemaining < 0} className="bg-teal-700 text-white hover:bg-teal-800">
               {distributing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Share2 className="mr-1.5 h-4 w-4" />}
               Save Distribution
             </Button>

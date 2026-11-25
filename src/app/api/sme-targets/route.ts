@@ -75,19 +75,30 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/sme-targets — set a new SME establishment target (admin).
-// Body: { level, subCity?, area?, periodType, refDate?, targetValue, note? }
+// POST /api/sme-targets — set a new city-wide SME establishment target (admin).
+// Scenario: only city-wide targets are created directly. Sub-city and woreda
+// targets are shares of a parent target and come exclusively from
+// /api/sme-targets/distribute.
+// Body: { level: 'CITY', periodType, refDate?, targetValue, note? }
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAdmin();
     if (auth.error) return auth.error;
 
     const body = await request.json();
-    const { level, subCity, area, periodType, refDate, targetValue, note } = body;
+    const { level, periodType, refDate, targetValue, note } = body;
 
     if (!isSmeTargetLevel(level)) {
       return NextResponse.json(
         { error: `level must be one of: ${SME_TARGET_LEVELS.join(', ')}` },
+        { status: 400 }
+      );
+    }
+    // Sub-city and woreda targets are shares of a parent target — they are
+    // created only through the distribute endpoint, never directly.
+    if (level !== 'CITY') {
+      return NextResponse.json(
+        { error: 'Sub-city and woreda targets are shares of a parent target — set a city-wide target and use Distribute instead' },
         { status: 400 }
       );
     }
@@ -106,34 +117,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate the administrative scope against the managed locations
-    let scopeSubCity = '';
-    let scopeArea = '';
-    if (level === 'SUB_CITY' || level === 'WOREDA') {
-      scopeSubCity = String(subCity || '').trim();
-      if (!scopeSubCity) {
-        return NextResponse.json({ error: 'Sub-city is required for this target level' }, { status: 400 });
-      }
-      const sc = await db.subCity.findUnique({ where: { name: scopeSubCity } });
-      if (!sc) {
-        return NextResponse.json({ error: `Unknown sub-city "${scopeSubCity}"` }, { status: 400 });
-      }
-    }
-    if (level === 'WOREDA') {
-      scopeArea = String(area || '').trim();
-      if (!scopeArea) {
-        return NextResponse.json({ error: 'Woreda (area) is required for woreda targets' }, { status: 400 });
-      }
-      const woreda = await db.subCityArea.findFirst({
-        where: { name: scopeArea, subCity: { name: scopeSubCity } },
-      });
-      if (!woreda) {
-        return NextResponse.json(
-          { error: `"${scopeArea}" is not a woreda of "${scopeSubCity}"` },
-          { status: 400 }
-        );
-      }
-    }
+    // City-wide target — no administrative scope attached
+    const scopeSubCity = '';
+    const scopeArea = '';
 
     const ref = refDate ? new Date(refDate) : new Date();
     if (Number.isNaN(ref.getTime())) {
