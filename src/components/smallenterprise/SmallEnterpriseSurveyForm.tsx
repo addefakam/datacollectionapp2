@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SMALL_ENTERPRISE_TYPES, SMALL_ENTERPRISE_OWNERSHIP_TYPES } from '@/lib/location-data';
 import { SME_STATUS_META, SME_STATUSES, type SmeStatus } from '@/lib/sme';
 import { useSettings } from '@/components/SettingsProvider';
+import {
+  sectorSurveyFieldEnabled,
+  sectorSurveyFieldRequired,
+  sectorSurveyFieldsDefault,
+  type SurveyFieldConfig,
+} from '@/lib/survey-fields';
 
 interface SmallEnterpriseSurveyFormProps {
   onSubmit: () => void;
@@ -51,6 +57,17 @@ const STEPS = [
   { id: 4, title: 'Review', titleOr: 'Mirkanaa', icon: Eye },
 ];
 
+/** Uniform question label: admin-managed English label + Afaan Oromoo sub-label + required star. */
+function FieldLabel({ id, en, or, required }: { id: string; en: string; or?: string; required?: boolean }) {
+  return (
+    <Label htmlFor={id} className="text-xs sm:text-sm">
+      {en}
+      {or ? (<><br /><span className="text-xs font-normal text-muted-foreground">{or}</span></>) : null}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </Label>
+  );
+}
+
 export default function SmallEnterpriseSurveyForm({
   onSubmit,
   surveyorName,
@@ -65,6 +82,35 @@ export default function SmallEnterpriseSurveyForm({
   const [selectedSubCity, setSelectedSubCity] = useState('');
   const [areas, setAreas] = useState<string[]>([]);
   const [dataConfirmed, setDataConfirmed] = useState('');
+
+  // Admin-managed questionnaire (Manage workspace → Survey Questions);
+  // registry defaults until it loads (offline keeps the defaults).
+  const [fields, setFields] = useState<SurveyFieldConfig[]>(() =>
+    sectorSurveyFieldsDefault('small-enterprise')
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields/small-enterprise')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields) && d.fields.length > 0) setFields(d.fields);
+      })
+      .catch(() => {
+        // offline — keep registry defaults
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Questionnaire accessors: shown / required / admin-managed bilingual label.
+  const shown = (key: string) => sectorSurveyFieldEnabled('small-enterprise', fields, key);
+  const req = (key: string) => sectorSurveyFieldRequired('small-enterprise', fields, key);
+  const label = (key: string) => {
+    const f = fields.find((x) => x.key === key);
+    return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
+  };
 
   const emptyForm = {
     enterpriseName: '',
@@ -136,31 +182,43 @@ export default function SmallEnterpriseSurveyForm({
   };
 
   const validateStep = (step: number): boolean => {
+    /** First missing required field of a step (missing = empty AND questionnaire-required). */
+    const missingRequired = (keys: string[]): string | null => {
+      for (const key of keys) {
+        if (req(key) && !formData[key as keyof typeof formData]) return label(key).en;
+      }
+      return null;
+    };
     switch (step) {
-      case 1:
-        if (!formData.enterpriseName || !formData.enterpriseType || !formData.subCity || !formData.area || !formData.specificAddress) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      case 1: {
+        const missing = missingRequired(['enterpriseName', 'enterpriseType', 'subCity', 'area', 'specificAddress']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         return true;
-      case 2:
-        if (!formData.ownershipType) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Ownership type is required / Gosa abbaa qabuu barbaachisaadha', variant: 'destructive' });
+      }
+      case 2: {
+        const missing = missingRequired(['ownershipType']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         if (!formData.employeeCount || Number(formData.employeeCount) < 0) {
           toast({ title: 'Invalid Employee Count / Lakkoofsa Hojjetaa Dogoggora', description: 'Enter a valid employee count / Lakkoofsa hojjetaa sirrii galchi', variant: 'destructive' });
           return false;
         }
-        if (!validateSexPair(formData.maleEmployees, formData.femaleEmployees, formData.employeeCount, 'Employee Count')) return false;
-        if (formData.startupCapital !== '' && (Number.isNaN(Number(formData.startupCapital)) || Number(formData.startupCapital) < 0)) {
+        if (shown('employeesSex') && !validateSexPair(formData.maleEmployees, formData.femaleEmployees, formData.employeeCount, 'Employee Count')) return false;
+        if (shown('startupCapital') && formData.startupCapital !== '' && (Number.isNaN(Number(formData.startupCapital)) || Number(formData.startupCapital) < 0)) {
           toast({ title: 'Invalid Capital / Maallaqa Dogoggora', description: 'Startup capital cannot be negative / Maallaqa jalqabaa diidaa hin qabaatu', variant: 'destructive' });
           return false;
         }
         return true;
-      case 3:
-        if (!formData.contactName || !formData.contactPhone) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Contact person and phone are required / Maqaa fi bilbila quunnamtii barbaachisa', variant: 'destructive' });
+      }
+      case 3: {
+        const missing = missingRequired(['contactName', 'contactPhone']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         {
@@ -172,6 +230,7 @@ export default function SmallEnterpriseSurveyForm({
           }
         }
         return true;
+      }
       case 4:
         if (dataConfirmed !== 'yes') {
           toast({ title: 'Confirmation Required / Mirkanaa\u2019uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\u2019eef mirkanaadhu', variant: 'destructive' });
@@ -241,23 +300,25 @@ export default function SmallEnterpriseSurveyForm({
     }
   };
 
-  const reviewItems = [
-    { label: 'Enterprise / Midhaalee', value: formData.enterpriseName },
-    { label: 'Enterprise Type / Gosa', value: formData.enterpriseType },
-    { label: 'Current Status / Sadarkaa', value: SME_STATUS_META[(formData.status as SmeStatus) in SME_STATUS_META ? (formData.status as SmeStatus) : 'REGISTERED'].label },
-    { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
-    { label: 'Sub-City / Kututtaa Maggalaa', value: formData.subCity },
-    { label: 'Werreda', value: formData.area },
-    { label: 'Address / Baka Addaa', value: formData.specificAddress },
-    { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
-    { label: 'Employees / Hojjetaa', value: formData.employeeCount },
-    { label: 'Male / Dhiira', value: formData.maleEmployees === '' ? '—' : formData.maleEmployees },
-    { label: 'Female / Dubartii', value: formData.femaleEmployees === '' ? '—' : formData.femaleEmployees },
-    { label: 'Startup Capital (ETB)', value: formData.startupCapital === '' ? '—' : formData.startupCapital },
-    { label: 'Own Premises', value: formData.hasPremises === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'MSE Training', value: formData.hasTraining === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
-  ];
+  const reviewItems = (
+    [
+      shown('enterpriseName') && { label: 'Enterprise / Midhaalee', value: formData.enterpriseName },
+      shown('enterpriseType') && { label: 'Enterprise Type / Gosa', value: formData.enterpriseType },
+      shown('status') && { label: 'Current Status / Sadarkaa', value: SME_STATUS_META[(formData.status as SmeStatus) in SME_STATUS_META ? (formData.status as SmeStatus) : 'REGISTERED'].label },
+      shown('ownershipType') && { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
+      shown('subCity') && { label: 'Sub-City / Kututtaa Maggalaa', value: formData.subCity },
+      shown('area') && { label: 'Werreda', value: formData.area },
+      shown('specificAddress') && { label: 'Address / Baka Addaa', value: formData.specificAddress },
+      shown('licenseNumber') && { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
+      shown('employeeCount') && { label: 'Employees / Hojjetaa', value: formData.employeeCount },
+      shown('employeesSex') && { label: 'Male / Dhiira', value: formData.maleEmployees === '' ? '—' : formData.maleEmployees },
+      shown('employeesSex') && { label: 'Female / Dubartii', value: formData.femaleEmployees === '' ? '—' : formData.femaleEmployees },
+      shown('startupCapital') && { label: 'Startup Capital (ETB)', value: formData.startupCapital === '' ? '—' : formData.startupCapital },
+      shown('hasPremises') && { label: 'Own Premises', value: formData.hasPremises === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasTraining') && { label: 'MSE Training', value: formData.hasTraining === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('contactName') && { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
+    ].filter(Boolean) as { label: string; value: string }[]
+  );
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -314,11 +375,11 @@ export default function SmallEnterpriseSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="enterpriseName" className="text-xs sm:text-sm">Enterprise Name <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="enterpriseName" en={label('enterpriseName').en} or={label('enterpriseName').or} required={req('enterpriseName')} />
                   <Input id="enterpriseName" name="enterpriseName" placeholder="e.g., TIGIST TAILORING WORKSHOP" value={formData.enterpriseName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="enterpriseType" className="text-xs sm:text-sm">Enterprise Type / Gosa Midhaalee <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="enterpriseType" en={label('enterpriseType').en} or={label('enterpriseType').or} required={req('enterpriseType')} />
                   <Select value={formData.enterpriseType} onValueChange={(v) => handleSelectChange('enterpriseType', v)}>
                     <SelectTrigger id="enterpriseType" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                     <SelectContent className="max-h-64">{SMALL_ENTERPRISE_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
@@ -326,26 +387,29 @@ export default function SmallEnterpriseSurveyForm({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="subCity" en={label('subCity').en} or={label('subCity').or} required={req('subCity')} />
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="area" en={label('area').en} or={label('area').or} required={req('area')} />
                     <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
                       <SelectTrigger id="area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
                       <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                 </div>
+                {shown('specificAddress') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
-                  <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="specificAddress" en={label('specificAddress').en} or={label('specificAddress').or} required={req('specificAddress')} />
+                  <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
+                {shown('status') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="status" className="text-xs sm:text-sm">Current Status<br /><span className="text-xs font-normal text-muted-foreground">Sadarkaa Ammaa</span></Label>
+                  <FieldLabel id="status" en={label('status').en} or={label('status').or} required={req('status')} />
                   <Select value={formData.status} onValueChange={(v) => handleSelectChange('status', v)}>
                     <SelectTrigger id="status" className="text-sm sm:text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -359,6 +423,7 @@ export default function SmallEnterpriseSurveyForm({
                   </Select>
                   <p className="text-[10px] text-muted-foreground">Establishment lifecycle: registered → fully legalized → awaiting operation → operational</p>
                 </div>
+                )}
               </CardContent>
             </>
           )}
@@ -374,12 +439,15 @@ export default function SmallEnterpriseSurveyForm({
                 <CardDescription className="text-xs sm:text-sm">License, ownership, employees, capital and support</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {shown('licenseNumber') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyeema</span></Label>
+                  <FieldLabel id="licenseNumber" en={label('licenseNumber').en} or={label('licenseNumber').or} required={req('licenseNumber')} />
                   <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., MSE/2024/012" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
+                {shown('ownershipType') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className="text-xs sm:text-sm">Ownership Type / Gosa Abbaa Qabuu <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="mse-ownershipType" en={label('ownershipType').en} or={label('ownershipType').or} required={req('ownershipType')} />
                   <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {SMALL_ENTERPRISE_OWNERSHIP_TYPES.map((t) => (
                       <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-amber-500 has-data-[state=checked]:bg-amber-50">
@@ -389,14 +457,16 @@ export default function SmallEnterpriseSurveyForm({
                     ))}
                   </RadioGroup>
                 </div>
+                )}
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="employeeCount" className="text-xs sm:text-sm">Employee Count<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Hojjetaa</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="employeeCount" en={label('employeeCount').en} or={label('employeeCount').or} required={req('employeeCount')} />
                   <Input id="employeeCount" name="employeeCount" type="number" min="0" placeholder="e.g., 8" value={formData.employeeCount} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 {/* Employees by sex (male / female) */}
+                {shown('employeesSex') && (
                 <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs sm:text-sm">Employees by Sex<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa Dhiira fi Dubartii</span></Label>
+                    <Label className="text-xs sm:text-sm">{label('employeesSex').en}<br /><span className="text-xs font-normal text-muted-foreground">{label('employeesSex').or}</span></Label>
                     <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-medium text-amber-700 sm:text-[10px]">Optional / Filannoo</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -411,17 +481,20 @@ export default function SmallEnterpriseSurveyForm({
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Employee Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
+                )}
+                {shown('startupCapital') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="startupCapital" className="text-xs sm:text-sm">Startup Capital (ETB)<br /><span className="text-xs font-normal text-muted-foreground">Maallaqa Jalqabaa</span></Label>
+                  <FieldLabel id="startupCapital" en={label('startupCapital').en} or={label('startupCapital').or} required={req('startupCapital')} />
                   <Input id="startupCapital" name="startupCapital" type="number" min="0" step="any" placeholder="e.g., 85000" value={formData.startupCapital} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   {[
                     { name: 'hasPremises', label: 'Own Working Premises', labelOr: 'Iddoo hojii mataa isaa' },
                     { name: 'hasTraining', label: 'MSE Training / Support', labelOr: 'Deeggarsa fi leenjii' },
-                  ].map((svc) => (
+                  ].filter((svc) => shown(svc.name)).map((svc) => (
                     <div key={svc.name} className="space-y-1.5 sm:space-y-2">
-                      <Label className="text-xs sm:text-sm">{svc.label}<br /><span className="text-xs font-normal text-muted-foreground">{svc.labelOr}</span></Label>
+                      <Label className="text-xs sm:text-sm">{label(svc.name).en}<br /><span className="text-xs font-normal text-muted-foreground">{label(svc.name).or}</span></Label>
                       <RadioGroup value={formData[svc.name as keyof typeof formData]} onValueChange={(v) => handleSelectChange(svc.name, v)} className="flex gap-4">
                         <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-amber-500 has-data-[state=checked]:bg-amber-50">
                           <RadioGroupItem value="yes" id={`${svc.name}-yes`} />
@@ -451,11 +524,11 @@ export default function SmallEnterpriseSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Quunnamtu</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="contactName" en={label('contactName').en} or={label('contactName').or} required={req('contactName')} />
                   <Input id="contactName" name="contactName" placeholder="Full name of owner / manager" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="contactPhone" className="text-xs sm:text-sm">Contact Phone<br /><span className="text-xs font-normal text-muted-foreground">Bilbila Quunnamtii</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="contactPhone" en={label('contactPhone').en} or={label('contactPhone').or} required={req('contactPhone')} />
                   <Input id="contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>

@@ -47,6 +47,7 @@ import CampaignGoalForm from '@/components/charity/campaign/CampaignGoalForm';
 import CampaignAchievementForm from '@/components/charity/campaign/CampaignAchievementForm';
 import CampaignReport from '@/components/charity/campaign/CampaignReport';
 import SettingsManager from '@/components/admin/SettingsManager';
+import { SurveyQuestionsSection } from '@/components/admin/SectorSurveyQuestionsSection';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import { AppSidebar, MobileSidebar } from '@/components/admin/ManageSidebar';
 import { SettingsProvider } from '@/components/SettingsProvider';
@@ -248,11 +249,13 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Hotel manage workspace: dashboard — records live in their own Records tab (admin) */}
+          {/* Hotel manage workspace: dashboard + survey questionnaire — records
+              live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="hotelManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
                 <Dashboard />
+                <SurveyQuestionsSection sector="guesthouse" />
               </div>
             </TabsContent>
           )}
@@ -280,11 +283,13 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Health manage workspace: stats — records live in their own Records tab (admin) */}
+          {/* Health manage workspace: stats + survey questionnaire — records
+              live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="healthManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
                 <HealthStats />
+                <SurveyQuestionsSection sector="health" />
               </div>
             </TabsContent>
           )}
@@ -312,11 +317,13 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Education manage workspace: stats — records live in their own Records tab (admin) */}
+          {/* Education manage workspace: stats + survey questionnaire — records
+              live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="eduManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
                 <EducationStats />
+                <SurveyQuestionsSection sector="education" />
               </div>
             </TabsContent>
           )}
@@ -344,11 +351,13 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Agriculture manage workspace: stats — records live in their own Records tab (admin) */}
+          {/* Agriculture manage workspace: stats + survey questionnaire — records
+              live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="agriManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
                 <AgricultureStats />
+                <SurveyQuestionsSection sector="agriculture" />
               </div>
             </TabsContent>
           )}
@@ -376,12 +385,13 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Small Enterprise manage workspace: performance dashboard — records
-              live in their own Records tab (admin) */}
+          {/* Small Enterprise manage workspace: performance dashboard + survey
+              questionnaire — records live in their own Records tab (admin) */}
           {isAdmin && (
             <TabsContent value="mseManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
                 <SmePerformanceDashboard />
+                <SurveyQuestionsSection sector="small-enterprise" />
               </div>
             </TabsContent>
           )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +34,12 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { HEALTH_FACILITY_TYPES, HEALTH_OWNERSHIP_TYPES } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+import {
+  sectorSurveyFieldEnabled,
+  sectorSurveyFieldRequired,
+  sectorSurveyFieldsDefault,
+  type SurveyFieldConfig,
+} from '@/lib/survey-fields';
 
 interface HealthSurveyFormProps {
   onSubmit: () => void;
@@ -57,6 +63,17 @@ const SERVICE_FIELDS: { name: string; label: string; labelOr: string; hint: stri
   { name: 'hasEmergency', label: 'Emergency (24/7)', labelOr: 'Ethiirtii 24/7', hint: 'Open day and night' },
 ];
 
+/** Uniform question label: admin-managed English label + Afaan Oromoo sub-label + required star. */
+function FieldLabel({ id, en, or, required }: { id: string; en: string; or?: string; required?: boolean }) {
+  return (
+    <Label htmlFor={id} className="text-xs sm:text-sm">
+      {en}
+      {or ? (<><br /><span className="text-xs font-normal text-muted-foreground">{or}</span></>) : null}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </Label>
+  );
+}
+
 export default function HealthSurveyForm({
   onSubmit,
   surveyorName,
@@ -71,6 +88,35 @@ export default function HealthSurveyForm({
   const [selectedSubCity, setSelectedSubCity] = useState('');
   const [areas, setAreas] = useState<string[]>([]);
   const [dataConfirmed, setDataConfirmed] = useState('');
+
+  // Admin-managed questionnaire (Manage workspace → Survey Questions);
+  // registry defaults until it loads (offline keeps the defaults).
+  const [fields, setFields] = useState<SurveyFieldConfig[]>(() =>
+    sectorSurveyFieldsDefault('health')
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields/health')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields) && d.fields.length > 0) setFields(d.fields);
+      })
+      .catch(() => {
+        // offline — keep registry defaults
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Questionnaire accessors: shown / required / admin-managed bilingual label.
+  const shown = (key: string) => sectorSurveyFieldEnabled('health', fields, key);
+  const req = (key: string) => sectorSurveyFieldRequired('health', fields, key);
+  const label = (key: string) => {
+    const f = fields.find((x) => x.key === key);
+    return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
+  };
 
   const emptyForm = {
     facilityName: '',
@@ -143,31 +189,43 @@ export default function HealthSurveyForm({
   };
 
   const validateStep = (step: number): boolean => {
+    /** First missing required field of a step (missing = empty AND questionnaire-required). */
+    const missingRequired = (keys: string[]): string | null => {
+      for (const key of keys) {
+        if (req(key) && !formData[key as keyof typeof formData]) return label(key).en;
+      }
+      return null;
+    };
     switch (step) {
-      case 1:
-        if (!formData.facilityName || !formData.facilityType || !formData.subCity || !formData.area || !formData.specificAddress) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      case 1: {
+        const missing = missingRequired(['facilityName', 'facilityType', 'subCity', 'area', 'specificAddress']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         return true;
-      case 2:
-        if (!formData.ownershipType) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Ownership type is required / Gosa abbaa qabuu barbaachisaadha', variant: 'destructive' });
+      }
+      case 2: {
+        const missing = missingRequired(['ownershipType']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         if (!formData.staffCount || Number(formData.staffCount) < 0) {
           toast({ title: 'Invalid Staff Count / Lakkoofsa Hojjetaa Dogoggora', description: 'Enter a valid staff count / Lakkoofsa hojjetaa sirrii galchi', variant: 'destructive' });
           return false;
         }
-        if (!validateSexPair(formData.maleStaff, formData.femaleStaff, formData.staffCount, 'Staff Count')) return false;
-        if (formData.bedCount !== '' && Number(formData.bedCount) < 0) {
+        if (shown('staffSex') && !validateSexPair(formData.maleStaff, formData.femaleStaff, formData.staffCount, 'Staff Count')) return false;
+        if (shown('bedCount') && formData.bedCount !== '' && Number(formData.bedCount) < 0) {
           toast({ title: 'Invalid Beds / Lakkoofsa Siree Dogoggora', description: 'Bed count cannot be negative / Lakkoofsa siree diidaa hin qabaatu', variant: 'destructive' });
           return false;
         }
         return true;
-      case 3:
-        if (!formData.contactName || !formData.contactPhone) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Contact person and phone are required / Maqaa fi bilbila quunnamtii barbaachisa', variant: 'destructive' });
+      }
+      case 3: {
+        const missing = missingRequired(['contactName', 'contactPhone']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         {
@@ -179,6 +237,7 @@ export default function HealthSurveyForm({
           }
         }
         return true;
+      }
       case 4:
         if (dataConfirmed !== 'yes') {
           toast({ title: 'Confirmation Required / Mirkanaa\u2019uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\u2019eef mirkanaadhu', variant: 'destructive' });
@@ -250,24 +309,26 @@ export default function HealthSurveyForm({
     }
   };
 
-  const reviewItems = [
-    { label: 'Facility / Manaa Yaalaa', value: formData.facilityName },
-    { label: 'Facility Type / Gosa', value: formData.facilityType },
-    { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
-    { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
-    { label: 'Werreda', value: formData.area },
-    { label: 'Address / Baka Addaa', value: formData.specificAddress },
-    { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
-    { label: 'Staff / Hojjetaa', value: formData.staffCount },
-    { label: 'Male Staff / Dhiira', value: formData.maleStaff === '' ? '—' : formData.maleStaff },
-    { label: 'Female Staff / Dubartii', value: formData.femaleStaff === '' ? '—' : formData.femaleStaff },
-    { label: 'Beds / Siree', value: formData.bedCount === '' ? '0' : formData.bedCount },
-    { label: 'Laboratory', value: formData.hasLaboratory === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Pharmacy', value: formData.hasPharmacy === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Maternity / Dhalachaa', value: formData.hasMaternity === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Emergency (24/7)', value: formData.hasEmergency === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
-  ];
+  const reviewItems = (
+    [
+      shown('facilityName') && { label: 'Facility / Manaa Yaalaa', value: formData.facilityName },
+      shown('facilityType') && { label: 'Facility Type / Gosa', value: formData.facilityType },
+      shown('ownershipType') && { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
+      shown('subCity') && { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
+      shown('area') && { label: 'Werreda', value: formData.area },
+      shown('specificAddress') && { label: 'Address / Baka Addaa', value: formData.specificAddress },
+      shown('licenseNumber') && { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
+      shown('staffCount') && { label: 'Staff / Hojjetaa', value: formData.staffCount },
+      shown('staffSex') && { label: 'Male Staff / Dhiira', value: formData.maleStaff === '' ? '—' : formData.maleStaff },
+      shown('staffSex') && { label: 'Female Staff / Dubartii', value: formData.femaleStaff === '' ? '—' : formData.femaleStaff },
+      shown('bedCount') && { label: 'Beds / Siree', value: formData.bedCount === '' ? '0' : formData.bedCount },
+      shown('hasLaboratory') && { label: 'Laboratory', value: formData.hasLaboratory === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasPharmacy') && { label: 'Pharmacy', value: formData.hasPharmacy === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasMaternity') && { label: 'Maternity / Dhalachaa', value: formData.hasMaternity === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasEmergency') && { label: 'Emergency (24/7)', value: formData.hasEmergency === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('contactName') && { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
+    ].filter(Boolean) as { label: string; value: string }[]
+  );
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -324,11 +385,11 @@ export default function HealthSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="facilityName" className="text-xs sm:text-sm">Facility Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Manaa Yaalaa</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="facilityName" en={label('facilityName').en} or={label('facilityName').or} required={req('facilityName')} />
                   <Input id="facilityName" name="facilityName" placeholder="e.g., BISHOFTU GENERAL HOSPITAL" value={formData.facilityName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="facilityType" className="text-xs sm:text-sm">Facility Type / Gosa Manaa Yaalaa <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="facilityType" en={label('facilityType').en} or={label('facilityType').or} required={req('facilityType')} />
                   <Select value={formData.facilityType} onValueChange={(v) => handleSelectChange('facilityType', v)}>
                     <SelectTrigger id="facilityType" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                     <SelectContent className="max-h-64">{HEALTH_FACILITY_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
@@ -336,24 +397,26 @@ export default function HealthSurveyForm({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="subCity" en={label('subCity').en} or={label('subCity').or} required={req('subCity')} />
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="area" en={label('area').en} or={label('area').or} required={req('area')} />
                     <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
                       <SelectTrigger id="area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
                       <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                 </div>
+                {shown('specificAddress') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
-                  <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="specificAddress" en={label('specificAddress').en} or={label('specificAddress').or} required={req('specificAddress')} />
+                  <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
               </CardContent>
             </>
           )}
@@ -369,12 +432,15 @@ export default function HealthSurveyForm({
                 <CardDescription className="text-xs sm:text-sm">License, ownership, staff and available services</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {shown('licenseNumber') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyeema</span></Label>
+                  <FieldLabel id="licenseNumber" en={label('licenseNumber').en} or={label('licenseNumber').or} required={req('licenseNumber')} />
                   <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., HC/2015/0234" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
+                {shown('ownershipType') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className="text-xs sm:text-sm">Ownership Type / Gosa Abbaa Qabuu <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="ownershipType" en={label('ownershipType').en} or={label('ownershipType').or} required={req('ownershipType')} />
                   <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {HEALTH_OWNERSHIP_TYPES.map((t) => (
                       <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-sky-500 has-data-[state=checked]:bg-sky-50">
@@ -384,20 +450,24 @@ export default function HealthSurveyForm({
                     ))}
                   </RadioGroup>
                 </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="staffCount" className="text-xs sm:text-sm">Staff Count<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Hojjetaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="staffCount" en={label('staffCount').en} or={label('staffCount').or} required={req('staffCount')} />
                     <Input id="staffCount" name="staffCount" type="number" min="0" placeholder="e.g., 25" value={formData.staffCount} onChange={handleChange} required className="text-sm sm:text-base" />
                   </div>
+                  {shown('bedCount') && (
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="bedCount" className="text-xs sm:text-sm">Inpatient Beds<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Siree</span></Label>
+                    <FieldLabel id="bedCount" en={label('bedCount').en} or={label('bedCount').or} required={req('bedCount')} />
                     <Input id="bedCount" name="bedCount" type="number" min="0" placeholder="0 if outpatient only" value={formData.bedCount} onChange={handleChange} className="text-sm sm:text-base" />
                   </div>
+                  )}
                 </div>
                 {/* Staff by sex (male / female) */}
+                {shown('staffSex') && (
                 <div className="rounded-lg border border-sky-100 bg-sky-50/50 p-3 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs sm:text-sm">Staff by Sex<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa Dhiira fi Dubartii</span></Label>
+                    <Label className="text-xs sm:text-sm">{label('staffSex').en}<br /><span className="text-xs font-normal text-muted-foreground">{label('staffSex').or}</span></Label>
                     <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[9px] font-medium text-sky-700 sm:text-[10px]">Optional / Filannoo</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -412,11 +482,12 @@ export default function HealthSurveyForm({
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Staff Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
+                )}
                 {/* Available services */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                  {SERVICE_FIELDS.map((svc) => (
+                  {SERVICE_FIELDS.filter((svc) => shown(svc.name)).map((svc) => (
                     <div key={svc.name} className="space-y-1.5 sm:space-y-2">
-                      <Label className="text-xs sm:text-sm">{svc.label}<br /><span className="text-xs font-normal text-muted-foreground">{svc.labelOr} — {svc.hint}</span></Label>
+                      <Label className="text-xs sm:text-sm">{label(svc.name).en}<br /><span className="text-xs font-normal text-muted-foreground">{label(svc.name).or} — {svc.hint}</span></Label>
                       <RadioGroup value={formData[svc.name as keyof typeof formData]} onValueChange={(v) => handleSelectChange(svc.name, v)} className="flex gap-4">
                         <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-sky-500 has-data-[state=checked]:bg-sky-50">
                           <RadioGroupItem value="yes" id={`${svc.name}-yes`} />
@@ -446,11 +517,11 @@ export default function HealthSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Quunnamtu</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="contactName" en={label('contactName').en} or={label('contactName').or} required={req('contactName')} />
                   <Input id="contactName" name="contactName" placeholder="Full name of manager / head nurse" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="contactPhone" className="text-xs sm:text-sm">Contact Phone<br /><span className="text-xs font-normal text-muted-foreground">Bilbila Quunnamtii</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="contactPhone" en={label('contactPhone').en} or={label('contactPhone').or} required={req('contactPhone')} />
                   <Input id="contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>

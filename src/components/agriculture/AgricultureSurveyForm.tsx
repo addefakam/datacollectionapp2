@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +34,12 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AGRICULTURE_FARM_TYPES, AGRICULTURE_OWNERSHIP_TYPES } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+import {
+  sectorSurveyFieldEnabled,
+  sectorSurveyFieldRequired,
+  sectorSurveyFieldsDefault,
+  type SurveyFieldConfig,
+} from '@/lib/survey-fields';
 
 interface AgricultureSurveyFormProps {
   onSubmit: () => void;
@@ -57,6 +63,17 @@ const SERVICE_FIELDS: { name: string; label: string; labelOr?: string; hint: str
   { name: 'hasStorage', label: 'Storage', hint: 'On-site storage facility' },
 ];
 
+/** Uniform question label: admin-managed English label + Afaan Oromoo sub-label + required star. */
+function FieldLabel({ id, en, or, required }: { id: string; en: string; or?: string; required?: boolean }) {
+  return (
+    <Label htmlFor={id} className="text-xs sm:text-sm">
+      {en}
+      {or ? (<><br /><span className="text-xs font-normal text-muted-foreground">{or}</span></>) : null}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </Label>
+  );
+}
+
 export default function AgricultureSurveyForm({
   onSubmit,
   surveyorName,
@@ -71,6 +88,35 @@ export default function AgricultureSurveyForm({
   const [selectedSubCity, setSelectedSubCity] = useState('');
   const [areas, setAreas] = useState<string[]>([]);
   const [dataConfirmed, setDataConfirmed] = useState('');
+
+  // Admin-managed questionnaire (Manage workspace → Survey Questions);
+  // registry defaults until it loads (offline keeps the defaults).
+  const [fields, setFields] = useState<SurveyFieldConfig[]>(() =>
+    sectorSurveyFieldsDefault('agriculture')
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields/agriculture')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields) && d.fields.length > 0) setFields(d.fields);
+      })
+      .catch(() => {
+        // offline — keep registry defaults
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Questionnaire accessors: shown / required / admin-managed bilingual label.
+  const shown = (key: string) => sectorSurveyFieldEnabled('agriculture', fields, key);
+  const req = (key: string) => sectorSurveyFieldRequired('agriculture', fields, key);
+  const label = (key: string) => {
+    const f = fields.find((x) => x.key === key);
+    return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
+  };
 
   const emptyForm = {
     farmName: '',
@@ -143,31 +189,43 @@ export default function AgricultureSurveyForm({
   };
 
   const validateStep = (step: number): boolean => {
+    /** First missing required field of a step (missing = empty AND questionnaire-required). */
+    const missingRequired = (keys: string[]): string | null => {
+      for (const key of keys) {
+        if (req(key) && !formData[key as keyof typeof formData]) return label(key).en;
+      }
+      return null;
+    };
     switch (step) {
-      case 1:
-        if (!formData.farmName || !formData.farmType || !formData.subCity || !formData.area || !formData.specificAddress) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      case 1: {
+        const missing = missingRequired(['farmName', 'farmType', 'subCity', 'area', 'specificAddress']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         return true;
-      case 2:
-        if (!formData.ownershipType) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Ownership type is required / Gosa abbaa qabuu barbaachisaadha', variant: 'destructive' });
+      }
+      case 2: {
+        const missing = missingRequired(['ownershipType', 'landSizeHectares']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         if (!formData.workerCount || Number(formData.workerCount) < 0) {
           toast({ title: 'Invalid Worker Count', description: 'Enter a valid worker count', variant: 'destructive' });
           return false;
         }
-        if (!validateSexPair(formData.maleWorkers, formData.femaleWorkers, formData.workerCount, 'Worker Count')) return false;
-        if (!formData.landSizeHectares || Number(formData.landSizeHectares) < 0) {
+        if (shown('workersSex') && !validateSexPair(formData.maleWorkers, formData.femaleWorkers, formData.workerCount, 'Worker Count')) return false;
+        if (shown('landSizeHectares') && formData.landSizeHectares !== '' && Number(formData.landSizeHectares) < 0) {
           toast({ title: 'Invalid Land Size', description: 'Land size cannot be negative', variant: 'destructive' });
           return false;
         }
         return true;
-      case 3:
-        if (!formData.contactName || !formData.contactPhone) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Contact person and phone are required / Maqaa fi bilbila quunnamtii barbaachisa', variant: 'destructive' });
+      }
+      case 3: {
+        const missing = missingRequired(['contactName', 'contactPhone']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         {
@@ -179,6 +237,7 @@ export default function AgricultureSurveyForm({
           }
         }
         return true;
+      }
       case 4:
         if (dataConfirmed !== 'yes') {
           toast({ title: 'Confirmation Required / Mirkanaa\u2019uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\u2019eef mirkanaadhu', variant: 'destructive' });
@@ -250,24 +309,26 @@ export default function AgricultureSurveyForm({
     }
   };
 
-  const reviewItems = [
-    { label: 'Farm / Mana Qonnaa', value: formData.farmName },
-    { label: 'Farm Type / Gosa Qonnaa', value: formData.farmType },
-    { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
-    { label: 'Sub-City / Kututtaa Maggalaa', value: formData.subCity },
-    { label: 'Werreda', value: formData.area },
-    { label: 'Address / Baka Addaa', value: formData.specificAddress },
-    { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
-    { label: 'Land (ha) / Dachaa', value: formData.landSizeHectares === '' ? '0' : formData.landSizeHectares },
-    { label: 'Workers / Hojjetaa', value: formData.workerCount },
-    { label: 'Male Workers / Dhiira', value: formData.maleWorkers === '' ? '—' : formData.maleWorkers },
-    { label: 'Female Workers / Dubartii', value: formData.femaleWorkers === '' ? '—' : formData.femaleWorkers },
-    { label: 'Irrigation', value: formData.hasIrrigation === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Greenhouse', value: formData.hasGreenhouse === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Machinery / Meeshaa Qonnaa', value: formData.hasMachinery === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Storage', value: formData.hasStorage === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
-  ];
+  const reviewItems = (
+    [
+      shown('farmName') && { label: 'Farm / Mana Qonnaa', value: formData.farmName },
+      shown('farmType') && { label: 'Farm Type / Gosa Qonnaa', value: formData.farmType },
+      shown('ownershipType') && { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
+      shown('subCity') && { label: 'Sub-City / Kututtaa Maggalaa', value: formData.subCity },
+      shown('area') && { label: 'Werreda', value: formData.area },
+      shown('specificAddress') && { label: 'Address / Baka Addaa', value: formData.specificAddress },
+      shown('licenseNumber') && { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
+      shown('landSizeHectares') && { label: 'Land (ha) / Dachaa', value: formData.landSizeHectares === '' ? '0' : formData.landSizeHectares },
+      shown('workerCount') && { label: 'Workers / Hojjetaa', value: formData.workerCount },
+      shown('workersSex') && { label: 'Male Workers / Dhiira', value: formData.maleWorkers === '' ? '—' : formData.maleWorkers },
+      shown('workersSex') && { label: 'Female Workers / Dubartii', value: formData.femaleWorkers === '' ? '—' : formData.femaleWorkers },
+      shown('hasIrrigation') && { label: 'Irrigation', value: formData.hasIrrigation === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasGreenhouse') && { label: 'Greenhouse', value: formData.hasGreenhouse === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasMachinery') && { label: 'Machinery / Meeshaa Qonnaa', value: formData.hasMachinery === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasStorage') && { label: 'Storage', value: formData.hasStorage === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('contactName') && { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
+    ].filter(Boolean) as { label: string; value: string }[]
+  );
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -324,11 +385,11 @@ export default function AgricultureSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="a-farmName" className="text-xs sm:text-sm">Farm / Establishment Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Mana Qonnaa</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="a-farmName" en={label('farmName').en} or={label('farmName').or} required={req('farmName')} />
                   <Input id="a-farmName" name="farmName" placeholder="e.g., ADAA GREEN DAIRY FARM" value={formData.farmName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="a-farmType" className="text-xs sm:text-sm">Farm Type / Gosa Qonnaa <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="a-farmType" en={label('farmType').en} or={label('farmType').or} required={req('farmType')} />
                   <Select value={formData.farmType} onValueChange={(v) => handleSelectChange('farmType', v)}>
                     <SelectTrigger id="a-farmType" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                     <SelectContent className="max-h-64">{AGRICULTURE_FARM_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
@@ -336,24 +397,26 @@ export default function AgricultureSurveyForm({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="a-subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="a-subCity" en={label('subCity').en} or={label('subCity').or} required={req('subCity')} />
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="a-subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="a-area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="a-area" en={label('area').en} or={label('area').or} required={req('area')} />
                     <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
                       <SelectTrigger id="a-area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
                       <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                 </div>
+                {shown('specificAddress') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="a-specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
-                  <Input id="a-specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="a-specificAddress" en={label('specificAddress').en} or={label('specificAddress').or} required={req('specificAddress')} />
+                  <Input id="a-specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
               </CardContent>
             </>
           )}
@@ -369,12 +432,15 @@ export default function AgricultureSurveyForm({
                 <CardDescription className="text-xs sm:text-sm">License, ownership, land size and available infrastructure</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {shown('licenseNumber') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="a-licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyeema</span></Label>
+                  <FieldLabel id="a-licenseNumber" en={label('licenseNumber').en} or={label('licenseNumber').or} required={req('licenseNumber')} />
                   <Input id="a-licenseNumber" name="licenseNumber" placeholder="e.g., AG/2024/0234" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
+                {shown('ownershipType') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className="text-xs sm:text-sm">Ownership Type / Gosa Abbaa Qabuu <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="a-ownershipType" en={label('ownershipType').en} or={label('ownershipType').or} required={req('ownershipType')} />
                   <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {AGRICULTURE_OWNERSHIP_TYPES.map((t) => (
                       <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-emerald-500 has-data-[state=checked]:bg-emerald-50">
@@ -384,20 +450,24 @@ export default function AgricultureSurveyForm({
                     ))}
                   </RadioGroup>
                 </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  {shown('landSizeHectares') && (
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="a-landSizeHectares" className="text-xs sm:text-sm">Land Size (ha)<br /><span className="text-xs font-normal text-muted-foreground">Dachaa</span> <span className="text-red-500">*</span></Label>
-                    <Input id="a-landSizeHectares" name="landSizeHectares" type="number" min="0" step="0.1" placeholder="e.g., 12.5" value={formData.landSizeHectares} onChange={handleChange} required className="text-sm sm:text-base" />
+                    <FieldLabel id="a-landSizeHectares" en={label('landSizeHectares').en} or={label('landSizeHectares').or} required={req('landSizeHectares')} />
+                    <Input id="a-landSizeHectares" name="landSizeHectares" type="number" min="0" step="0.1" placeholder="e.g., 12.5" value={formData.landSizeHectares} onChange={handleChange} className="text-sm sm:text-base" />
                   </div>
+                  )}
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="a-workerCount" className="text-xs sm:text-sm">Worker Count<br /><span className="text-xs font-normal text-muted-foreground">Hojjetaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="a-workerCount" en={label('workerCount').en} or={label('workerCount').or} required={req('workerCount')} />
                     <Input id="a-workerCount" name="workerCount" type="number" min="0" placeholder="e.g., 15" value={formData.workerCount} onChange={handleChange} required className="text-sm sm:text-base" />
                   </div>
                 </div>
                 {/* Workers by sex (male / female) */}
+                {shown('workersSex') && (
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs sm:text-sm">Workers by Sex<br /><span className="text-xs font-normal text-muted-foreground">Hojjettoota Dhiira fi Dubartii</span></Label>
+                    <Label className="text-xs sm:text-sm">{label('workersSex').en}<br /><span className="text-xs font-normal text-muted-foreground">{label('workersSex').or}</span></Label>
                     <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-700 sm:text-[10px]">Optional / Filannoo</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -412,11 +482,12 @@ export default function AgricultureSurveyForm({
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Worker Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
+                )}
                 {/* Available infrastructure */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                  {SERVICE_FIELDS.map((svc) => (
+                  {SERVICE_FIELDS.filter((svc) => shown(svc.name)).map((svc) => (
                     <div key={svc.name} className="space-y-1.5 sm:space-y-2">
-                      <Label className="text-xs sm:text-sm">{svc.label}{svc.labelOr && (<><br /><span className="text-xs font-normal text-muted-foreground">{svc.labelOr} — {svc.hint}</span></>)}{!svc.labelOr && (<><br /><span className="text-xs font-normal text-muted-foreground">{svc.hint}</span></>)}</Label>
+                      <Label className="text-xs sm:text-sm">{label(svc.name).en}{label(svc.name).or ? (<><br /><span className="text-xs font-normal text-muted-foreground">{label(svc.name).or} — {svc.hint}</span></>) : (<><br /><span className="text-xs font-normal text-muted-foreground">{svc.hint}</span></>)}</Label>
                       <RadioGroup value={formData[svc.name as keyof typeof formData]} onValueChange={(v) => handleSelectChange(svc.name, v)} className="flex gap-4">
                         <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-emerald-500 has-data-[state=checked]:bg-emerald-50">
                           <RadioGroupItem value="yes" id={`a-${svc.name}-yes`} />
@@ -446,11 +517,11 @@ export default function AgricultureSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="a-contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Quunnamtu</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="a-contactName" en={label('contactName').en} or={label('contactName').or} required={req('contactName')} />
                   <Input id="a-contactName" name="contactName" placeholder="Full name of manager / farm head" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="a-contactPhone" className="text-xs sm:text-sm">Contact Phone<br /><span className="text-xs font-normal text-muted-foreground">Bilbila Quunnamtii</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="a-contactPhone" en={label('contactPhone').en} or={label('contactPhone').or} required={req('contactPhone')} />
                   <Input id="a-contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>

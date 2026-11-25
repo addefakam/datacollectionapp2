@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
 import { isSmeStatus } from '@/lib/sme';
 import { canonicalArea, canonicalSubCity } from '@/lib/sme-server';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import { sectorSurveyFieldRequired } from '@/lib/survey-fields';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -33,10 +35,24 @@ export async function POST(request: NextRequest) {
       surveyorId,
     } = body;
 
-    // Validate required fields
-    if (!enterpriseName || !enterpriseType || !ownershipType || !subCity || !area || !specificAddress || !contactName || !contactPhone) {
+    // Validate required fields — the required set follows the admin-managed
+    // questionnaire (Manage → Survey Questions): locked fields are always
+    // required, configurable ones only when the questionnaire shows them as
+    // required.
+    const surveyFields = await loadSectorSurveyFields('small-enterprise');
+    const need = (key: string): boolean => sectorSurveyFieldRequired('small-enterprise', surveyFields, key);
+    if (
+      !enterpriseName ||
+      !enterpriseType ||
+      !subCity ||
+      !area ||
+      !contactName ||
+      !contactPhone ||
+      (need('ownershipType') && !ownershipType) ||
+      (need('specificAddress') && !specificAddress)
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields', missing: { enterpriseName: !enterpriseName, enterpriseType: !enterpriseType, ownershipType: !ownershipType, subCity: !subCity, area: !area, specificAddress: !specificAddress, contactName: !contactName, contactPhone: !contactPhone } },
+        { error: 'Missing required fields', missing: { enterpriseName: !enterpriseName, enterpriseType: !enterpriseType, ownershipType: need('ownershipType') && !ownershipType, subCity: !subCity, area: !area, specificAddress: need('specificAddress') && !specificAddress, contactName: !contactName, contactPhone: !contactPhone } },
         { status: 400 }
       );
     }
@@ -81,7 +97,7 @@ export async function POST(request: NextRequest) {
       data: {
         enterpriseName,
         enterpriseType,
-        ownershipType,
+        ownershipType: ownershipType || '', // hidden question stores an empty value
         subCity: scopeSubCity,
         area: scopeArea,
         specificAddress: specificAddress || '',

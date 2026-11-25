@@ -2,6 +2,8 @@ import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeInstitutionTypes } from '@/lib/location-data';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import { sectorSurveyFieldRequired } from '@/lib/survey-fields';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -37,11 +39,25 @@ export async function POST(request: NextRequest) {
       surveyorId,
     } = body;
 
-    // Validate required fields (institutionType accepts a string or array of types)
+    // Validate required fields (institutionType accepts a string or array of
+    // types) — the required set follows the admin-managed questionnaire
+    // (Manage → Survey Questions): locked fields are always required,
+    // configurable ones only when the questionnaire shows them as required.
     const normalizedInstitutionType = normalizeInstitutionTypes(institutionType);
-    if (!institutionName || !normalizedInstitutionType || !ownershipType || !subCity || !area || !specificAddress || !contactName || !contactPhone) {
+    const surveyFields = await loadSectorSurveyFields('education');
+    const need = (key: string): boolean => sectorSurveyFieldRequired('education', surveyFields, key);
+    if (
+      !institutionName ||
+      !normalizedInstitutionType ||
+      !subCity ||
+      !area ||
+      !contactName ||
+      !contactPhone ||
+      (need('ownershipType') && !ownershipType) ||
+      (need('specificAddress') && !specificAddress)
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields', missing: { institutionName: !institutionName, institutionType: !normalizedInstitutionType, ownershipType: !ownershipType, subCity: !subCity, area: !area, specificAddress: !specificAddress, contactName: !contactName, contactPhone: !contactPhone } },
+        { error: 'Missing required fields', missing: { institutionName: !institutionName, institutionType: !normalizedInstitutionType, ownershipType: need('ownershipType') && !ownershipType, subCity: !subCity, area: !area, specificAddress: need('specificAddress') && !specificAddress, contactName: !contactName, contactPhone: !contactPhone } },
         { status: 400 }
       );
     }
@@ -84,7 +100,7 @@ export async function POST(request: NextRequest) {
       data: {
         institutionName,
         institutionType: normalizedInstitutionType,
-        ownershipType,
+        ownershipType: ownershipType || '', // hidden question stores an empty value
         subCity,
         area,
         specificAddress: specificAddress || '',

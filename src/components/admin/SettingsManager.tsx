@@ -47,6 +47,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useSettings, SubCityData } from '@/components/SettingsProvider';
 import { IndustryQuestionnaireSection, IndustryStatsConditionSection } from '@/components/industry/IndustrySurveySettings';
+import { SurveyQuestionsSection } from '@/components/admin/SectorSurveyQuestionsSection';
 
 // ============ Sub-Cities & Areas section ============
 
@@ -615,7 +616,14 @@ export default function SettingsManager() {
           <CategoriesSection />
         </TabsContent>
         <TabsContent value="survey" className="mt-3">
-          <IndustryQuestionnaireSection />
+          <div className="space-y-4">
+            <IndustryQuestionnaireSection />
+            <SurveyQuestionsSection sector="guesthouse" />
+            <SurveyQuestionsSection sector="health" />
+            <SurveyQuestionsSection sector="education" />
+            <SurveyQuestionsSection sector="agriculture" />
+            <SurveyQuestionsSection sector="small-enterprise" />
+          </div>
         </TabsContent>
         <TabsContent value="stats" className="mt-3">
           <IndustryStatsConditionSection />

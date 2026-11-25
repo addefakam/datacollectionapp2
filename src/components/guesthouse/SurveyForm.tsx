@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import SignaturePad, { SignaturePadHandle } from '@/components/SignaturePad';
 import { LICENSE_TYPES, LICENSE_LEVELS } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+import {
+  sectorSurveyFieldEnabled,
+  sectorSurveyFieldRequired,
+  sectorSurveyFieldsDefault,
+  type SurveyFieldConfig,
+} from '@/lib/survey-fields';
 
 interface SurveyFormProps {
   onSubmit: () => void;
@@ -51,6 +57,17 @@ const STEPS = [
   { id: 4, title: 'Review', titleOr: 'Mirkanaa', icon: Eye },
 ];
 
+/** Uniform question label: admin-managed English label + Afaan Oromoo sub-label + required star. */
+function FieldLabel({ id, en, or, required }: { id: string; en: string; or?: string; required?: boolean }) {
+  return (
+    <Label htmlFor={id} className="text-xs sm:text-sm">
+      {en}
+      {or ? (<><br /><span className="text-xs font-normal text-muted-foreground">{or}</span></>) : null}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </Label>
+  );
+}
+
 export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnline = true, onOfflineSave }: SurveyFormProps) {
   const { subCities, areasFor } = useSettings();
   const { toast } = useToast();
@@ -60,6 +77,35 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
   const [areas, setAreas] = useState<string[]>([]);
   const [dataConfirmed, setDataConfirmed] = useState('');
   const signaturePadRef = useRef<SignaturePadHandle>(null);
+
+  // Admin-managed questionnaire (Manage workspace → Survey Questions);
+  // registry defaults until it loads (offline keeps the defaults).
+  const [fields, setFields] = useState<SurveyFieldConfig[]>(() =>
+    sectorSurveyFieldsDefault('guesthouse')
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields/guesthouse')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields) && d.fields.length > 0) setFields(d.fields);
+      })
+      .catch(() => {
+        // offline — keep registry defaults
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Questionnaire accessors: shown / required / admin-managed bilingual label.
+  const shown = (key: string) => sectorSurveyFieldEnabled('guesthouse', fields, key);
+  const req = (key: string) => sectorSurveyFieldRequired('guesthouse', fields, key);
+  const label = (key: string) => {
+    const f = fields.find((x) => x.key === key);
+    return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
+  };
 
   const emptyForm = {
     guestHouseName: '',
@@ -96,22 +142,34 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
   };
 
   const validateStep = (step: number): boolean => {
+    /** First missing required field of a step (missing = empty AND questionnaire-required). */
+    const missingRequired = (keys: string[]): string | null => {
+      for (const key of keys) {
+        if (req(key) && !formData[key as keyof typeof formData]) return label(key).en;
+      }
+      return null;
+    };
     switch (step) {
-      case 1:
-        if (!formData.organizationName || !formData.subCity || !formData.area || !formData.specificAddress) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      case 1: {
+        const missing = missingRequired(['organizationName', 'subCity', 'area', 'specificAddress']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         return true;
-      case 2:
-        if (!formData.numberOfRooms || !formData.licenseType || !formData.licenseLevel || !formData.licenseNumber) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      }
+      case 2: {
+        const missing = missingRequired(['numberOfRooms', 'licenseType', 'licenseLevel', 'licenseNumber']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         return true;
-      case 3:
-        if (!formData.ownerName || !formData.contactName || !formData.contactPhone) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      }
+      case 3: {
+        const missing = missingRequired(['ownerName', 'contactName', 'contactPhone']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         const phoneClean = formData.contactPhone.replace(/[\s-]/g, '');
@@ -120,18 +178,19 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
           toast({ title: 'Invalid Phone / Bilbila Dogoggora', description: 'Enter valid Ethiopian number (e.g., +251 91 234 5678)', variant: 'destructive' });
           return false;
         }
-        if (formData.contactPhone2) {
+        if (shown('contactPhone2') && formData.contactPhone2) {
           const phoneClean2 = formData.contactPhone2.replace(/[\s-]/g, '');
           if (!ethPhoneRegex.test(phoneClean2)) {
             toast({ title: 'Invalid Phone 2 / Bilbila 2 Dogoggora', description: 'Enter valid Ethiopian number for second contact', variant: 'destructive' });
             return false;
           }
         }
-        if (formData.contactPhone2 && !formData.contactName2) {
+        if (shown('contactPhone2') && shown('contactName2') && formData.contactPhone2 && !formData.contactName2) {
           toast({ title: 'Name Required / Maqaa Barbaachisaa', description: 'Second contact person name is required when phone is provided / Bilbila 2 qofatu yoo galmeessame maqaan isaa barbaachisaa', variant: 'destructive' });
           return false;
         }
         return true;
+      }
       case 4:
         if (dataConfirmed !== 'yes') {
           toast({ title: 'Confirmation Required / Mirkanaa\'uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\'eef mirkanaadhu', variant: 'destructive' });
@@ -197,19 +256,21 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
     }
   };
 
-  const reviewItems = [
-    { label: 'Organization / Dhaabbataa', value: formData.organizationName },
-    { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
-    { label: 'Werreda', value: formData.area },
-    { label: 'Address / Baka Addaa', value: formData.specificAddress },
-    { label: 'Rooms / Qubeettii', value: formData.numberOfRooms },
-    { label: 'License Type / Goossa Eyyema', value: formData.licenseType },
-    { label: 'License Level / Saddarkaa Eyyema', value: formData.licenseLevel },
-    { label: 'License No. / Lakofsaa Eyyema', value: formData.licenseNumber },
-    { label: 'Owner / Abbaa Qaabeyee', value: formData.ownerName },
-    { label: 'Contact 1 / Quunnamtaa 1', value: `${formData.contactName} — ${formData.contactPhone}` },
-    { label: 'Contact 2 / Quunnamtaa 2', value: formData.contactName2 ? `${formData.contactName2} — ${formData.contactPhone2}` : '' },
-  ];
+  const reviewItems = (
+    [
+      shown('organizationName') && { label: 'Organization / Dhaabbataa', value: formData.organizationName },
+      shown('subCity') && { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
+      shown('area') && { label: 'Werreda', value: formData.area },
+      shown('specificAddress') && { label: 'Address / Baka Addaa', value: formData.specificAddress },
+      shown('numberOfRooms') && { label: 'Rooms / Qubeettii', value: formData.numberOfRooms },
+      shown('licenseType') && { label: label('licenseType').en, value: formData.licenseType },
+      shown('licenseLevel') && { label: label('licenseLevel').en, value: formData.licenseLevel },
+      shown('licenseNumber') && { label: label('licenseNumber').en, value: formData.licenseNumber },
+      shown('ownerName') && { label: label('ownerName').en, value: formData.ownerName },
+      shown('contactName') && { label: 'Contact 1 / Quunnamtaa 1', value: `${formData.contactName} — ${formData.contactPhone}` },
+      (shown('contactName2') || shown('contactPhone2')) && { label: 'Contact 2 / Quunnamtaa 2', value: formData.contactName2 ? `${formData.contactName2} — ${formData.contactPhone2}` : formData.contactPhone2 },
+    ].filter(Boolean) as { label: string; value: string }[]
+  );
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -266,29 +327,31 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="organizationName" className="text-xs sm:text-sm">Organization Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Dhaabbataa</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="organizationName" en={label('organizationName').en} or={label('organizationName').or} required={req('organizationName')} />
                   <Input id="organizationName" name="organizationName" placeholder="e.g., GOLD MARK HOTEL" value={formData.organizationName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="subCity" en={label('subCity').en} or={label('subCity').or} required={req('subCity')} />
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="area" en={label('area').en} or={label('area').or} required={req('area')} />
                     <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
                       <SelectTrigger id="area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
                       <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                 </div>
+                {shown('specificAddress') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
-                  <Input id="specificAddress" name="specificAddress" placeholder="Street name, landmark..." value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="specificAddress" en={label('specificAddress').en} or={label('specificAddress').or} required={req('specificAddress')} />
+                  <Input id="specificAddress" name="specificAddress" placeholder="Street name, landmark..." value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
               </CardContent>
             </>
           )}
@@ -305,29 +368,35 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="numberOfRooms" className="text-xs sm:text-sm">Number of Rooms<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Qubeettii</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="numberOfRooms" en={label('numberOfRooms').en} or={label('numberOfRooms').or} required={req('numberOfRooms')} />
                   <Input id="numberOfRooms" name="numberOfRooms" type="number" min="1" placeholder="e.g., 20" value={formData.numberOfRooms} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  {shown('licenseType') && (
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label className="text-xs sm:text-sm">License Type<br /><span className="text-xs font-normal text-muted-foreground">Goossa Eyyema</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="licenseType" en={label('licenseType').en} or={label('licenseType').or} required={req('licenseType')} />
                     <Select value={formData.licenseType} onValueChange={(v) => handleSelectChange('licenseType', v)}>
                       <SelectTrigger className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{LICENSE_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
+                  )}
+                  {shown('licenseLevel') && (
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label className="text-xs sm:text-sm">License Level<br /><span className="text-xs font-normal text-muted-foreground">Saddarkaa Eyyema</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="licenseLevel" en={label('licenseLevel').en} or={label('licenseLevel').or} required={req('licenseLevel')} />
                     <Select value={formData.licenseLevel} onValueChange={(v) => handleSelectChange('licenseLevel', v)}>
                       <SelectTrigger className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{LICENSE_LEVELS.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
+                  )}
                 </div>
+                {shown('licenseNumber') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyema</span> <span className="text-red-500">*</span></Label>
-                  <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., GH-2024-001" value={formData.licenseNumber} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="licenseNumber" en={label('licenseNumber').en} or={label('licenseNumber').or} required={req('licenseNumber')} />
+                  <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., GH-2024-001" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
               </CardContent>
             </>
           )}
@@ -343,32 +412,40 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
                 <CardDescription className="text-xs sm:text-sm">Owner and contact details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {shown('ownerName') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="ownerName" className="text-xs sm:text-sm">Owner Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Abbaa Qaabeyee</span> <span className="text-red-500">*</span></Label>
-                  <Input id="ownerName" name="ownerName" placeholder="Full name of owner" value={formData.ownerName} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="ownerName" en={label('ownerName').en} or={label('ownerName').or} required={req('ownerName')} />
+                  <Input id="ownerName" name="ownerName" placeholder="Full name of owner" value={formData.ownerName} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
                 <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-3 space-y-3">
                   <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">Quunnamtaa 1 / Contact 1</p>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Adadura Qunnamnu</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="contactName" en={label('contactName').en} or={label('contactName').or} required={req('contactName')} />
                     <Input id="contactName" name="contactName" placeholder="Manager or reception contact" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="contactPhone" className="text-xs sm:text-sm">Phone Number<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Bilbila</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="contactPhone" en={label('contactPhone').en} or={label('contactPhone').or} required={req('contactPhone')} />
                     <Input id="contactPhone" name="contactPhone" type="tel" placeholder="e.g., +251 91 234 5678" value={formData.contactPhone} onChange={(e) => { const val = e.target.value.replace(/[^0-9+\s-]/g, ''); setFormData(prev => ({ ...prev, contactPhone: val })); }} required className="text-sm sm:text-base" />
                   </div>
                 </div>
+                {(shown('contactName2') || shown('contactPhone2')) && (
                 <div className="rounded-lg border border-dashed border-gray-300 p-3 space-y-3">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Quunnamtaa 2 / Contact 2 <span className="normal-case font-normal">(optional)</span></p>
+                  {shown('contactName2') && (
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="contactName2" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Adadura Qunnamnu 2</span></Label>
+                    <FieldLabel id="contactName2" en={label('contactName2').en} or={label('contactName2').or} required={req('contactName2')} />
                     <Input id="contactName2" name="contactName2" placeholder="Second contact person" value={formData.contactName2} onChange={handleChange} className="text-sm sm:text-base" />
                   </div>
+                  )}
+                  {shown('contactPhone2') && (
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="contactPhone2" className="text-xs sm:text-sm">Phone Number<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Bilbila 2</span></Label>
+                    <FieldLabel id="contactPhone2" en={label('contactPhone2').en} or={label('contactPhone2').or} required={req('contactPhone2')} />
                     <Input id="contactPhone2" name="contactPhone2" type="tel" placeholder="e.g., +251 92 345 6789" value={formData.contactPhone2} onChange={(e) => { const val = e.target.value.replace(/[^0-9+\s-]/g, ''); setFormData(prev => ({ ...prev, contactPhone2: val })); }} className="text-sm sm:text-base" />
                   </div>
+                  )}
                 </div>
+                )}
               </CardContent>
             </>
           )}

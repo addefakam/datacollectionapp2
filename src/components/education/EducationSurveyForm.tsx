@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { EDUCATION_INSTITUTION_TYPES, EDUCATION_OWNERSHIP_TYPES, normalizeInstitutionTypes } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
 import { InstitutionTypeMultiSelect } from './InstitutionTypeMultiSelect';
+import {
+  sectorSurveyFieldEnabled,
+  sectorSurveyFieldRequired,
+  sectorSurveyFieldsDefault,
+  type SurveyFieldConfig,
+} from '@/lib/survey-fields';
 
 interface EducationSurveyFormProps {
   onSubmit: () => void;
@@ -58,6 +64,18 @@ const SERVICE_FIELDS: { name: string; label: string; labelOr: string; hint: stri
   { name: 'hasFeedingProgram', label: 'Feeding program', labelOr: 'Soorataa', hint: 'School meals program' },
 ];
 
+/** Uniform question label: admin-managed English label + Afaan Oromoo sub-label + required star. */
+function FieldLabel({ id, en, or, required, hint }: { id: string; en: string; or?: string; required?: boolean; hint?: string }) {
+  return (
+    <Label htmlFor={id} className="text-xs sm:text-sm">
+      {en}
+      {or ? (<><br /><span className="text-xs font-normal text-muted-foreground">{or}</span></>) : null}
+      {hint ? (<span className="block text-[10px] font-normal text-muted-foreground sm:text-xs">{hint}</span>) : null}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </Label>
+  );
+}
+
 export default function EducationSurveyForm({
   onSubmit,
   surveyorName,
@@ -72,6 +90,35 @@ export default function EducationSurveyForm({
   const [selectedSubCity, setSelectedSubCity] = useState('');
   const [areas, setAreas] = useState<string[]>([]);
   const [dataConfirmed, setDataConfirmed] = useState('');
+
+  // Admin-managed questionnaire (Manage workspace → Survey Questions);
+  // registry defaults until it loads (offline keeps the defaults).
+  const [fields, setFields] = useState<SurveyFieldConfig[]>(() =>
+    sectorSurveyFieldsDefault('education')
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields/education')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields) && d.fields.length > 0) setFields(d.fields);
+      })
+      .catch(() => {
+        // offline — keep registry defaults
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Questionnaire accessors: shown / required / admin-managed bilingual label.
+  const shown = (key: string) => sectorSurveyFieldEnabled('education', fields, key);
+  const req = (key: string) => sectorSurveyFieldRequired('education', fields, key);
+  const label = (key: string) => {
+    const f = fields.find((x) => x.key === key);
+    return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
+  };
 
   const emptyForm = {
     institutionName: '',
@@ -157,36 +204,48 @@ export default function EducationSurveyForm({
   };
 
   const validateStep = (step: number): boolean => {
+    /** First missing required field of a step (missing = empty AND questionnaire-required). */
+    const missingRequired = (keys: string[]): string | null => {
+      for (const key of keys) {
+        if (req(key) && !formData[key as keyof typeof formData]) return label(key).en;
+      }
+      return null;
+    };
     switch (step) {
-      case 1:
-        if (!formData.institutionName || formData.institutionTypes.length === 0 || !formData.subCity || !formData.area || !formData.specificAddress) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'All fields in this step are required / Galii hundinuu barbaachisaadha', variant: 'destructive' });
+      case 1: {
+        const missing = missingRequired(['institutionName', 'subCity', 'area', 'specificAddress']);
+        if (missing || formData.institutionTypes.length === 0) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing || label('institutionTypes').en} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         return true;
-      case 2:
-        if (!formData.ownershipType) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Ownership type is required / Gosa abbaa qabuu barbaachisaadha', variant: 'destructive' });
+      }
+      case 2: {
+        const missing = missingRequired(['ownershipType', 'teacherCount', 'classroomCount']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         if (!formData.studentCount || Number(formData.studentCount) < 0) {
           toast({ title: 'Invalid Student Count / Lakkoofsa Barataa Dogoggora', description: 'Enter a valid student count / Lakkoofsa barataa sirrii galchi', variant: 'destructive' });
           return false;
         }
-        if (!formData.teacherCount || Number(formData.teacherCount) < 0) {
+        if (shown('teacherCount') && formData.teacherCount !== '' && Number(formData.teacherCount) < 0) {
           toast({ title: 'Invalid Teacher Count / Lakkoofsa Barsiisaa Dogoggora', description: 'Enter a valid teacher count / Lakkoofsa barsiisaa sirrii galchi', variant: 'destructive' });
           return false;
         }
-        if (!formData.classroomCount || Number(formData.classroomCount) < 0) {
+        if (shown('classroomCount') && formData.classroomCount !== '' && Number(formData.classroomCount) < 0) {
           toast({ title: 'Invalid Classroom Count', description: 'Enter a valid classroom count (0 or more)', variant: 'destructive' });
           return false;
         }
-        if (!validateSexPair(formData.maleStudents, formData.femaleStudents, formData.studentCount, 'Student Count')) return false;
-        if (!validateSexPair(formData.maleTeachers, formData.femaleTeachers, formData.teacherCount, 'Teacher Count')) return false;
+        if (shown('studentsSex') && !validateSexPair(formData.maleStudents, formData.femaleStudents, formData.studentCount, 'Student Count')) return false;
+        if (shown('teachersSex') && !validateSexPair(formData.maleTeachers, formData.femaleTeachers, formData.teacherCount, 'Teacher Count')) return false;
         return true;
-      case 3:
-        if (!formData.contactName || !formData.contactPhone) {
-          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: 'Contact person and phone are required / Maqaa fi bilbila quunnamtii barbaachisa', variant: 'destructive' });
+      }
+      case 3: {
+        const missing = missingRequired(['contactName', 'contactPhone']);
+        if (missing) {
+          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
         {
@@ -198,6 +257,7 @@ export default function EducationSurveyForm({
           }
         }
         return true;
+      }
       case 4:
         if (dataConfirmed !== 'yes') {
           toast({ title: 'Confirmation Required / Mirkanaa\u2019uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\u2019eef mirkanaadhu', variant: 'destructive' });
@@ -273,27 +333,29 @@ export default function EducationSurveyForm({
     }
   };
 
-  const reviewItems = [
-    { label: 'Institution / Mana Barumsaa', value: formData.institutionName },
-    { label: 'Institution Type / Gosa', value: formData.institutionTypes.join(', ') },
-    { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
-    { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
-    { label: 'Werreda', value: formData.area },
-    { label: 'Address / Baka Addaa', value: formData.specificAddress },
-    { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
-    { label: 'Students / Barataa', value: formData.studentCount },
-    { label: 'Male Students / Barataa Dhiiraa', value: formData.maleStudents === '' ? '—' : formData.maleStudents },
-    { label: 'Female Students / Barattii Dubartii', value: formData.femaleStudents === '' ? '—' : formData.femaleStudents },
-    { label: 'Teachers / Barsiisaa', value: formData.teacherCount },
-    { label: 'Male Teachers / Barsiisaa Dhiiraa', value: formData.maleTeachers === '' ? '—' : formData.maleTeachers },
-    { label: 'Female Teachers / Dubartii Barsiisaa', value: formData.femaleTeachers === '' ? '—' : formData.femaleTeachers },
-    { label: 'Classrooms', value: formData.classroomCount === '' ? '0' : formData.classroomCount },
-    { label: 'Library', value: formData.hasLibrary === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Laboratory', value: formData.hasLaboratory === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Computer Lab', value: formData.hasComputerLab === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Feeding Program', value: formData.hasFeedingProgram === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
-  ];
+  const reviewItems = (
+    [
+      shown('institutionName') && { label: 'Institution / Mana Barumsaa', value: formData.institutionName },
+      shown('institutionTypes') && { label: 'Institution Type / Gosa', value: formData.institutionTypes.join(', ') },
+      shown('ownershipType') && { label: 'Ownership / Abbaa Qabuu', value: formData.ownershipType },
+      shown('subCity') && { label: 'Sub-City / Kuttaa Maggalaa', value: formData.subCity },
+      shown('area') && { label: 'Werreda', value: formData.area },
+      shown('specificAddress') && { label: 'Address / Baka Addaa', value: formData.specificAddress },
+      shown('licenseNumber') && { label: 'License No. / Lakofsaa Eyyeema', value: formData.licenseNumber || '—' },
+      shown('studentCount') && { label: 'Students / Barataa', value: formData.studentCount },
+      shown('studentsSex') && { label: 'Male Students / Barataa Dhiiraa', value: formData.maleStudents === '' ? '—' : formData.maleStudents },
+      shown('studentsSex') && { label: 'Female Students / Barattii Dubartii', value: formData.femaleStudents === '' ? '—' : formData.femaleStudents },
+      shown('teacherCount') && { label: 'Teachers / Barsiisaa', value: formData.teacherCount },
+      shown('teachersSex') && { label: 'Male Teachers / Barsiisaa Dhiiraa', value: formData.maleTeachers === '' ? '—' : formData.maleTeachers },
+      shown('teachersSex') && { label: 'Female Teachers / Dubartii Barsiisaa', value: formData.femaleTeachers === '' ? '—' : formData.femaleTeachers },
+      shown('classroomCount') && { label: 'Classrooms', value: formData.classroomCount === '' ? '0' : formData.classroomCount },
+      shown('hasLibrary') && { label: 'Library', value: formData.hasLibrary === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasLaboratory') && { label: 'Laboratory', value: formData.hasLaboratory === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasComputerLab') && { label: 'Computer Lab', value: formData.hasComputerLab === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('hasFeedingProgram') && { label: 'Feeding Program', value: formData.hasFeedingProgram === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+      shown('contactName') && { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
+    ].filter(Boolean) as { label: string; value: string }[]
+  );
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -350,14 +412,11 @@ export default function EducationSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-institutionName" className="text-xs sm:text-sm">Institution Name<br /><span className="text-xs font-normal text-muted-foreground">Maqaa Mana Barumsaa</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="e-institutionName" en={label('institutionName').en} or={label('institutionName').or} required={req('institutionName')} />
                   <Input id="e-institutionName" name="institutionName" placeholder="e.g., BISHOFTU PRIMARY SCHOOL" value={formData.institutionName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-institutionType" className="text-xs sm:text-sm">
-                    Institution Type / Gosa Mana Barumsaa <span className="text-red-500">*</span>
-                    <span className="block text-[10px] font-normal text-muted-foreground sm:text-xs">Select all that apply — an institution may run several levels / Filachuuf ni dandeessu</span>
-                  </Label>
+                  <FieldLabel id="e-institutionType" en={label('institutionTypes').en} or={label('institutionTypes').or} required={req('institutionTypes')} hint="Select all that apply — an institution may run several levels / Filachuuf ni dandeessu" />
                   <InstitutionTypeMultiSelect
                     id="e-institutionType"
                     selected={formData.institutionTypes}
@@ -367,24 +426,26 @@ export default function EducationSurveyForm({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="e-subCity" className="text-xs sm:text-sm">Sub-City<br /><span className="text-xs font-normal text-muted-foreground">Kuttaa Maggalaa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="e-subCity" en={label('subCity').en} or={label('subCity').or} required={req('subCity')} />
                     <Select value={formData.subCity} onValueChange={handleSubCityChange}>
                       <SelectTrigger id="e-subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
                       <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="e-area" className="text-xs sm:text-sm">Werreda <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="e-area" en={label('area').en} or={label('area').or} required={req('area')} />
                     <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
                       <SelectTrigger id="e-area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
                       <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                 </div>
+                {shown('specificAddress') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-specificAddress" className="text-xs sm:text-sm">Specific Address<br /><span className="text-xs font-normal text-muted-foreground">Baka Addaa</span> <span className="text-red-500">*</span></Label>
-                  <Input id="e-specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="e-specificAddress" en={label('specificAddress').en} or={label('specificAddress').or} required={req('specificAddress')} />
+                  <Input id="e-specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
               </CardContent>
             </>
           )}
@@ -400,12 +461,15 @@ export default function EducationSurveyForm({
                 <CardDescription className="text-xs sm:text-sm">License, ownership, students and available services</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {shown('licenseNumber') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-licenseNumber" className="text-xs sm:text-sm">License Number<br /><span className="text-xs font-normal text-muted-foreground">Lakofsaa Eyyeema</span></Label>
+                  <FieldLabel id="e-licenseNumber" en={label('licenseNumber').en} or={label('licenseNumber').or} required={req('licenseNumber')} />
                   <Input id="e-licenseNumber" name="licenseNumber" placeholder="e.g., ED/2015/0234" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
+                {shown('ownershipType') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className="text-xs sm:text-sm">Ownership Type / Gosa Abbaa Qabuu <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="e-ownershipType" en={label('ownershipType').en} or={label('ownershipType').or} required={req('ownershipType')} />
                   <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {EDUCATION_OWNERSHIP_TYPES.map((t) => (
                       <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-indigo-500 has-data-[state=checked]:bg-indigo-50">
@@ -415,20 +479,24 @@ export default function EducationSurveyForm({
                     ))}
                   </RadioGroup>
                 </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="e-studentCount" className="text-xs sm:text-sm">Student Count<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Barataa</span> <span className="text-red-500">*</span></Label>
+                    <FieldLabel id="e-studentCount" en={label('studentCount').en} or={label('studentCount').or} required={req('studentCount')} />
                     <Input id="e-studentCount" name="studentCount" type="number" min="0" placeholder="e.g., 850" value={formData.studentCount} onChange={handleChange} required className="text-sm sm:text-base" />
                   </div>
+                  {shown('teacherCount') && (
                   <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="e-teacherCount" className="text-xs sm:text-sm">Teacher Count<br /><span className="text-xs font-normal text-muted-foreground">Lakkoofsa Barsiisaa</span> <span className="text-red-500">*</span></Label>
-                    <Input id="e-teacherCount" name="teacherCount" type="number" min="0" placeholder="e.g., 24" value={formData.teacherCount} onChange={handleChange} required className="text-sm sm:text-base" />
+                    <FieldLabel id="e-teacherCount" en={label('teacherCount').en} or={label('teacherCount').or} required={req('teacherCount')} />
+                    <Input id="e-teacherCount" name="teacherCount" type="number" min="0" placeholder="e.g., 24" value={formData.teacherCount} onChange={handleChange} className="text-sm sm:text-base" />
                   </div>
+                  )}
                 </div>
                 {/* Students by sex (male / female) */}
+                {shown('studentsSex') && (
                 <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs sm:text-sm">Students by Sex<br /><span className="text-xs font-normal text-muted-foreground">Barattoota Dhiira fi Dubartii</span></Label>
+                    <Label className="text-xs sm:text-sm">{label('studentsSex').en}<br /><span className="text-xs font-normal text-muted-foreground">{label('studentsSex').or}</span></Label>
                     <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-medium text-indigo-700 sm:text-[10px]">Optional / Filannoo</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -443,10 +511,12 @@ export default function EducationSurveyForm({
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Student Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
+                )}
                 {/* Teachers by sex (male / female) */}
+                {shown('teachersSex') && (
                 <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs sm:text-sm">Teachers by Sex<br /><span className="text-xs font-normal text-muted-foreground">Barsiisota Dhiira fi Dubartii</span></Label>
+                    <Label className="text-xs sm:text-sm">{label('teachersSex').en}<br /><span className="text-xs font-normal text-muted-foreground">{label('teachersSex').or}</span></Label>
                     <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-medium text-indigo-700 sm:text-[10px]">Optional / Filannoo</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -461,15 +531,18 @@ export default function EducationSurveyForm({
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Teacher Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
                 </div>
+                )}
+                {shown('classroomCount') && (
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-classroomCount" className="text-xs sm:text-sm">Classroom Count <span className="text-red-500">*</span></Label>
-                  <Input id="e-classroomCount" name="classroomCount" type="number" min="0" placeholder="e.g., 18" value={formData.classroomCount} onChange={handleChange} required className="text-sm sm:text-base" />
+                  <FieldLabel id="e-classroomCount" en={label('classroomCount').en} or={label('classroomCount').or} required={req('classroomCount')} />
+                  <Input id="e-classroomCount" name="classroomCount" type="number" min="0" placeholder="e.g., 18" value={formData.classroomCount} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
+                )}
                 {/* Available services */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                  {SERVICE_FIELDS.map((svc) => (
+                  {SERVICE_FIELDS.filter((svc) => shown(svc.name)).map((svc) => (
                     <div key={svc.name} className="space-y-1.5 sm:space-y-2">
-                      <Label className="text-xs sm:text-sm">{svc.label}<br /><span className="text-xs font-normal text-muted-foreground">{svc.labelOr} — {svc.hint}</span></Label>
+                      <Label className="text-xs sm:text-sm">{label(svc.name).en}<br /><span className="text-xs font-normal text-muted-foreground">{label(svc.name).or} — {svc.hint}</span></Label>
                       <RadioGroup value={formData[svc.name as keyof typeof formData] as string} onValueChange={(v) => handleSelectChange(svc.name, v)} className="flex gap-4">
                         <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-indigo-500 has-data-[state=checked]:bg-indigo-50">
                           <RadioGroupItem value="yes" id={`e-${svc.name}-yes`} />
@@ -499,11 +572,11 @@ export default function EducationSurveyForm({
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-contactName" className="text-xs sm:text-sm">Contact Person<br /><span className="text-xs font-normal text-muted-foreground">Nama Quunnamtu</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="e-contactName" en={label('contactName').en} or={label('contactName').or} required={req('contactName')} />
                   <Input id="e-contactName" name="contactName" placeholder="Full name of director / principal" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
                 </div>
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="e-contactPhone" className="text-xs sm:text-sm">Contact Phone<br /><span className="text-xs font-normal text-muted-foreground">Bilbila Quunnamtii</span> <span className="text-red-500">*</span></Label>
+                  <FieldLabel id="e-contactPhone" en={label('contactPhone').en} or={label('contactPhone').or} required={req('contactPhone')} />
                   <Input id="e-contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>

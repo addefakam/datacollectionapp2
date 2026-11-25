@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import { sectorSurveyFieldRequired } from '@/lib/survey-fields';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,10 +31,27 @@ export async function POST(request: NextRequest) {
       signature,
     } = body;
 
-    // Validate required fields from the 4-step form
-    if (!organizationName || !subCity || !area || !specificAddress || !numberOfRooms || !licenseType || !licenseLevel || !licenseNumber || !ownerName || !contactName || !contactPhone) {
+    // Validate required fields from the 4-step form — the required set follows
+    // the admin-managed questionnaire (Manage → Survey Questions): locked
+    // fields are always required, configurable ones only when the
+    // questionnaire shows them as required.
+    const surveyFields = await loadSectorSurveyFields('guesthouse');
+    const need = (key: string): boolean => sectorSurveyFieldRequired('guesthouse', surveyFields, key);
+    if (
+      !organizationName ||
+      !subCity ||
+      !area ||
+      !numberOfRooms ||
+      !contactName ||
+      !contactPhone ||
+      (need('specificAddress') && !specificAddress) ||
+      (need('licenseType') && !licenseType) ||
+      (need('licenseLevel') && !licenseLevel) ||
+      (need('licenseNumber') && !licenseNumber) ||
+      (need('ownerName') && !ownerName)
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields', missing: { organizationName: !organizationName, subCity: !subCity, area: !area, specificAddress: !specificAddress, numberOfRooms: !numberOfRooms, licenseType: !licenseType, licenseLevel: !licenseLevel, licenseNumber: !licenseNumber, ownerName: !ownerName, contactName: !contactName, contactPhone: !contactPhone } },
+        { error: 'Missing required fields', missing: { organizationName: !organizationName, subCity: !subCity, area: !area, specificAddress: need('specificAddress') && !specificAddress, numberOfRooms: !numberOfRooms, licenseType: need('licenseType') && !licenseType, licenseLevel: need('licenseLevel') && !licenseLevel, licenseNumber: need('licenseNumber') && !licenseNumber, ownerName: need('ownerName') && !ownerName, contactName: !contactName, contactPhone: !contactPhone } },
         { status: 400 }
       );
     }
@@ -54,9 +73,9 @@ export async function POST(request: NextRequest) {
         subCity,
         area,
         specificAddress: specificAddress || '',
-        numberOfRooms: Number(numberOfRooms),
-        licenseType,
-        licenseLevel,
+        numberOfRooms: Number(numberOfRooms) || 0,
+        licenseType: licenseType || '', // hidden question stores an empty value
+        licenseLevel: licenseLevel || '', // hidden question stores an empty value
         licenseNumber: licenseNumber || null,
         serviceRating: Number(serviceRating) || 0,
         contactPhone: contactPhone || null,
