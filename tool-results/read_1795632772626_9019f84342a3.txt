@@ -1,0 +1,1356 @@
+     1→'use client';
+     2→
+     3→import * as React from 'react';
+     4→import {
+     5→  Bar,
+     6→  BarChart,
+     7→  CartesianGrid,
+     8→  Legend,
+     9→  ResponsiveContainer,
+    10→  Tooltip,
+    11→  XAxis,
+    12→  YAxis,
+    13→} from 'recharts';
+    14→import {
+    15→  CheckCircle2,
+    16→  ChevronRight,
+    17→  Clock,
+    18→  Download,
+    19→  Eye,
+    20→  FileText,
+    21→  Gauge,
+    22→  Loader2,
+    23→  MapPin,
+    24→  Printer,
+    25→  RefreshCw,
+    26→  Store,
+    27→  Target,
+    28→  TrendingUp,
+    29→  Users,
+    30→} from 'lucide-react';
+    31→import { Button } from '@/components/ui/button';
+    32→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+    33→import { Badge } from '@/components/ui/badge';
+    34→import { Skeleton } from '@/components/ui/skeleton';
+    35→import {
+    36→  Dialog,
+    37→  DialogContent,
+    38→  DialogDescription,
+    39→  DialogHeader,
+    40→  DialogTitle,
+    41→} from '@/components/ui/dialog';
+    42→import {
+    43→  Select,
+    44→  SelectContent,
+    45→  SelectItem,
+    46→  SelectTrigger,
+    47→  SelectValue,
+    48→} from '@/components/ui/select';
+    49→import { Input } from '@/components/ui/input';
+    50→import { Label } from '@/components/ui/label';
+    51→import { useToast } from '@/hooks/use-toast';
+    52→import { useSettings } from '@/components/SettingsProvider';
+    53→import { cn } from '@/lib/utils';
+    54→import {
+    55→  SME_PERIOD_TYPES,
+    56→  SME_STATUS_META,
+    57→  SME_UNIT_STATUS_META,
+    58→  type SmePeriodType,
+    59→  type SmeStatus,
+    60→  type SmeUnitStatus,
+    61→} from '@/lib/sme';
+    62→
+    63→// ---------------------------------------------------------------------------
+    64→// Types (mirror /api/sme/performance)
+    65→// ---------------------------------------------------------------------------
+    66→
+    67→interface PerfRow {
+    68→  subCity: string;
+    69→  area: string;
+    70→  label: string;
+    71→  target: number;
+    72→  actual: number;
+    73→  achievementPct: number;
+    74→  unitStatus: SmeUnitStatus;
+    75→  standing: Record<SmeStatus, number>;
+    76→  standingTotal: number;
+    77→  pending: number;
+    78→  operationalRate: number;
+    79→  members: number;
+    80→  femaleMembers: number;
+    81→}
+    82→
+    83→interface PerfData {
+    84→  period: { type: string; start: string; end: string; label: string; pacePct: number };
+    85→  scope: { level: 'city' | 'subcity'; subCity: string | null };
+    86→  cityTarget: number | null;
+    87→  cityActual: number | null;
+    88→  kpis: {
+    89→    totalTarget: number;
+    90→    totalRegistered: number;
+    91→    achievementPct: number;
+    92→    pending: number;
+    93→    operational: number;
+    94→    standingTotal: number;
+    95→    operationalRate: number;
+    96→    members: number;
+    97→    femaleMembers: number;
+    98→    avgMembers: number;
+    99→  };
+   100→  totals: { byStatus: Record<SmeStatus, number>; standingTotal: number };
+   101→  rows: PerfRow[];
+   102→  byType?: PerfTypeRow[];
+   103→}
+   104→
+   105→/** One row of the "By Enterprise Type" report (mirrors the API byType). */
+   106→interface PerfTypeRow {
+   107→  type: string;
+   108→  standing: Record<SmeStatus, number>;
+   109→  standingTotal: number;
+   110→  registeredInPeriod: number;
+   111→  members: number;
+   112→  femaleMembers: number;
+   113→}
+   114→
+   115→interface SmeRecord {
+   116→  id: string;
+   117→  enterpriseName: string;
+   118→  enterpriseType: string;
+   119→  subCity: string;
+   120→  area: string;
+   121→  employeeCount: number;
+   122→  femaleEmployees: number;
+   123→  status: string;
+   124→  createdAt: string;
+   125→}
+   126→
+   127→const fmt = (n: number) => n.toLocaleString('en');
+   128→const chartTooltipStyle = {
+   129→  borderRadius: 12,
+   130→  border: '1px solid #ccf1ea',
+   131→  boxShadow: '0 8px 24px -8px rgba(13,148,136,0.35)',
+   132→  fontSize: 12,
+   133→};
+   134→
+   135→// --- custom report builder (pure client-side, built from the loaded performance data) ---
+   136→
+   137→type ReportGroup = 'unit' | 'type' | 'status';
+   138→type ReportColumnKey = 'registered' | 'target' | 'achievement' | 'pending' | 'stages' | 'members';
+   139→
+   140→/** Toggleable metric columns of the custom report ("stages" expands to the 4 standing columns + total). */
+   141→const REPORT_COL_META: { key: ReportColumnKey; label: string }[] = [
+   142→  { key: 'registered', label: 'Registered (period)' },
+   143→  { key: 'target', label: 'Target' },
+   144→  { key: 'achievement', label: 'Achievement %' },
+   145→  { key: 'pending', label: 'Pending' },
+   146→  { key: 'stages', label: 'Stage breakdown' },
+   147→  { key: 'members', label: 'Members' },
+   148→];
+   149→
+   150→const REPORT_COLS_BY_GROUP: Record<ReportGroup, ReportColumnKey[]> = {
+   151→  unit: ['registered', 'target', 'achievement', 'pending', 'stages', 'members'],
+   152→  type: ['registered', 'stages', 'members'],
+   153→  status: [],
+   154→};
+   155→
+   156→const REPORT_TITLES: Record<ReportGroup, string> = {
+   157→  unit: 'Standing by administrative unit',
+   158→  type: 'Standing by enterprise type',
+   159→  status: 'Standing by stage',
+   160→};
+   161→
+   162→export default function SmePerformanceDashboard() {
+   163→  const { toast } = useToast();
+   164→  const { subCities } = useSettings();
+   165→
+   166→  const [periodType, setPeriodType] = React.useState<SmePeriodType>('yearly');
+   167→  const [refDate, setRefDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+   168→  const [levelScope, setLevelScope] = React.useState('all'); // 'all' = city overview
+   169→  const [data, setData] = React.useState<PerfData | null>(null);
+   170→  const [loading, setLoading] = React.useState(true);
+   171→  const [error, setError] = React.useState(false);
+   172→
+   173→  // Click-through detail dialog (accountability table)
+   174→  const [detailUnit, setDetailUnit] = React.useState<{ subCity: string; area: string; label: string } | null>(null);
+   175→  const [detailSmes, setDetailSmes] = React.useState<SmeRecord[] | null>(null);
+   176→  const [detailLoading, setDetailLoading] = React.useState(false);
+   177→
+   178→  // Inline detail record opened by clicking a bar of the Target vs Registered chart
+   179→  const [chartRow, setChartRow] = React.useState<PerfRow | null>(null);
+   180→  const [chartSmes, setChartSmes] = React.useState<SmeRecord[] | null>(null);
+   181→  const [chartLoading, setChartLoading] = React.useState(false);
+   182→
+   183→  // Inline detail record opened by clicking a bar of the Operational Progress chart
+   184→  const [pipeRow, setPipeRow] = React.useState<PerfRow | null>(null);
+   185→  const [pipeSmes, setPipeSmes] = React.useState<SmeRecord[] | null>(null);
+   186→  const [pipeLoading, setPipeLoading] = React.useState(false);
+   187→
+   188→  // Record list opened by clicking a KPI card (Registered / Pending / Operational)
+   189→  const [kpiPanel, setKpiPanel] = React.useState<'registered' | 'achievement' | 'pending' | 'operational' | null>(null);
+   190→  const [kpiSmes, setKpiSmes] = React.useState<SmeRecord[] | null>(null);
+   191→  const [kpiLoading, setKpiLoading] = React.useState(false);
+   192→
+   193→  // Record list opened by clicking a row of the By Enterprise Type report
+   194→  const [typeDetail, setTypeDetail] = React.useState<{ type: string; smes: SmeRecord[] | null; loading: boolean } | null>(null);
+   195→
+   196→  // Custom report builder (grouping + selected metric columns)
+   197→  const [reportGroup, setReportGroup] = React.useState<ReportGroup>('unit');
+   198→  const [reportCols, setReportCols] = React.useState<ReportColumnKey[]>(REPORT_COLS_BY_GROUP.unit);
+   199→
+   200→  const load = React.useCallback(() => {
+   201→    setLoading(true);
+   202→    setError(false);
+   203→    // a new scope/period invalidates every opened drill-down
+   204→    setChartRow(null);
+   205→    setPipeRow(null);
+   206→    setKpiPanel(null);
+   207→    setTypeDetail(null);
+   208→    const params = new URLSearchParams({ periodType, ref: refDate });
+   209→    if (levelScope !== 'all') params.set('subCity', levelScope);
+   210→    fetch(`/api/sme/performance?${params}`)
+   211→      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('failed'))))
+   212→      .then((json) => setData(json))
+   213→      .catch(() => setError(true))
+   214→      .finally(() => setLoading(false));
+   215→  }, [periodType, refDate, levelScope]);
+   216→
+   217→  React.useEffect(() => {
+   218→    load();
+   219→  }, [load]);
+   220→
+   221→  /** Fetch small-enterprise records with query params (drill-down lists). */
+   222→  const fetchSmes = (params: Record<string, string>) =>
+   223→    fetch(`/api/smallenterprises?${new URLSearchParams(params)}`)
+   224→      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('failed'))))
+   225→      .then((json) => (json.data ?? []) as SmeRecord[]);
+   226→
+   227→  /** Fetch the registered enterprises of one administrative unit. */
+   228→  const fetchUnitSmes = (row: { subCity: string; area: string }) => {
+   229→    const params: Record<string, string> = { subCity: row.subCity, limit: '200' };
+   230→    if (row.area) params.area = row.area;
+   231→    return fetchSmes(params);
+   232→  };
+   233→
+   234→  /** Shared failure toast for drill-down loads. */
+   235→  const drillLoadError = () =>
+   236→    toast({ title: 'Error', description: 'Could not load the enterprise list', variant: 'destructive' });
+   237→
+   238→  /** Open the click-through detail for one administrative unit. */
+   239→  const openDetail = (row: { subCity: string; area: string; label: string }) => {
+   240→    setDetailUnit(row);
+   241→    setDetailSmes(null);
+   242→    setDetailLoading(true);
+   243→    fetchUnitSmes(row)
+   244→      .then((list) => setDetailSmes(list))
+   245→      .catch(() => {
+   246→        setDetailSmes([]);
+   247→        drillLoadError();
+   248→      })
+   249→      .finally(() => setDetailLoading(false));
+   250→  };
+   251→
+   252→  /** Open the inline detail record below the Target vs Registered chart. */
+   253→  const openChartDetail = (row: PerfRow) => {
+   254→    setChartRow(row);
+   255→    setChartSmes(null);
+   256→    setChartLoading(true);
+   257→    fetchUnitSmes(row)
+   258→      .then((list) => setChartSmes(list))
+   259→      .catch(() => {
+   260→        setChartSmes([]);
+   261→        drillLoadError();
+   262→      })
+   263→      .finally(() => setChartLoading(false));
+   264→  };
+   265→
+   266→  /** Open the inline detail record below the Operational Progress chart. */
+   267→  const openPipeDetail = (row: PerfRow) => {
+   268→    setPipeRow(row);
+   269→    setPipeSmes(null);
+   270→    setPipeLoading(true);
+   271→    fetchUnitSmes(row)
+   272→      .then((list) => setPipeSmes(list))
+   273→      .catch(() => {
+   274→        setPipeSmes([]);
+   275→        drillLoadError();
+   276→      })
+   277→      .finally(() => setPipeLoading(false));
+   278→  };
+   279→
+   280→  if (loading) {
+   281→    return (
+   282→      <div className="mx-auto max-w-5xl space-y-4">
+   283→        <Skeleton className="h-16 w-full rounded-2xl" />
+   284→        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+   285→          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+   286→        </div>
+   287→        <div className="grid gap-4 lg:grid-cols-2">
+   288→          <Skeleton className="h-72 rounded-2xl" />
+   289→          <Skeleton className="h-72 rounded-2xl" />
+   290→        </div>
+   291→        <Skeleton className="h-64 rounded-2xl" />
+   292→      </div>
+   293→    );
+   294→  }
+   295→
+   296→  if (error || !data) {
+   297→    return (
+   298→      <Card className="mx-auto max-w-md rounded-2xl border-amber-200">
+   299→        <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+   300→          <p className="text-sm font-medium text-teal-950">Could not load the performance dashboard. Check the connection and try again.</p>
+   301→          <Button variant="outline" size="sm" onClick={load}>
+   302→            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry
+   303→          </Button>
+   304→        </CardContent>
+   305→      </Card>
+   306→    );
+   307→  }
+   308→
+   309→  const isCityOverview = data.scope.level === 'city';
+   310→  const targetChartData = data.rows.map((r) => ({
+   311→    label: r.label,
+   312→    Target: r.target,
+   313→    Registered: r.actual,
+   314→    subCity: r.subCity,
+   315→    area: r.area,
+   316→  }));
+   317→
+   318→  /** Map a clicked bar (via its datum payload) back to its performance row. */
+   319→  const selectChartRow = (entry: { payload?: { subCity?: string; area?: string } }) => {
+   320→    const p = entry?.payload;
+   321→    if (!p) return;
+   322→    const row = data.rows.find((r) => r.subCity === p.subCity && r.area === p.area);
+   323→    if (row) openChartDetail(row);
+   324→  };
+   325→  const selectPipeRow = (entry: { payload?: { subCity?: string; area?: string } }) => {
+   326→    const p = entry?.payload;
+   327→    if (!p) return;
+   328→    const row = data.rows.find((r) => r.subCity === p.subCity && r.area === p.area);
+   329→    if (row) openPipeDetail(row);
+   330→  };
+   331→  const pipelineChartData = data.rows.map((r) => ({
+   332→    label: r.label,
+   333→    Registered: r.standing.REGISTERED,
+   334→    'Fully Legalized': r.standing.FULLY_LEGALIZED,
+   335→    'Awaiting Operation': r.standing.AWAITING_OPERATION,
+   336→    Operational: r.standing.OPERATIONAL,
+   337→    subCity: r.subCity,
+   338→    area: r.area,
+   339→  }));
+   340→
+   341→  const typeChartData = (data.byType ?? []).map((t) => ({
+   342→    type: t.type,
+   343→    Registered: t.standing.REGISTERED,
+   344→    'Fully Legalized': t.standing.FULLY_LEGALIZED,
+   345→    'Awaiting Operation': t.standing.AWAITING_OPERATION,
+   346→    Operational: t.standing.OPERATIONAL,
+   347→  }));
+   348→
+   349→  // --- custom report builder -------------------------------------------------
+   350→
+   351→  const changeReportGroup = (g: ReportGroup) => {
+   352→    setReportGroup(g);
+   353→    setReportCols(REPORT_COLS_BY_GROUP[g]);
+   354→  };
+   355→
+   356→  const toggleReportCol = (k: ReportColumnKey) => {
+   357→    setReportCols((prev) => (prev.includes(k) ? prev.filter((c) => c !== k) : [...prev, k]));
+   358→  };
+   359→
+   360→  // Recomputed per render as plain code (cheap at dashboard scale; a hook here would sit below the loading early-returns).
+   361→  const report = (() => {
+   362→    if (!data) return null;
+   363→    const scopeLabel = data.scope.level === 'city' ? 'City-wide' : `Sub-city: ${data.scope.subCity}`;
+   364→    const subtitle = `${data.period.label} · ${scopeLabel}`;
+   365→    const statusKeys: SmeStatus[] = ['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'];
+   366→    const col = (k: ReportColumnKey) => reportCols.includes(k);
+   367→    const sumAt = (rows: (string | number)[][], i: number) => rows.reduce((s, row) => s + (typeof row[i] === 'number' ? (row[i] as number) : 0), 0);
+   368→
+   369→    if (reportGroup === 'status') {
+   370→      const total = data.totals.standingTotal;
+   371→      const rows = statusKeys.map((s) => [
+   372→        SME_STATUS_META[s].label,
+   373→        data.totals.byStatus[s],
+   374→        total > 0 ? `${((data.totals.byStatus[s] / total) * 100).toFixed(1)}%` : '0.0%',
+   375→      ]);
+   376→      return {
+   377→        title: REPORT_TITLES.status,
+   378→        subtitle,
+   379→        cols: ['Stage', 'Enterprises', 'Share of standing'],
+   380→        rows,
+   381→        totals: ['Total standing', total, total > 0 ? '100%' : '0.0%'],
+   382→      };
+   383→    }
+   384→
+   385→    const cols: string[] = [reportGroup === 'unit' ? 'Administrative unit' : 'Enterprise Type'];
+   386→    if (col('registered')) cols.push('Registered (period)');
+   387→    if (col('target')) cols.push('Target');
+   388→    if (col('achievement')) cols.push('Achievement %');
+   389→    if (col('pending')) cols.push('Pending');
+   390→    if (col('stages')) cols.push('Registered', 'Legalized', 'Awaiting', 'Operational', 'Standing total');
+   391→    if (col('members')) cols.push('Members', 'Female members');
+   392→
+   393→    let rows: (string | number)[][];
+   394→    const totals: (string | number)[] = [reportGroup === 'unit' ? 'All units in scope' : 'All types'];
+   395→
+   396→    if (reportGroup === 'unit') {
+   397→      rows = data.rows.map((r) => {
+   398→        const row: (string | number)[] = [r.label];
+   399→        if (col('registered')) row.push(r.actual);
+   400→        if (col('target')) row.push(r.target);
+   401→        if (col('achievement')) row.push(r.target > 0 ? `${r.achievementPct}%` : '—');
+   402→        if (col('pending')) row.push(r.pending);
+   403→        if (col('stages')) row.push(r.standing.REGISTERED, r.standing.FULLY_LEGALIZED, r.standing.AWAITING_OPERATION, r.standing.OPERATIONAL, r.standingTotal);
+   404→        if (col('members')) row.push(r.members, r.femaleMembers);
+   405→        return row;
+   406→      });
+   407→      let ci = 1;
+   408→      if (col('registered')) { totals.push(sumAt(rows, ci)); ci += 1; }
+   409→      if (col('target')) { totals.push(sumAt(rows, ci)); ci += 1; }
+   410→      if (col('achievement')) { totals.push(`${data.kpis.achievementPct}%`); ci += 1; }
+   411→      if (col('pending')) { totals.push(sumAt(rows, ci)); ci += 1; }
+   412→      if (col('stages')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1), sumAt(rows, ci + 2), sumAt(rows, ci + 3), sumAt(rows, ci + 4)); ci += 5; }
+   413→      if (col('members')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1)); }
+   414→    } else {
+   415→      rows = (data.byType ?? []).map((t) => {
+   416→        const row: (string | number)[] = [t.type];
+   417→        if (col('registered')) row.push(t.registeredInPeriod);
+   418→        if (col('stages')) row.push(t.standing.REGISTERED, t.standing.FULLY_LEGALIZED, t.standing.AWAITING_OPERATION, t.standing.OPERATIONAL, t.standingTotal);
+   419→        if (col('members')) row.push(t.members, t.femaleMembers);
+   420→        return row;
+   421→      });
+   422→      let ci = 1;
+   423→      if (col('registered')) { totals.push(sumAt(rows, ci)); ci += 1; }
+   424→      if (col('stages')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1), sumAt(rows, ci + 2), sumAt(rows, ci + 3), sumAt(rows, ci + 4)); ci += 5; }
+   425→      if (col('members')) { totals.push(sumAt(rows, ci), sumAt(rows, ci + 1)); }
+   426→    }
+   427→
+   428→    return { title: REPORT_TITLES[reportGroup], subtitle, cols, rows, totals };
+   429→  })();
+   430→
+   431→  const exportReportCsv = () => {
+   432→    if (!report || report.rows.length === 0) return;
+   433→    const cell = (v: string | number) => {
+   434→      const s = String(v ?? '');
+   435→      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+   436→    };
+   437→    const lines: (string | number)[][] = [report.cols, ...report.rows];
+   438→    if (report.totals) lines.push(report.totals);
+   439→    const csv = lines.map((row) => row.map(cell).join(',')).join('\r\n');
+   440→    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+   441→    const url = URL.createObjectURL(blob);
+   442→    const a = document.createElement('a');
+   443→    a.href = url;
+   444→    a.download = `sme-custom-report-${new Date().toISOString().slice(0, 10)}.csv`;
+   445→    document.body.appendChild(a);
+   446→    a.click();
+   447→    a.remove();
+   448→    URL.revokeObjectURL(url);
+   449→    toast({ title: 'Report Exported', description: 'CSV downloaded — it opens cleanly in Excel.' });
+   450→  };
+   451→
+   452→  const printReport = () => {
+   453→    if (!report) return;
+   454→    const esc = (v: string | number) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+   455→    const th = report.cols
+   456→      .map((c, i) => `<th style="padding:6px 10px;border-bottom:2px solid #0d9488;text-align:${i === 0 ? 'left' : 'right'};font-size:11px;text-transform:uppercase;color:#134e4a">${esc(c)}</th>`)
+   457→      .join('');
+   458→    const trs = report.rows
+   459→      .map((r) => `<tr>${r.map((c, i) => `<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:${i === 0 ? 'left' : 'right'};font-weight:${i === 0 ? 600 : 400}">${esc(c)}</td>`).join('')}</tr>`)
+   460→      .join('');
+   461→    const totalsHtml = report.totals
+   462→      ? `<tr style="background:#f0fdfa;font-weight:700">${report.totals.map((c, i) => `<td style="padding:6px 10px;border-top:2px solid #0d9488;text-align:${i === 0 ? 'left' : 'right'}">${esc(c)}</td>`).join('')}</tr>`
+   463→      : '';
+   464→    const html = [
+   465→      '<!doctype html><html><head><meta charset="utf-8" />',
+   466→      `<title>${esc(report.title)} — SME Performance</title>`,
+   467→      '<style>body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:24px}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 16px;font-size:12px;color:#64748b}table{border-collapse:collapse;width:100%;font-size:12px}</style>',
+   468→      '</head><body>',
+   469→      `<h1>${esc(report.title)} — SME Performance</h1>`,
+   470→      `<p>${esc(report.subtitle)} · generated ${new Date().toLocaleString('en-GB')}</p>`,
+   471→      `<table><thead><tr>${th}</tr></thead><tbody>${trs}${totalsHtml}</tbody></table>`,
+   472→      '</body></html>',
+   473→    ].join('');
+   474→    const w = window.open('', '_blank');
+   475→    if (!w) {
+   476→      toast({ title: 'Popup Blocked', description: 'Allow pop-ups for this site to print the report.', variant: 'destructive' });
+   477→      return;
+   478→    }
+   479→    w.document.write(html);
+   480→    w.document.close();
+   481→    w.focus();
+   482→    w.print();
+   483→  };
+   484→
+   485→  /** Open the record list behind a KPI card below the KPI grid. */
+   486→  const openKpiPanel = (kind: 'registered' | 'achievement' | 'pending' | 'operational') => {
+   487→    if (kpiPanel === kind) {
+   488→      setKpiPanel(null);
+   489→      return;
+   490→    }
+   491→    setKpiPanel(kind);
+   492→    if (kind === 'achievement') {
+   493→      setKpiSmes(null); // per-unit summary, computed from the loaded rows
+   494→      setKpiLoading(false);
+   495→      return;
+   496→    }
+   497→    setKpiSmes(null);
+   498→    setKpiLoading(true);
+   499→    const params: Record<string, string> = { limit: '500' };
+   500→    if (data.scope.subCity) params.subCity = data.scope.subCity;
+   501→    if (kind === 'pending') params.pending = '1';
+   502→    if (kind === 'operational') params.status = 'OPERATIONAL';
+   503→    fetchSmes(params)
+   504→      .then((list) => {
+   505→        if (kind !== 'registered') {
+   506→          setKpiSmes(list);
+   507→          return;
+   508→        }
+   509→        const start = new Date(data.period.start).getTime();
+   510→        const end = new Date(data.period.end).getTime();
+   511→        setKpiSmes(
+   512→          list.filter((s) => {
+   513→            const t = new Date(s.createdAt).getTime();
+   514→            return t >= start && t <= end;
+   515→          })
+   516→        );
+   517→      })
+   518→      .catch(() => {
+   519→        setKpiSmes([]);
+   520→        toast({ title: 'Error', description: 'Could not load the record list', variant: 'destructive' });
+   521→      })
+   522→      .finally(() => setKpiLoading(false));
+   523→  };
+   524→
+   525→  /** Toggle the record list of one enterprise type under the type report. */
+   526→  const openTypeDetail = (type: string) => {
+   527→    if (typeDetail?.type === type) {
+   528→      setTypeDetail(null);
+   529→      return;
+   530→    }
+   531→    setTypeDetail({ type, smes: null, loading: true });
+   532→    const params: Record<string, string> = { enterpriseType: type, limit: '200' };
+   533→    if (data.scope.subCity) params.subCity = data.scope.subCity;
+   534→    fetchSmes(params)
+   535→      .then((list) => setTypeDetail({ type, smes: list, loading: false }))
+   536→      .catch(() => {
+   537→        setTypeDetail({ type, smes: [], loading: false });
+   538→        drillLoadError();
+   539→      });
+   540→  };
+   541→
+   542→  return (
+   543→    <div className="animate-fade-up mx-auto max-w-5xl space-y-4">
+   544→      {/* ============ Controls ============ */}
+   545→      <Card className="rounded-2xl border-teal-100">
+   546→        <CardHeader className="pb-2">
+   547→          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+   548→            <TrendingUp className="h-5 w-5 text-amber-600" />
+   549→            SME Performance Dashboard
+   550→          </CardTitle>
+   551→          <CardDescription className="text-xs sm:text-sm">
+   552→            {isCityOverview
+   553→              ? 'City-level accountability — targets vs achievements per sub-city. Click any row for details.'
+   554→              : `Woreda-level accountability within ${data.scope.subCity} — click any row for details.`}
+   555→          </CardDescription>
+   556→        </CardHeader>
+   557→        <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+   558→          <div className="space-y-1.5">
+   559→            <Label className="text-xs">Period</Label>
+   560→            <Select value={periodType} onValueChange={(v) => setPeriodType(v as SmePeriodType)}>
+   561→              <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+   562→              <SelectContent>
+   563→                {SME_PERIOD_TYPES.map((p) => (
+   564→                  <SelectItem key={p} value={p}>{p === 'monthly' ? 'Monthly' : p === 'quarterly' ? 'Quarterly' : 'Yearly'}</SelectItem>
+   565→                ))}
+   566→              </SelectContent>
+   567→            </Select>
+   568→          </div>
+   569→          <div className="space-y-1.5">
+   570→            <Label htmlFor="sme-perf-ref" className="text-xs">Date in Period</Label>
+   571→            <Input id="sme-perf-ref" type="date" value={refDate} onChange={(e) => setRefDate(e.target.value)} className="text-sm" />
+   572→          </div>
+   573→          <div className="space-y-1.5">
+   574→            <Label className="text-xs">Level</Label>
+   575→            <Select value={levelScope} onValueChange={setLevelScope}>
+   576→              <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+   577→              <SelectContent>
+   578→                <SelectItem value="all">City overview (all sub-cities)</SelectItem>
+   579→                {subCities.map((sc) => (
+   580→                  <SelectItem key={sc.name} value={sc.name}>{sc.name} — woredas</SelectItem>
+   581→                ))}
+   582→              </SelectContent>
+   583→            </Select>
+   584→          </div>
+   585→          <p className="text-[11px] text-muted-foreground sm:col-span-3">
+   586→            {data.period.label} · {data.period.pacePct}% of the period elapsed
+   587→            {levelScope === 'all' && data.cityTarget != null && (
+   588→              <> · City-wide target: <span className="font-semibold text-teal-900">{fmt(data.cityTarget)}</span> enterprises, registered <span className="font-semibold text-teal-900">{fmt(data.cityActual ?? 0)}</span> ({data.cityTarget > 0 ? Math.round(((data.cityActual ?? 0) / data.cityTarget) * 1000) / 10 : 0}%)</>
+   589→            )}
+   590→          </p>
+   591→        </CardContent>
+   592→      </Card>
+   593→
+   594→      {/* ============ KPI cards ============ */}
+   595→      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+   596→        <KpiCard icon={<Target className="h-4 w-4" />} label={data.kpis.totalTarget > 0 ? 'Assigned Target' : 'No Target Set'} value={fmt(data.kpis.totalTarget)} sub="enterprises to establish" />
+   597→        <KpiCard icon={<Store className="h-4 w-4" />} label="Registered" value={fmt(data.kpis.totalRegistered)} sub={`in ${data.period.label.toLowerCase()}`} onClick={() => openKpiPanel('registered')} title="Click to view the registered records" />
+   598→        <KpiCard icon={<Gauge className="h-4 w-4" />} label="Achievement" value={`${data.kpis.achievementPct}%`} sub="of assigned targets" highlight={data.kpis.achievementPct >= 100 ? 'emerald' : data.kpis.achievementPct >= 60 ? 'teal' : 'red'} onClick={() => openKpiPanel('achievement')} title="Click to view achievement per unit" />
+   599→        <KpiCard icon={<Clock className="h-4 w-4" />} label="Pending SMEs" value={fmt(data.kpis.pending)} sub="not yet operational" onClick={() => openKpiPanel('pending')} title="Click to view the pending records" />
+   600→        <KpiCard icon={<CheckCircle2 className="h-4 w-4" />} label="Operational" value={fmt(data.kpis.operational)} sub={`${data.kpis.operationalRate}% of standing`} highlight="emerald" onClick={() => openKpiPanel('operational')} title="Click to view the operational records" />
+   601→        <KpiCard icon={<Users className="h-4 w-4" />} label="Members" value={fmt(data.kpis.members)} sub={`avg ${fmt(data.kpis.avgMembers)} per SME · F ${fmt(data.kpis.femaleMembers)}`} />
+   602→      </div>
+   603→
+   604→      {/* ============ KPI drill-down record list ============ */}
+   605→      {kpiPanel && (
+   606→        <Card className="rounded-2xl border-teal-100">
+   607→          <CardHeader className="pb-2">
+   608→            <div className="flex items-center justify-between gap-2">
+   609→              <CardTitle className="text-sm sm:text-base">
+   610→                {kpiPanel === 'registered' && <>Registered in {data.period.label} {kpiLoading ? '' : `(${kpiSmes?.length ?? 0})`}</>}
+   611→                {kpiPanel === 'achievement' && <>Achievement per {isCityOverview ? 'sub-city' : 'woreda'} — {data.period.label}</>}
+   612→                {kpiPanel === 'pending' && <>Pending SMEs — not yet operational {kpiLoading ? '' : `(${kpiSmes?.length ?? 0})`}</>}
+   613→                {kpiPanel === 'operational' && <>Operational SMEs {kpiLoading ? '' : `(${kpiSmes?.length ?? 0})`}</>}
+   614→              </CardTitle>
+   615→              <Button variant="outline" size="sm" onClick={() => setKpiPanel(null)} className="h-7 px-2 text-[11px]">
+   616→                Close
+   617→              </Button>
+   618→            </div>
+   619→            <CardDescription className="text-xs">
+   620→              {kpiPanel === 'registered' && `Enterprises registered during ${data.period.label}`}
+   621→              {kpiPanel === 'achievement' && 'Target vs registrations per administrative unit — click a row for its full record'}
+   622→              {kpiPanel === 'pending' && 'Registered, legalized or awaiting operation — production not started yet'}
+   623→              {kpiPanel === 'operational' && 'Currently producing or trading'}
+   624→            </CardDescription>
+   625→          </CardHeader>
+   626→          <CardContent>
+   627→            {kpiPanel === 'achievement' ? (
+   628→              <div className="overflow-x-auto">
+   629→                <table className="w-full min-w-[420px] text-left text-xs sm:text-sm">
+   630→                  <thead>
+   631→                    <tr className="border-b border-teal-100 text-[10px] uppercase tracking-wide text-teal-900/60">
+   632→                      <th className="py-2 pr-2 font-semibold">Unit</th>
+   633→                      <th className="py-2 pr-2 text-right font-semibold">Target</th>
+   634→                      <th className="py-2 pr-2 text-right font-semibold">Registered</th>
+   635→                      <th className="py-2 pr-2 font-semibold">Achievement</th>
+   636→                      <th className="py-2 font-semibold"><span className="sr-only">Details</span></th>
+   637→                    </tr>
+   638→                  </thead>
+   639→                  <tbody>
+   640→                    {data.rows.map((r) => (
+   641→                      <tr
+   642→                        key={`kpi-${r.subCity}||${r.area}`}
+   643→                        className="cursor-pointer border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60"
+   644→                        onClick={() => openDetail(r)}
+   645→                        title="View details"
+   646→                      >
+   647→                        <td className="py-2 pr-2 font-semibold text-teal-950">{r.label}</td>
+   648→                        <td className="py-2 pr-2 text-right">{r.target > 0 ? fmt(r.target) : <span className="text-[10px] italic text-amber-600">not set</span>}</td>
+   649→                        <td className="py-2 pr-2 text-right font-semibold">{fmt(r.actual)}</td>
+   650→                        <td className="py-2 pr-2">
+   651→                          <span className="text-[11px] font-medium text-teal-900">{r.target > 0 ? `${r.achievementPct}%` : '—'}</span>
+   652→                          <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-teal-50">
+   653→                            <div className="h-full rounded-full bg-teal-500" style={{ width: `${Math.min(r.achievementPct, 100)}%` }} />
+   654→                          </div>
+   655→                        </td>
+   656→                        <td className="py-2">
+   657→                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 text-teal-700">
+   658→                            <Eye className="h-3.5 w-3.5" />
+   659→                          </span>
+   660→                        </td>
+   661→                      </tr>
+   662→                    ))}
+   663→                  </tbody>
+   664→                </table>
+   665→              </div>
+   666→            ) : kpiLoading ? (
+   667→              <div className="space-y-2">
+   668→                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+   669→              </div>
+   670→            ) : (
+   671→              <EnterpriseListBlock loading={false} smes={kpiSmes} emptyText="No records found for this card" />
+   672→            )}
+   673→          </CardContent>
+   674→        </Card>
+   675→      )}
+   676→
+   677→      {data.kpis.standingTotal === 0 && data.kpis.totalTarget === 0 ? (
+   678→        <Card className="rounded-2xl border-teal-100">
+   679→          <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
+   680→            <Store className="h-10 w-10 text-teal-300" />
+   681→            <p className="font-semibold text-teal-950">No targets or enterprises for {data.period.label}</p>
+   682→            <p className="text-sm text-muted-foreground">Set establishment targets and register SMEs to see the analysis.</p>
+   683→          </CardContent>
+   684→        </Card>
+   685→      ) : (
+   686→        <>
+   687→          {/* ============ Charts ============ */}
+   688→          <div className="grid gap-4 lg:grid-cols-2">
+   689→            <Card className="card-lift rounded-2xl border-teal-100 lg:col-span-2">
+   690→              <CardHeader className="pb-2">
+   691→                <CardTitle className="text-base">Target vs Registered</CardTitle>
+   692→                <CardDescription>
+   693→                  Establishment target and registrations per {isCityOverview ? 'sub-city' : 'woreda'} — {data.period.label}.
+   694→                  Click a bar to open its detail record below.
+   695→                </CardDescription>
+   696→              </CardHeader>
+   697→              <CardContent>
+   698→                <div className="h-64 [&_.recharts-bar-rectangle]:cursor-pointer">
+   699→                  <ResponsiveContainer width="100%" height="100%">
+   700→                    <BarChart data={targetChartData} margin={{ top: 4, right: 8, bottom: 0, left: -14 }}>
+   701→                      <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" vertical={false} />
+   702→                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#134e4a' }} interval={0} />
+   703→                      <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
+   704→                      <Tooltip contentStyle={chartTooltipStyle} />
+   705→                      <Legend wrapperStyle={{ fontSize: 11 }} />
+   706→                      <Bar
+   707→                        dataKey="Target"
+   708→                        fill="#f59e0b"
+   709→                        radius={[6, 6, 0, 0]}
+   710→                        barSize={22}
+   711→                        cursor="pointer"
+   712→                        onClick={(entry: { payload?: { subCity: string; area: string } }) => selectChartRow(entry)}
+   713→                      />
+   714→                      <Bar
+   715→                        dataKey="Registered"
+   716→                        fill="#0d9488"
+   717→                        radius={[6, 6, 0, 0]}
+   718→                        barSize={22}
+   719→                        cursor="pointer"
+   720→                        onClick={(entry: { payload?: { subCity: string; area: string } }) => selectChartRow(entry)}
+   721→                      />
+   722→                    </BarChart>
+   723→                  </ResponsiveContainer>
+   724→                </div>
+   725→
+   726→                {/* Inline detail record for the clicked bar */}
+   727→                {chartRow && (
+   728→                  <UnitDrillPanel
+   729→                    row={chartRow}
+   730→                    periodLabel={data.period.label}
+   731→                    loading={chartLoading}
+   732→                    smes={chartSmes}
+   733→                    onClose={() => setChartRow(null)}
+   734→                  />
+   735→                )}
+   736→              </CardContent>
+   737→            </Card>
+   738→
+   739→            <Card className="card-lift rounded-2xl border-teal-100 lg:col-span-2">
+   740→              <CardHeader className="pb-2">
+   741→                <CardTitle className="text-base">Operational Progress by {isCityOverview ? 'Sub-City' : 'Woreda'}</CardTitle>
+   742→                <CardDescription>
+   743→                  Status pipeline of the SMEs registered under each unit (standing today).
+   744→                  Click a bar to open its detail record below.
+   745→                </CardDescription>
+   746→              </CardHeader>
+   747→              <CardContent>
+   748→                <div className="h-64 [&_.recharts-bar-rectangle]:cursor-pointer">
+   749→                  <ResponsiveContainer width="100%" height="100%">
+   750→                    <BarChart data={pipelineChartData} margin={{ top: 4, right: 8, bottom: 0, left: -14 }}>
+   751→                      <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" vertical={false} />
+   752→                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#134e4a' }} interval={0} />
+   753→                      <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
+   754→                      <Tooltip contentStyle={chartTooltipStyle} />
+   755→                      <Legend wrapperStyle={{ fontSize: 11 }} />
+   756→                      {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
+   757→                        <Bar
+   758→                          key={s}
+   759→                          dataKey={SME_STATUS_META[s].label}
+   760→                          stackId="pipe"
+   761→                          fill={SME_STATUS_META[s].color}
+   762→                          barSize={26}
+   763→                          cursor="pointer"
+   764→                          onClick={(entry: { payload?: { subCity: string; area: string } }) => selectPipeRow(entry)}
+   765→                        />
+   766→                      ))}
+   767→                    </BarChart>
+   768→                  </ResponsiveContainer>
+   769→                </div>
+   770→
+   771→                {/* Inline detail record for the clicked unit */}
+   772→                {pipeRow && (
+   773→                  <UnitDrillPanel
+   774→                    row={pipeRow}
+   775→                    periodLabel={data.period.label}
+   776→                    loading={pipeLoading}
+   777→                    smes={pipeSmes}
+   778→                    onClose={() => setPipeRow(null)}
+   779→                  />
+   780→                )}
+   781→              </CardContent>
+   782→            </Card>
+   783→
+   784→            {/* ============ By Enterprise Type report ============ */}
+   785→            <Card className="card-lift rounded-2xl border-teal-100 lg:col-span-2">
+   786→              <CardHeader className="pb-2">
+   787→                <CardTitle className="text-base">By Enterprise Type</CardTitle>
+   788→                <CardDescription>
+   789→                  Standing pipeline per enterprise type in scope.
+   790→                  Click a bar to show its stage breakdown, members and records below.
+   791→                </CardDescription>
+   792→              </CardHeader>
+   793→              <CardContent className="space-y-3">
+   794→                {typeChartData.length === 0 ? (
+   795→                  <p className="py-6 text-center text-sm text-muted-foreground">No enterprise records in scope yet</p>
+   796→                ) : (
+   797→                  <>
+   798→                    <div className="h-64 [&_.recharts-bar-rectangle]:cursor-pointer">
+   799→                      <ResponsiveContainer width="100%" height="100%">
+   800→                        <BarChart data={typeChartData} margin={{ top: 4, right: 8, bottom: 0, left: -14 }}>
+   801→                          <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" vertical={false} />
+   802→                          <XAxis type="category" dataKey="type" tick={{ fontSize: 10, fill: '#134e4a' }} />
+   803→                          <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
+   804→                          <Tooltip contentStyle={chartTooltipStyle} />
+   805→                          <Legend wrapperStyle={{ fontSize: 11 }} />
+   806→                          {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
+   807→                            <Bar
+   808→                              key={s}
+   809→                              dataKey={SME_STATUS_META[s].label}
+   810→                              stackId="type"
+   811→                              fill={SME_STATUS_META[s].color}
+   812→                              barSize={18}
+   813→                              cursor="pointer"
+   814→                              onClick={(entry: { payload?: { type?: string } }) => {
+   815→                                const t = entry?.payload?.type;
+   816→                                if (t) openTypeDetail(t);
+   817→                              }}
+   818→                            />
+   819→                          ))}
+   820→                        </BarChart>
+   821→                      </ResponsiveContainer>
+   822→                    </div>
+   823→                    {typeDetail && (
+   824→                    <div className="overflow-x-auto">
+   825→                      <table className="w-full min-w-[680px] text-left text-xs sm:text-sm">
+   826→                        <thead>
+   827→                          <tr className="border-b border-teal-100 text-[10px] uppercase tracking-wide text-teal-900/60">
+   828→                            <th className="py-2 pr-2 font-semibold">Enterprise Type</th>
+   829→                            <th className="py-2 pr-2 text-right font-semibold">Registered ({data.period.label})</th>
+   830→                            <th className="py-2 pr-2 text-right font-semibold">Registered</th>
+   831→                            <th className="py-2 pr-2 text-right font-semibold">Legalized</th>
+   832→                            <th className="py-2 pr-2 text-right font-semibold">Awaiting</th>
+   833→                            <th className="py-2 pr-2 text-right font-semibold">Operational</th>
+   834→                            <th className="py-2 pr-2 text-right font-semibold">Total</th>
+   835→                            <th className="py-2 pr-2 text-right font-semibold">Members</th>
+   836→                            <th className="py-2 font-semibold"><span className="sr-only">Details</span></th>
+   837→                          </tr>
+   838→                        </thead>
+   839→                        <tbody>
+   840→                          {(data.byType ?? []).map((t) => (
+   841→                            <tr
+   842→                              key={`type-${t.type}`}
+   843→                              className={`cursor-pointer border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60 ${typeDetail?.type === t.type ? 'bg-teal-50/80' : ''}`}
+   844→                              onClick={() => openTypeDetail(t.type)}
+   845→                              title="View records of this type"
+   846→                            >
+   847→                              <td className="py-2.5 pr-2 font-semibold text-teal-950">{t.type}</td>
+   848→                              <td className="py-2.5 pr-2 text-right">{fmt(t.registeredInPeriod)}</td>
+   849→                              <td className="py-2.5 pr-2 text-right">{fmt(t.standing.REGISTERED)}</td>
+   850→                              <td className="py-2.5 pr-2 text-right">{fmt(t.standing.FULLY_LEGALIZED)}</td>
+   851→                              <td className="py-2.5 pr-2 text-right">{fmt(t.standing.AWAITING_OPERATION)}</td>
+   852→                              <td className="py-2.5 pr-2 text-right font-semibold">{fmt(t.standing.OPERATIONAL)}</td>
+   853→                              <td className="py-2.5 pr-2 text-right font-semibold text-teal-900">{fmt(t.standingTotal)}</td>
+   854→                              <td className="py-2.5 pr-2 text-right">
+   855→                                {fmt(t.members)} <span className="text-[10px] text-muted-foreground">(F {fmt(t.femaleMembers)})</span>
+   856→                              </td>
+   857→                              <td className="py-2.5">
+   858→                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 text-teal-700">
+   859→                                  <Eye className="h-3.5 w-3.5" />
+   860→                                </span>
+   861→                              </td>
+   862→                            </tr>
+   863→                          ))}
+   864→                        </tbody>
+   865→                      </table>
+   866→                    </div>
+   867→                    )}
+   868→                  </>
+   869→                )}
+   870→
+   871→                {/* Records of the clicked enterprise type */}
+   872→                {typeDetail && (
+   873→                  <div className="overflow-hidden rounded-xl border border-teal-100 bg-white">
+   874→                    <div className="flex items-center justify-between gap-2 border-b border-teal-100 bg-teal-50/60 px-3 py-2">
+   875→                      <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+   876→                        {typeDetail.type} — records {typeDetail.loading ? '' : `(${typeDetail.smes?.length ?? 0})`}
+   877→                      </p>
+   878→                      <button
+   879→                        type="button"
+   880→                        onClick={() => setTypeDetail(null)}
+   881→                        className="shrink-0 rounded-md border border-teal-200 bg-white px-2 py-1 text-[10px] font-medium text-teal-700 transition-colors hover:bg-teal-50"
+   882→                      >
+   883→                        Close
+   884→                      </button>
+   885→                    </div>
+   886→                    <EnterpriseListBlock loading={typeDetail.loading} smes={typeDetail.smes} emptyText="No records of this type in scope yet" />
+   887→                  </div>
+   888→                )}
+   889→              </CardContent>
+   890→            </Card>
+   891→          </div>
+   892→
+   893→          {/* ============ Custom report builder ============ */}
+   894→          <Card className="rounded-2xl border-teal-100">
+   895→            <CardHeader className="pb-2">
+   896→              <div className="flex flex-wrap items-start justify-between gap-2">
+   897→                <div>
+   898→                  <CardTitle className="flex items-center gap-1.5 text-base">
+   899→                    <FileText className="h-4 w-4 text-teal-700" />
+   900→                    Custom Report
+   901→                  </CardTitle>
+   902→                  <CardDescription>
+   903→                    Pick a grouping and only the metrics you need — the table updates live and totals itself.
+   904→                    Export to CSV for Excel or print a clean copy.
+   905→                  </CardDescription>
+   906→                </div>
+   907→                <div className="flex gap-1.5">
+   908→                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={exportReportCsv} disabled={!report || report.rows.length === 0}>
+   909→                    <Download className="mr-1 h-3.5 w-3.5" /> CSV
+   910→                  </Button>
+   911→                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={printReport} disabled={!report || report.rows.length === 0}>
+   912→                    <Printer className="mr-1 h-3.5 w-3.5" /> Print
+   913→                  </Button>
+   914→                </div>
+   915→              </div>
+   916→            </CardHeader>
+   917→            <CardContent className="space-y-3">
+   918→              <div className="flex flex-wrap items-center gap-1.5">
+   919→                {([['unit', 'By administrative unit'], ['type', 'By enterprise type'], ['status', 'By stage (standing today)']] as [ReportGroup, string][]).map(([g, lbl]) => (
+   920→                  <button
+   921→                    key={g}
+   922→                    type="button"
+   923→                    onClick={() => changeReportGroup(g)}
+   924→                    className={cn(
+   925→                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+   926→                      reportGroup === g ? 'border-teal-700 bg-teal-700 text-white' : 'border-teal-200 bg-white text-teal-800 hover:bg-teal-50'
+   927→                    )}
+   928→                  >
+   929→                    {lbl}
+   930→                  </button>
+   931→                ))}
+   932→              </div>
+   933→
+   934→              {reportGroup !== 'status' && (
+   935→                <div className="flex flex-wrap items-center gap-1.5">
+   936→                  <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">Columns:</span>
+   937→                  {REPORT_COL_META.filter((k) => REPORT_COLS_BY_GROUP[reportGroup].includes(k.key)).map((k) => (
+   938→                    <label
+   939→                      key={k.key}
+   940→                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-teal-200 bg-white px-2.5 py-1 text-xs text-teal-900 transition-colors hover:bg-teal-50"
+   941→                    >
+   942→                      <input type="checkbox" className="h-3 w-3 accent-teal-700" checked={reportCols.includes(k.key)} onChange={() => toggleReportCol(k.key)} />
+   943→                      {k.label}
+   944→                    </label>
+   945→                  ))}
+   946→                </div>
+   947→              )}
+   948→
+   949→              {report && report.rows.length > 0 ? (
+   950→                <div className="overflow-hidden rounded-xl border border-teal-100">
+   951→                  <div className="border-b border-teal-100 bg-teal-50/60 px-3 py-2">
+   952→                    <p className="text-xs font-semibold text-teal-950">{report.title}</p>
+   953→                    <p className="text-[10px] text-muted-foreground">{report.subtitle} · generated {new Date().toLocaleString('en-GB')}</p>
+   954→                  </div>
+   955→                  <div className="overflow-x-auto">
+   956→                    <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
+   957→                      <thead>
+   958→                        <tr className="border-b border-teal-100 bg-white text-[10px] uppercase tracking-wide text-teal-900/60">
+   959→                          {report.cols.map((c, i) => (
+   960→                            <th key={c} className={cn('whitespace-nowrap px-3 py-2 font-semibold', i > 0 && 'text-right')}>{c}</th>
+   961→                          ))}
+   962→                        </tr>
+   963→                      </thead>
+   964→                      <tbody>
+   965→                        {report.rows.map((r, ri) => (
+   966→                          <tr key={ri} className="border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60">
+   967→                            {r.map((cell, ci) => (
+   968→                              <td
+   969→                                key={ci}
+   970→                                className={cn('whitespace-nowrap px-3 py-2', ci === 0 ? 'font-semibold text-teal-950' : 'text-right text-slate-600')}
+   971→                              >
+   972→                                {typeof cell === 'number' ? fmt(cell) : cell}
+   973→                              </td>
+   974→                            ))}
+   975→                          </tr>
+   976→                        ))}
+   977→                        {report.totals && (
+   978→                          <tr className="border-t-2 border-teal-200 bg-teal-50/50 font-semibold">
+   979→                            {report.totals.map((cell, ci) => (
+   980→                              <td key={ci} className={cn('whitespace-nowrap px-3 py-2 text-teal-900', ci > 0 && 'text-right')}>
+   981→                                {typeof cell === 'number' ? fmt(cell) : cell}
+   982→                              </td>
+   983→                            ))}
+   984→                          </tr>
+   985→                        )}
+   986→                      </tbody>
+   987→                    </table>
+   988→                  </div>
+   989→                </div>
+   990→              ) : (
+   991→                <p className="py-6 text-center text-sm text-muted-foreground">
+   992→                  No data for this grouping in the selected scope and period.
+   993→                </p>
+   994→              )}
+   995→            </CardContent>
+   996→          </Card>
+   997→
+   998→          {/* ============ Accountability table (click a row for details) ============ */}
+   999→          <Card className="rounded-2xl border-teal-100">
+  1000→            <CardHeader className="pb-2">
+  1001→              <CardTitle className="text-base">Accountability per {isCityOverview ? 'Sub-City' : 'Woreda'}</CardTitle>
+  1002→              <CardDescription className="text-xs sm:text-sm">
+  1003→                Click a row to see the unit&apos;s target summary and its registered enterprises
+  1004→              </CardDescription>
+  1005→            </CardHeader>
+  1006→            <CardContent className="overflow-x-auto">
+  1007→              <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
+  1008→                <thead>
+  1009→                  <tr className="border-b border-teal-100 text-[10px] uppercase tracking-wide text-teal-900/60">
+  1010→                    <th className="py-2 pr-2 font-semibold">Unit</th>
+  1011→                    <th className="py-2 pr-2 text-right font-semibold">Target</th>
+  1012→                    <th className="py-2 pr-2 text-right font-semibold">Registered</th>
+  1013→                    <th className="py-2 pr-2 font-semibold">Achievement</th>
+  1014→                    <th className="py-2 pr-2 text-right font-semibold">Pending</th>
+  1015→                    <th className="py-2 pr-2 text-right font-semibold">Operational</th>
+  1016→                    <th className="py-2 pr-2 text-right font-semibold">Members</th>
+  1017→                    <th className="py-2 pr-2 font-semibold">Status</th>
+  1018→                    <th className="py-2 font-semibold"><span className="sr-only">Details</span></th>
+  1019→                  </tr>
+  1020→                </thead>
+  1021→                <tbody>
+  1022→                  {data.rows.map((r) => {
+  1023→                    const statusMeta = SME_UNIT_STATUS_META[r.unitStatus];
+  1024→                    return (
+  1025→                      <tr
+  1026→                        key={`${r.subCity}||${r.area}`}
+  1027→                        className="cursor-pointer border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60"
+  1028→                        onClick={() => openDetail(r)}
+  1029→                        title="View details"
+  1030→                      >
+  1031→                        <td className="py-2.5 pr-2 font-semibold text-teal-950">{r.label}</td>
+  1032→                        <td className="py-2.5 pr-2 text-right">
+  1033→                          {r.target > 0 ? fmt(r.target) : <span className="text-[10px] italic text-amber-600">not set</span>}
+  1034→                        </td>
+  1035→                        <td className="py-2.5 pr-2 text-right font-semibold">{fmt(r.actual)}</td>
+  1036→                        <td className="py-2.5 pr-2">
+  1037→                          <div className="flex items-center gap-1.5">
+  1038→                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-teal-50">
+  1039→                              <div
+  1040→                                className={cn(
+  1041→                                  'h-full rounded-full',
+  1042→                                  r.unitStatus === 'achieved' ? 'bg-emerald-500'
+  1043→                                    : r.unitStatus === 'behind' || r.unitStatus === 'missed' ? 'bg-red-400'
+  1044→                                      : r.unitStatus === 'no_target' ? 'bg-slate-300' : 'bg-teal-500'
+  1045→                                )}
+  1046→                                style={{ width: `${Math.min(r.achievementPct, 100)}%` }}
+  1047→                              />
+  1048→                            </div>
+  1049→                            <span className="text-[11px] font-medium text-teal-900">{r.target > 0 ? `${r.achievementPct}%` : '—'}</span>
+  1050→                          </div>
+  1051→                        </td>
+  1052→                        <td className="py-2.5 pr-2 text-right">{fmt(r.pending)}</td>
+  1053→                        <td className="py-2.5 pr-2 text-right">
+  1054→                          {fmt(r.standing.OPERATIONAL)} <span className="text-[10px] text-muted-foreground">({r.operationalRate}%)</span>
+  1055→                        </td>
+  1056→                        <td className="py-2.5 pr-2 text-right">{fmt(r.members)}</td>
+  1057→                        <td className="py-2.5 pr-2">
+  1058→                          <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
+  1059→                        </td>
+  1060→                        <td className="py-2.5">
+  1061→                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 text-teal-700">
+  1062→                            <Eye className="h-3.5 w-3.5" />
+  1063→                          </span>
+  1064→                        </td>
+  1065→                      </tr>
+  1066→                    );
+  1067→                  })}
+  1068→                  {data.rows.length === 0 && (
+  1069→                    <tr>
+  1070→                      <td colSpan={9} className="py-8 text-center text-muted-foreground">
+  1071→                        No {isCityOverview ? 'sub-cities' : 'woredas'} configured yet — add locations in Settings.
+  1072→                      </td>
+  1073→                    </tr>
+  1074→                  )}
+  1075→                </tbody>
+  1076→              </table>
+  1077→            </CardContent>
+  1078→          </Card>
+  1079→
+  1080→          <p className="pb-2 text-center text-[11px] text-teal-900/45">
+  1081→            Small Enterprise (MSE) registration & performance monitoring — Dhibayyuu Sub-City
+  1082→          </p>
+  1083→        </>
+  1084→      )}
+  1085→
+  1086→      {/* ============ Click-through detail dialog ============ */}
+  1087→      <Dialog open={!!detailUnit} onOpenChange={(open) => { if (!open) setDetailUnit(null); }}>
+  1088→        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+  1089→          <DialogHeader>
+  1090→            <DialogTitle className="flex items-center gap-2">
+  1091→              <MapPin className="h-5 w-5 text-teal-700" />
+  1092→              {detailUnit?.label}
+  1093→              <span className="text-xs font-normal text-muted-foreground">
+  1094→                {detailUnit && (detailUnit.area ? `woreda of ${detailUnit.subCity}` : 'sub-city')}
+  1095→              </span>
+  1096→            </DialogTitle>
+  1097→            <DialogDescription>
+  1098→              Performance detail — {data.period.label}
+  1099→            </DialogDescription>
+  1100→          </DialogHeader>
+  1101→
+  1102→          {detailUnit && (() => {
+  1103→            const row = data.rows.find((r) => r.subCity === detailUnit.subCity && r.area === detailUnit.area);
+  1104→            return (
+  1105→              <div className="space-y-3">
+  1106→                {/* Summary */}
+  1107→                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1108→                  <MiniStat label="Target" value={row && row.target > 0 ? fmt(row.target) : 'Not set'} />
+  1109→                  <MiniStat label="Registered" value={row ? fmt(row.actual) : '—'} />
+  1110→                  <MiniStat label="Achievement" value={row && row.target > 0 ? `${row.achievementPct}%` : '—'} />
+  1111→                  <MiniStat label="Pending" value={row ? fmt(row.pending) : '—'} />
+  1112→                </div>
+  1113→                {row && <UnitStatusChips row={row} />}
+  1114→
+  1115→                {/* Enterprise list */}
+  1116→                <div className="rounded-xl border border-teal-100">
+  1117→                  <p className="border-b border-teal-100 bg-teal-50/60 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+  1118→                    Registered enterprises {detailLoading ? '' : `(${detailSmes?.length ?? 0})`}
+  1119→                  </p>
+  1120→                  <EnterpriseListBlock loading={detailLoading} smes={detailSmes} />
+  1121→                </div>
+  1122→                <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+  1123→                  <ChevronRight className="h-3 w-3" />
+  1124→                  Status changes and updates are managed in the SME Records page.
+  1125→                </p>
+  1126→              </div>
+  1127→            );
+  1128→          })()}
+  1129→        </DialogContent>
+  1130→      </Dialog>
+  1131→    </div>
+  1132→  );
+  1133→}
+  1134→
+  1135→// ---------------------------------------------------------------------------
+  1136→// Small presentational helpers
+  1137→// ---------------------------------------------------------------------------
+  1138→
+  1139→function KpiCard({
+  1140→  icon,
+  1141→  label,
+  1142→  value,
+  1143→  sub,
+  1144→  highlight,
+  1145→  onClick,
+  1146→  title,
+  1147→}: {
+  1148→  icon: React.ReactNode;
+  1149→  label: string;
+  1150→  value: string;
+  1151→  sub: string;
+  1152→  highlight?: 'emerald' | 'teal' | 'red';
+  1153→  /** When set, the card opens its record list below the KPI grid. */
+  1154→  onClick?: () => void;
+  1155→  title?: string;
+  1156→}) {
+  1157→  return (
+  1158→    <div
+  1159→      className={cn(
+  1160→        'card-lift rounded-2xl border border-teal-100 bg-white p-4 shadow-sm',
+  1161→        onClick && 'cursor-pointer transition-colors hover:border-teal-300 hover:shadow-md'
+  1162→      )}
+  1163→      onClick={onClick}
+  1164→      role={onClick ? 'button' : undefined}
+  1165→      tabIndex={onClick ? 0 : undefined}
+  1166→      aria-label={title}
+  1167→      onKeyDown={
+  1168→        onClick
+  1169→          ? (e) => {
+  1170→              if (e.key === 'Enter' || e.key === ' ') {
+  1171→                e.preventDefault();
+  1172→                onClick();
+  1173→              }
+  1174→            }
+  1175→          : undefined
+  1176→      }
+  1177→      title={title}
+  1178→    >
+  1179→      <div className="flex items-center gap-2">
+  1180→        <span
+  1181→          className={cn(
+  1182→            'bg-brand-gradient flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm',
+  1183→            highlight === 'emerald' && 'bg-emerald-500',
+  1184→            highlight === 'red' && 'bg-red-500'
+  1185→          )}
+  1186→        >
+  1187→          {icon}
+  1188→        </span>
+  1189→        <div className="min-w-0">
+  1190→          <p className="truncate text-xl font-extrabold leading-tight text-teal-950">{value}</p>
+  1191→          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-teal-900/50">{label}</p>
+  1192→        </div>
+  1193→        {onClick && <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-teal-700/50" />}
+  1194→      </div>
+  1195→      <p className="mt-2 truncate text-[10px] text-muted-foreground">{sub}</p>
+  1196→    </div>
+  1197→  );
+  1198→}
+  1199→
+  1200→function MiniStat({ label, value }: { label: string; value: string }) {
+  1201→  return (
+  1202→    <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2">
+  1203→      <p className="text-[10px] uppercase tracking-wide text-teal-900/50">{label}</p>
+  1204→      <p className="text-sm font-bold text-teal-950">{value}</p>
+  1205→    </div>
+  1206→  );
+  1207→}
+  1208→
+  1209→/** Standing chips (status pipeline, members, target flag) of one administrative unit. */
+  1210→function UnitStatusChips({ row }: { row: PerfRow }) {
+  1211→  const statusMeta = SME_UNIT_STATUS_META[row.unitStatus];
+  1212→  return (
+  1213→    <div className="flex flex-wrap items-center gap-1.5">
+  1214→      <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
+  1215→      {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
+  1216→        <span key={s} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600">
+  1217→          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SME_STATUS_META[s].color }} />
+  1218→          {SME_STATUS_META[s].label} {fmt(row.standing[s] ?? 0)}
+  1219→        </span>
+  1220→      ))}
+  1221→      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+  1222→        <Users className="h-3 w-3" />{fmt(row.members)} members · F {fmt(row.femaleMembers)}
+  1223→      </span>
+  1224→      {row.target === 0 && (
+  1225→        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+  1226→          No target assigned for this period
+  1227→        </span>
+  1228→      )}
+  1229→    </div>
+  1230→  );
+  1231→}
+  1232→
+  1233→/** Body of the "Registered enterprises" box (loading skeleton, table or empty state). */
+  1234→function EnterpriseListBlock({
+  1235→  loading,
+  1236→  smes,
+  1237→  emptyText = 'No enterprises registered under this unit yet',
+  1238→}: {
+  1239→  loading: boolean;
+  1240→  smes: SmeRecord[] | null;
+  1241→  emptyText?: string;
+  1242→}) {
+  1243→  if (loading) {
+  1244→    return (
+  1245→      <div className="space-y-2 p-3">
+  1246→        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+  1247→      </div>
+  1248→    );
+  1249→  }
+  1250→  if (smes && smes.length > 0) {
+  1251→    return (
+  1252→      <div className="max-h-72 overflow-y-auto">
+  1253→        <table className="w-full min-w-[720px] text-left text-xs sm:text-sm">
+  1254→          <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#ccf1ea]">
+  1255→            <tr className="text-[10px] uppercase tracking-wide text-teal-900/60">
+  1256→              <th className="py-2 pl-3 pr-2 font-semibold">No.</th>
+  1257→              <th className="py-2 pr-2 font-semibold">Enterprise Name</th>
+  1258→              <th className="py-2 pr-2 font-semibold">Type</th>
+  1259→              <th className="py-2 pr-2 font-semibold">Sub-City</th>
+  1260→              <th className="py-2 pr-2 font-semibold">Woreda</th>
+  1261→              <th className="py-2 pr-2 text-right font-semibold">Members</th>
+  1262→              <th className="py-2 pr-2 text-right font-semibold">Registered</th>
+  1263→              <th className="py-2 pr-3 text-right font-semibold">Status</th>
+  1264→            </tr>
+  1265→          </thead>
+  1266→          <tbody>
+  1267→            {smes.map((sme, i) => {
+  1268→              const meta = SME_STATUS_META[(sme.status as SmeStatus) in SME_STATUS_META ? (sme.status as SmeStatus) : 'REGISTERED'];
+  1269→              return (
+  1270→                <tr key={sme.id} className="border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60">
+  1271→                  <td className="py-2.5 pl-3 pr-2 text-muted-foreground">{i + 1}</td>
+  1272→                  <td className="max-w-[220px] truncate py-2.5 pr-2 font-semibold text-teal-950" title={sme.enterpriseName}>
+  1273→                    {sme.enterpriseName}
+  1274→                  </td>
+  1275→                  <td className="py-2.5 pr-2 text-slate-600">{sme.enterpriseType}</td>
+  1276→                  <td className="py-2.5 pr-2 text-slate-600">{sme.subCity || '—'}</td>
+  1277→                  <td className="py-2.5 pr-2 text-slate-600">{sme.area || '—'}</td>
+  1278→                  <td className="py-2.5 pr-2 text-right">
+  1279→                    {fmt(sme.employeeCount)}
+  1280→                    {sme.femaleEmployees > 0 ? <span className="text-[10px] text-muted-foreground"> (F {fmt(sme.femaleEmployees)})</span> : null}
+  1281→                  </td>
+  1282→                  <td className="py-2.5 pr-2 text-right text-muted-foreground">{new Date(sme.createdAt).toLocaleDateString('en-GB')}</td>
+  1283→                  <td className="py-2.5 pr-3 text-right">
+  1284→                    <Badge variant="outline" className={cn('inline-flex text-[10px]', meta.badgeClass)}>{meta.label}</Badge>
+  1285→                  </td>
+  1286→                </tr>
+  1287→              );
+  1288→            })}
+  1289→          </tbody>
+  1290→        </table>
+  1291→      </div>
+  1292→    );
+  1293→  }
+  1294→  return (
+  1295→    <div className="flex flex-col items-center gap-1.5 p-6 text-center">
+  1296→      <Store className="h-7 w-7 text-teal-200" />
+  1297→      <p className="text-xs text-muted-foreground">{emptyText}</p>
+  1298→    </div>
+  1299→  );
+  1300→}
+  1301→
+  1302→/** Inline drill-down record shown under a clicked chart bar: unit summary + enterprises. */
+  1303→function UnitDrillPanel({
+  1304→  row,
+  1305→  periodLabel,
+  1306→  loading,
+  1307→  smes,
+  1308→  onClose,
+  1309→}: {
+  1310→  row: PerfRow;
+  1311→  periodLabel: string;
+  1312→  loading: boolean;
+  1313→  smes: SmeRecord[] | null;
+  1314→  onClose: () => void;
+  1315→}) {
+  1316→  return (
+  1317→    <div className="mt-4 overflow-hidden rounded-xl border border-teal-100 bg-teal-50/40">
+  1318→      <div className="flex items-center justify-between gap-2 border-b border-teal-100 bg-white/70 px-3 py-2">
+  1319→        <p className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-teal-950">
+  1320→          <MapPin className="h-3.5 w-3.5 shrink-0 text-teal-700" />
+  1321→          <span className="truncate">{row.label}</span>
+  1322→          <span className="shrink-0 text-[10px] font-normal text-muted-foreground">
+  1323→            {row.area ? `woreda of ${row.subCity}` : 'sub-city'} · {periodLabel}
+  1324→          </span>
+  1325→        </p>
+  1326→        <button
+  1327→          type="button"
+  1328→          onClick={onClose}
+  1329→          className="shrink-0 rounded-md border border-teal-200 bg-white px-2 py-1 text-[10px] font-medium text-teal-700 transition-colors hover:bg-teal-50"
+  1330→        >
+  1331→          Close
+  1332→        </button>
+  1333→      </div>
+  1334→      <div className="space-y-3 p-3">
+  1335→        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1336→          <MiniStat label="Target" value={row.target > 0 ? fmt(row.target) : 'Not set'} />
+  1337→          <MiniStat label="Registered" value={fmt(row.actual)} />
+  1338→          <MiniStat label="Achievement" value={row.target > 0 ? `${row.achievementPct}%` : '—'} />
+  1339→          <MiniStat label="Pending" value={fmt(row.pending)} />
+  1340→        </div>
+  1341→        <UnitStatusChips row={row} />
+  1342→        <div className="rounded-xl border border-teal-100 bg-white">
+  1343→          <p className="border-b border-teal-100 bg-teal-50/60 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+  1344→            Registered enterprises {loading ? '' : `(${smes?.length ?? 0})`}
+  1345→          </p>
+  1346→          <EnterpriseListBlock loading={loading} smes={smes} />
+  1347→        </div>
+  1348→        <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+  1349→          <ChevronRight className="h-3 w-3" />
+  1350→          Status changes and updates are managed in the SME Records page.
+  1351→        </p>
+  1352→      </div>
+  1353→    </div>
+  1354→  );
+  1355→}
+  1356→
