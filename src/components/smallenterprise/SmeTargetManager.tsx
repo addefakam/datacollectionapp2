@@ -2,9 +2,20 @@
 
 import * as React from 'react';
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Loader2,
   MapPin,
@@ -15,6 +26,7 @@ import {
   Store,
   Target,
   Trash2,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,7 +48,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -88,6 +100,7 @@ interface SmeTarget {
   targetValue: number;
   note: string | null;
   createdByName: string | null;
+  createdAt: string;
   progress: TargetProgress;
 }
 
@@ -106,6 +119,33 @@ interface GroupAggregate {
   achieved: number;
   behind: number;
 }
+
+/** One row of the sub-city target-distribution table: a sub-city + period
+ *  with its SUB_CITY target (if distributed) and its woreda targets. */
+interface SubCityDistRow {
+  key: string;
+  subCity: string;
+  periodLabel: string;
+  periodType: string;
+  periodStart: string;
+  periodEnd: string;
+  target: SmeTarget | null;
+  woredas: SmeTarget[];
+  /** Registrations counted once — from the sub-city target when present, otherwise the woreda sum. */
+  registered: number;
+  pending: number;
+  operational: number;
+  members: number;
+  /** Sum of the woreda target shares of this sub-city + period. */
+  distributedTotal: number;
+}
+
+const chartTooltipStyle = {
+  borderRadius: 12,
+  border: '1px solid #ccf1ea',
+  boxShadow: '0 8px 24px -8px rgba(13,148,136,0.35)',
+  fontSize: 12,
+};
 
 function aggregateOf(list: SmeTarget[]): GroupAggregate {
   const target = list.reduce((s, t) => s + t.targetValue, 0);
@@ -139,6 +179,9 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
   // Distribution dialog
   const [distributeTarget, setDistributeTarget] = React.useState<SmeTarget | null>(null);
   const [distributeValues, setDistributeValues] = React.useState<Record<string, string>>({});
+
+  // Sub-city distribution table — expanded row (sub-city + period) showing woreda details
+  const [expandedRowKey, setExpandedRowKey] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -286,21 +329,113 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
 
   // --- overview stats & grouped list ---------------------------------------
 
-  /** Targets grouped by administrative level so the city → sub-city → woreda hierarchy reads top-down. */
-  const grouped = React.useMemo(() => {
-    const order: Record<SmeTargetLevel, number> = { CITY: 0, SUB_CITY: 1, WOREDA: 2 };
-    const sorted = [...targets].sort((a, b) =>
-      order[a.level] - order[b.level]
-      || (a.subCity || '').localeCompare(b.subCity || '')
-      || (a.area || '').localeCompare(b.area || '')
-      || a.periodStart.localeCompare(b.periodStart)
+  /** City-wide targets — presented as cards above the distribution table. */
+  const cityTargets = React.useMemo(() => targets.filter((t) => t.level === 'CITY'), [targets]);
+
+  /**
+   * Sub-city target-distribution rows, one per (sub-city, period): the
+   * SUB_CITY target of that period (when the city share was distributed) plus
+   * the WOREDA targets assigned from it. Woreda targets whose sub-city has no
+   * SUB_CITY target for the period still get a row so no assignment is hidden.
+   * Sorted latest period first, then in Settings (sub-city) order.
+   */
+  const distRows = React.useMemo<SubCityDistRow[]>(() => {
+    const map = new Map<string, {
+      subCity: string;
+      periodType: string;
+      periodLabel: string;
+      periodStart: string;
+      periodEnd: string;
+      target: SmeTarget | null;
+      woredas: SmeTarget[];
+    }>();
+    for (const t of targets) {
+      if (t.level === 'CITY') continue;
+      const key = `${t.subCity}||${t.periodStart}||${t.periodEnd}`;
+      let row = map.get(key);
+      if (!row) {
+        row = {
+          subCity: t.subCity,
+          periodType: t.periodType,
+          periodLabel: t.periodLabel,
+          periodStart: String(t.periodStart),
+          periodEnd: String(t.periodEnd),
+          target: null,
+          woredas: [],
+        };
+        map.set(key, row);
+      }
+      if (t.level === 'SUB_CITY') {
+        // keep the newest copy should duplicates ever appear
+        if (!row.target || String(t.createdAt) > String(row.target.createdAt)) row.target = t;
+      } else {
+        row.woredas.push(t);
+      }
+    }
+    const settingsOrder = new Map(subCities.map((sc, i) => [sc.name.toLowerCase(), i]));
+    const list = [...map.values()];
+    list.sort((a, b) =>
+      b.periodStart.localeCompare(a.periodStart)
+      || (settingsOrder.get(a.subCity.toLowerCase()) ?? 999) - (settingsOrder.get(b.subCity.toLowerCase()) ?? 999)
+      || a.subCity.localeCompare(b.subCity)
     );
-    return {
-      city: sorted.filter((t) => t.level === 'CITY'),
-      subCity: sorted.filter((t) => t.level === 'SUB_CITY'),
-      woreda: sorted.filter((t) => t.level === 'WOREDA'),
-    };
-  }, [targets]);
+    return list.map((r) => {
+      const woredas = [...r.woredas].sort((a, b) => (a.area || '').localeCompare(b.area || ''));
+      const sum = (fn: (t: SmeTarget) => number) => woredas.reduce((s, t) => s + fn(t), 0);
+      return {
+        key: `${r.subCity}||${r.periodStart}||${r.periodEnd}`,
+        subCity: r.subCity,
+        periodLabel: r.periodLabel,
+        periodType: r.periodType,
+        periodStart: r.periodStart,
+        periodEnd: r.periodEnd,
+        target: r.target,
+        woredas,
+        // count each registration once: prefer the sub-city target's own figure
+        registered: r.target ? r.target.progress.actual : sum((t) => t.progress.actual),
+        pending: r.target ? r.target.progress.pending : sum((t) => t.progress.pending),
+        operational: r.target ? r.target.progress.standing.OPERATIONAL : sum((t) => t.progress.standing.OPERATIONAL ?? 0),
+        members: r.target ? r.target.progress.standing.members : sum((t) => t.progress.standing.members ?? 0),
+        distributedTotal: sum((t) => t.targetValue),
+      };
+    });
+  }, [targets, subCities]);
+
+  /** Summary graph (left): target vs registered per sub-city for the latest period. */
+  const summaryChartData = React.useMemo(() => {
+    if (distRows.length === 0) return [];
+    const latestStart = distRows[0].periodStart;
+    const latestEnd = distRows[0].periodEnd;
+    return distRows
+      .filter((r) => r.periodStart === latestStart && r.periodEnd === latestEnd)
+      .map((r) => ({
+        label: r.subCity,
+        Target: r.target ? r.target.targetValue : r.distributedTotal,
+        Registered: r.registered,
+      }));
+  }, [distRows]);
+
+  /** Summary graph (right): standing establishment pipeline per sub-city for the latest period. */
+  const summaryPipelineData = React.useMemo(() => {
+    if (distRows.length === 0) return [];
+    const latestStart = distRows[0].periodStart;
+    const latestEnd = distRows[0].periodEnd;
+    return distRows
+      .filter((r) => r.periodStart === latestStart && r.periodEnd === latestEnd)
+      .map((r) => {
+        const st = (k: SmeStatus) =>
+          r.target
+            ? (r.target.progress.standing[k] ?? 0)
+            : r.woredas.reduce((s, t) => s + (t.progress.standing[k] ?? 0), 0);
+        return {
+          label: r.subCity,
+          Registered: st('REGISTERED'),
+          'Fully Legalized': st('FULLY_LEGALIZED'),
+          'Awaiting Operation': st('AWAITING_OPERATION'),
+          Operational: st('OPERATIONAL'),
+        };
+      });
+  }, [distRows]);
 
   const stats = React.useMemo(() => {
     const targetSum = targets.reduce((s, t) => s + t.targetValue, 0);
@@ -431,29 +566,310 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
                 />
               </div>
 
-              {grouped.city.length > 0 && (
+              {cityTargets.length > 0 && (
                 <div className="space-y-2.5">
-                  <GroupHeading icon={<Target className="h-3.5 w-3.5 text-teal-700" />} label="City-wide targets" count={grouped.city.length} hint="the overall goal for the whole city" aggregate={grouped.city.length > 1 ? aggregateOf(grouped.city) : undefined} />
-                  {grouped.city.map((t) => (
+                  <GroupHeading icon={<Target className="h-3.5 w-3.5 text-teal-700" />} label="City-wide targets" count={cityTargets.length} hint="the overall goal for the whole city" aggregate={cityTargets.length > 1 ? aggregateOf(cityTargets) : undefined} />
+                  {cityTargets.map((t) => (
                     <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
                   ))}
                 </div>
               )}
-              {grouped.subCity.length > 0 && (
+
+              {/* Sub-city target distribution — table with click-through woreda details */}
+              {distRows.length > 0 && (
                 <div className="space-y-2.5">
-                  <GroupHeading icon={<MapPin className="h-3.5 w-3.5 text-blue-600" />} label="Sub-city targets" count={grouped.subCity.length} hint="shares distributed from the city target" aggregate={grouped.subCity.length > 1 ? aggregateOf(grouped.subCity) : undefined} />
-                  {grouped.subCity.map((t) => (
-                    <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
-                  ))}
+                  <GroupHeading icon={<MapPin className="h-3.5 w-3.5 text-blue-600" />} label="Sub-city target distribution" count={distRows.length} hint="shares of the city target — click a sub-city for its woredas" />
+                  <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[880px] text-left text-xs sm:text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100 bg-slate-50/60 text-[10px] uppercase tracking-wide text-slate-500">
+                            <th className="py-2.5 pl-4 pr-2 font-semibold">Sub-City</th>
+                            <th className="py-2.5 pr-2 font-semibold">Period</th>
+                            <th className="py-2.5 pr-2 text-right font-semibold">Target</th>
+                            <th className="py-2.5 pr-2 text-right font-semibold">Share of City</th>
+                            <th className="py-2.5 pr-2 text-right font-semibold">Registered</th>
+                            <th className="py-2.5 pr-2 font-semibold">Achievement</th>
+                            <th className="py-2.5 pr-2 text-right font-semibold">Pending</th>
+                            <th className="py-2.5 pr-2 text-right font-semibold">Operational</th>
+                            <th className="py-2.5 pr-2 text-right font-semibold">Members</th>
+                            <th className="py-2.5 pr-2 font-semibold">Status</th>
+                            <th className="py-2.5 pr-4 text-right font-semibold"><span className="sr-only">Actions</span></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {distRows.map((row) => {
+                            const cityTarget = cityTargets.find(
+                              (c) => String(c.periodStart) === row.periodStart && String(c.periodEnd) === row.periodEnd
+                            );
+                            const pct = row.target && row.target.targetValue > 0
+                              ? row.target.progress.achievementPct
+                              : row.distributedTotal > 0
+                                ? Math.round((row.registered / row.distributedTotal) * 1000) / 10
+                                : 0;
+                            const unitStatus = row.target ? row.target.progress.unitStatus : (row.distributedTotal > 0 ? 'on_track' : 'no_target');
+                            const statusMeta = SME_UNIT_STATUS_META[unitStatus];
+                            const expanded = expandedRowKey === row.key;
+                            const sharePct = cityTarget && cityTarget.targetValue > 0 && row.target
+                              ? Math.round((row.target.targetValue / cityTarget.targetValue) * 1000) / 10
+                              : null;
+                            const distributedPct = row.target && row.target.targetValue > 0
+                              ? Math.min(100, (row.distributedTotal / row.target.targetValue) * 100)
+                              : 0;
+                            return (
+                              <React.Fragment key={row.key}>
+                                <tr
+                                  className={cn(
+                                    'cursor-pointer border-b border-teal-50 transition-colors hover:bg-teal-50/60',
+                                    expanded && 'bg-teal-50/80'
+                                  )}
+                                  onClick={() => setExpandedRowKey(expanded ? null : row.key)}
+                                  title="Click to see this sub-city's woreda details"
+                                >
+                                  <td className="py-2.5 pl-4 pr-2 font-semibold text-teal-950">
+                                    <span className="inline-flex items-center gap-1.5">
+                                      {expanded
+                                        ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-teal-600" />
+                                        : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-teal-400" />}
+                                      {row.subCity}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 pr-2 text-[11px] text-muted-foreground">
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5">
+                                      <CalendarDays className="h-3 w-3 text-slate-400" />
+                                      {row.periodLabel} · {row.periodType}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 pr-2 text-right font-semibold text-teal-900">
+                                    {row.target ? fmt(row.target.targetValue) : <span className="text-[10px] italic text-amber-600">not set</span>}
+                                  </td>
+                                  <td className="py-2.5 pr-2 text-right text-slate-600">
+                                    {sharePct != null ? `${sharePct}%` : '—'}
+                                  </td>
+                                  <td className="py-2.5 pr-2 text-right font-semibold text-slate-900">{fmt(row.registered)}</td>
+                                  <td className="py-2.5 pr-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-slate-100">
+                                        <div
+                                          className={cn(
+                                            'h-full rounded-full',
+                                            pct >= 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-teal-500' : 'bg-slate-200'
+                                          )}
+                                          style={{ width: `${Math.min(pct, 100)}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-[11px] font-medium text-teal-900">{pct > 0 || row.target ? `${pct}%` : '—'}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 pr-2 text-right">{fmt(row.pending)}</td>
+                                  <td className="py-2.5 pr-2 text-right font-semibold text-emerald-700">{fmt(row.operational)}</td>
+                                  <td className="py-2.5 pr-2 text-right text-slate-600">{fmt(row.members)}</td>
+                                  <td className="py-2.5 pr-2">
+                                    <Badge variant="outline" className={cn('text-[10px]', statusMeta.badgeClass)}>{statusMeta.label}</Badge>
+                                  </td>
+                                  <td className="py-2.5 pr-4">
+                                    <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                      {row.target && (
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          title={`Distribute ${row.subCity}'s share to its woredas`}
+                                          onClick={() => openDistribute(row.target as SmeTarget)}
+                                        >
+                                          <Share2 className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                      {row.target && (
+                                        <Button variant="outline" size="icon" className="h-7 w-7" title="Edit this target" onClick={() => openEdit(row.target as SmeTarget)}>
+                                          <Pencil className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                      {row.target && (
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-7 w-7 border-red-200 text-red-500 hover:bg-red-50"
+                                          title="Delete this target"
+                                          onClick={() => setDeletingId((row.target as SmeTarget).id)}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                                {expanded && (
+                                  <tr className="border-b border-teal-50 bg-blue-50/30">
+                                    <td colSpan={11} className="px-4 py-3">
+                                      <div className="space-y-2">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                          <p className="flex items-center gap-1.5 text-xs font-semibold text-teal-950">
+                                            <ChevronRight className="h-3.5 w-3.5 text-blue-600" />
+                                            Woredas of {row.subCity} — {row.periodLabel}
+                                          </p>
+                                          {row.target && (
+                                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                                              <span>
+                                                Distributed <span className="font-semibold text-teal-900">{fmt(row.distributedTotal)}</span> of {fmt(row.target.targetValue)}
+                                              </span>
+                                              <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white">
+                                                <div
+                                                  className={cn('h-full rounded-full', distributedPct >= 100 ? 'bg-emerald-500' : 'bg-teal-600')}
+                                                  style={{ width: `${distributedPct}%` }}
+                                                />
+                                              </div>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-6 px-2 text-[10px]"
+                                                onClick={() => openDistribute(row.target as SmeTarget)}
+                                              >
+                                                <Share2 className="mr-1 h-2.5 w-2.5" /> Assign to woredas
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {row.woredas.length > 0 ? (
+                                          <div className="overflow-x-auto rounded-lg border border-teal-100 bg-white">
+                                            <table className="w-full min-w-[720px] text-left text-xs">
+                                              <thead>
+                                                <tr className="border-b border-teal-100 bg-teal-50/40 text-[10px] uppercase tracking-wide text-teal-900/60">
+                                                  <th className="py-2 pl-3 pr-2 font-semibold">Woreda</th>
+                                                  <th className="py-2 pr-2 text-right font-semibold">Target</th>
+                                                  <th className="py-2 pr-2 text-right font-semibold">Registered</th>
+                                                  <th className="py-2 pr-2 font-semibold">Achievement</th>
+                                                  <th className="py-2 pr-2 text-right font-semibold">Pending</th>
+                                                  <th className="py-2 pr-2 text-right font-semibold">Operational</th>
+                                                  <th className="py-2 pr-2 text-right font-semibold">Members</th>
+                                                  <th className="py-2 pr-2 font-semibold">Status</th>
+                                                  <th className="py-2 pr-3 text-right font-semibold"><span className="sr-only">Actions</span></th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {row.woredas.map((w) => {
+                                                  const wMeta = SME_UNIT_STATUS_META[w.progress.unitStatus];
+                                                  return (
+                                                    <tr key={w.id} className="border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/50">
+                                                      <td className="py-2 pl-3 pr-2 font-semibold text-teal-950">{w.area || '—'}</td>
+                                                      <td className="py-2 pr-2 text-right font-semibold text-teal-900">{fmt(w.targetValue)}</td>
+                                                      <td className="py-2 pr-2 text-right font-semibold">{fmt(w.progress.actual)}</td>
+                                                      <td className="py-2 pr-2">
+                                                        <div className="flex items-center gap-1.5">
+                                                          <div className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-100">
+                                                            <div
+                                                              className={cn(
+                                                                'h-full rounded-full',
+                                                                w.progress.achievementPct >= 100 ? 'bg-emerald-500' : w.progress.achievementPct > 0 ? 'bg-teal-500' : 'bg-slate-200'
+                                                              )}
+                                                              style={{ width: `${Math.min(w.progress.achievementPct, 100)}%` }}
+                                                            />
+                                                          </div>
+                                                          <span className="text-[11px] font-medium text-teal-900">{w.progress.achievementPct}%</span>
+                                                        </div>
+                                                      </td>
+                                                      <td className="py-2 pr-2 text-right">{fmt(w.progress.pending)}</td>
+                                                      <td className="py-2 pr-2 text-right font-semibold text-emerald-700">{fmt(w.progress.standing.OPERATIONAL ?? 0)}</td>
+                                                      <td className="py-2 pr-2 text-right text-slate-600">{fmt(w.progress.standing.members ?? 0)}</td>
+                                                      <td className="py-2 pr-2">
+                                                        <Badge variant="outline" className={cn('text-[10px]', wMeta.badgeClass)}>{wMeta.label}</Badge>
+                                                      </td>
+                                                      <td className="py-2 pr-3">
+                                                        <div className="flex justify-end gap-1">
+                                                          <Button variant="outline" size="icon" className="h-6 w-6" title="Edit this woreda target" onClick={() => openEdit(w)}>
+                                                            <Pencil className="h-2.5 w-2.5" />
+                                                          </Button>
+                                                          <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-6 w-6 border-red-200 text-red-500 hover:bg-red-50"
+                                                            title="Delete this woreda target"
+                                                            onClick={() => setDeletingId(w.id)}
+                                                          >
+                                                            <Trash2 className="h-2.5 w-2.5" />
+                                                          </Button>
+                                                        </div>
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        ) : (
+                                          <p className="rounded-lg border border-dashed border-teal-200 bg-white/70 px-3 py-3 text-xs text-muted-foreground">
+                                            No woreda targets assigned for {row.subCity} in {row.periodLabel} yet
+                                            {row.target ? ' — use "Assign to woredas" to split this sub-city\'s share.' : ' — distribute the city target to this sub-city first.'}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
-              {grouped.woreda.length > 0 && (
-                <div className="space-y-2.5">
-                  <GroupHeading icon={<ChevronRight className="h-3.5 w-3.5 text-violet-600" />} label="Woreda targets" count={grouped.woreda.length} hint="assigned by sub-cities" aggregate={grouped.woreda.length > 1 ? aggregateOf(grouped.woreda) : undefined} />
-                  {grouped.woreda.map((t) => (
-                    <TargetCard key={t.id} t={t} onDistribute={openDistribute} onEdit={openEdit} onDelete={setDeletingId} />
-                  ))}
-                </div>
+
+              {/* Summary graphs — distribution & registration progress across sub-cities */}
+              {distRows.length > 0 && (
+                <Card className="rounded-2xl border-teal-100">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-1.5 text-base">
+                      <TrendingUp className="h-4 w-4 text-teal-700" />
+                      Distribution Summary
+                    </CardTitle>
+                    <CardDescription>
+                      Target vs registrations and the establishment pipeline per sub-city — {distRows[0]?.periodLabel ?? ''}. Click a sub-city row above for woreda details.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 lg:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-teal-900/60">Target vs Registered</p>
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={summaryChartData} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" vertical={false} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#134e4a' }} interval={0} />
+                            <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
+                            <Tooltip contentStyle={chartTooltipStyle} />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <Bar dataKey="Target" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={20} />
+                            <Bar dataKey="Registered" fill="#0d9488" radius={[6, 6, 0, 0]} barSize={20} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-teal-900/60">Establishment pipeline (standing today)</p>
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={summaryPipelineData} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#0d948818" vertical={false} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#134e4a' }} interval={0} />
+                            <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
+                            <Tooltip contentStyle={chartTooltipStyle} />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
+                              <Bar
+                                key={s}
+                                dataKey={SME_STATUS_META[s].label}
+                                stackId="pipe"
+                                fill={SME_STATUS_META[s].color}
+                                barSize={22}
+                              />
+                            ))}
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </>
           )}
