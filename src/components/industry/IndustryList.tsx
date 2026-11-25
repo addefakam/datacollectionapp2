@@ -47,6 +47,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { ColumnVisibilityMenu, useColumnVisibility, type ColumnDef } from '@/components/shared/column-visibility';
 import {
   Search,
   Download,
@@ -121,7 +122,24 @@ interface IndustryListProps {
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-GB');
 const fmtCapital = (v: number | null) => (v != null ? v.toLocaleString('en-US') : '—');
 
+// Selectable table columns (fixed: row number + actions)
+const INDUSTRY_COLUMNS: ColumnDef[] = [
+  { key: 'establishment', label: 'Establishment' },
+  { key: 'sector', label: 'Sector' },
+  { key: 'subCity', label: 'Sub-City' },
+  { key: 'werreda', label: 'Werreda' },
+  { key: 'licenseNo', label: 'License No' },
+  { key: 'ownership', label: 'Ownership' },
+  { key: 'eia', label: 'EIA / EMP' },
+  { key: 'employees', label: 'Employees' },
+  { key: 'capital', label: 'Capital (ETB)' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'surveyor', label: 'Surveyor' },
+  { key: 'collected', label: 'Collected' },
+];
+
 export default function IndustryList({ refreshTrigger }: IndustryListProps) {
+  const colVis = useColumnVisibility('industry-records', INDUSTRY_COLUMNS);
   const { toast } = useToast();
   const { subCities, sectors, areasFor } = useSettings();
   const [data, setData] = useState<Industry[]>([]);
@@ -380,6 +398,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="flex-1 text-xs sm:text-sm">
               <Upload className="h-3.5 w-3.5" /> Import
             </Button>
+            <ColumnVisibilityMenu columns={INDUSTRY_COLUMNS} visibility={colVis} label="Industry" />
             <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="shrink-0">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             </Button>
@@ -409,18 +428,18 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                 <TableHeader>
                   <TableRow className="border-b bg-gradient-to-r from-slate-50 via-teal-50/60 to-slate-50 hover:bg-none">
                     <TableHead className="w-10 text-center font-semibold text-teal-900/60">##</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Establishment</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Sector</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Sub-City</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Werreda</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">License No</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Ownership</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">EIA / EMP</TableHead>
-                    <TableHead className="text-center font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Employees</TableHead>
-                    <TableHead className="text-right font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Capital (ETB)</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Contact</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Surveyor</TableHead>
-                    <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Collected</TableHead>
+                    {colVis.isVisible('establishment') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Establishment</TableHead>)}
+                    {colVis.isVisible('sector') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Sector</TableHead>)}
+                    {colVis.isVisible('subCity') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Sub-City</TableHead>)}
+                    {colVis.isVisible('werreda') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Werreda</TableHead>)}
+                    {colVis.isVisible('licenseNo') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">License No</TableHead>)}
+                    {colVis.isVisible('ownership') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Ownership</TableHead>)}
+                    {colVis.isVisible('eia') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">EIA / EMP</TableHead>)}
+                    {colVis.isVisible('employees') && (<TableHead className="text-center font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Employees</TableHead>)}
+                    {colVis.isVisible('capital') && (<TableHead className="text-right font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Capital (ETB)</TableHead>)}
+                    {colVis.isVisible('contact') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Contact</TableHead>)}
+                    {colVis.isVisible('surveyor') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Surveyor</TableHead>)}
+                    {colVis.isVisible('collected') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Collected</TableHead>)}
                     <TableHead className="text-center font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -428,38 +447,48 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   {data.map((item, i) => (
                     <TableRow key={item.id} className="hover:bg-teal-50/40 transition-colors">
                       <TableCell className="text-center text-muted-foreground/70">{startIndex + i + 1}</TableCell>
-                      <TableCell className="max-w-[200px]">
-                        <p className="truncate font-semibold text-foreground" title={item.establishmentName}>{item.establishmentName}</p>
-                        <p className="truncate text-[10px] text-muted-foreground" title={item.specificAddress}>
-                          <span className="inline-flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{item.specificAddress}</span>
-                        </p>
-                      </TableCell>
-                      <TableCell className="max-w-[130px]">
-                        <Badge variant="outline" className="max-w-full truncate bg-teal-50 text-[10px] font-normal text-teal-700" title={item.sector}>{item.sector}</Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{item.subCity}</TableCell>
-                      <TableCell className="whitespace-nowrap">{item.area}</TableCell>
-                      <TableCell className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</TableCell>
-                      <TableCell className="max-w-[110px] truncate text-muted-foreground" title={item.ownershipType}>{item.ownershipType}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EIA {item.hasEia ? '✓' : '✗'}</span>
-                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EMP {item.hasEmp ? '✓' : '✗'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-teal-100 px-1.5 text-xs font-semibold text-teal-700">{item.employeeCount}</span>
-                        {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
-                          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleEmployees}</span> · <span className="font-medium text-pink-600">F {item.femaleEmployees}</span></p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{fmtCapital(item.startupCapital)}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <p className="truncate max-w-[110px] font-medium" title={item.contactName}>{item.contactName}</p>
-                        <a href={`tel:${item.contactPhone}`} className="text-[11px] font-medium text-teal-600 hover:underline">{item.contactPhone}</a>
-                      </TableCell>
-                      <TableCell className="max-w-[90px] truncate text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '—'}</TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(item.createdAt)}</TableCell>
+                      {colVis.isVisible('establishment') && (
+                        <TableCell className="max-w-[200px]">
+                          <p className="truncate font-semibold text-foreground" title={item.establishmentName}>{item.establishmentName}</p>
+                          <p className="truncate text-[10px] text-muted-foreground" title={item.specificAddress}>
+                            <span className="inline-flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{item.specificAddress}</span>
+                          </p>
+                        </TableCell>
+                      )}
+                      {colVis.isVisible('sector') && (
+                        <TableCell className="max-w-[130px]">
+                          <Badge variant="outline" className="max-w-full truncate bg-teal-50 text-[10px] font-normal text-teal-700" title={item.sector}>{item.sector}</Badge>
+                        </TableCell>
+                      )}
+                      {colVis.isVisible('subCity') && (<TableCell className="whitespace-nowrap">{item.subCity}</TableCell>)}
+                      {colVis.isVisible('werreda') && (<TableCell className="whitespace-nowrap">{item.area}</TableCell>)}
+                      {colVis.isVisible('licenseNo') && (<TableCell className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</TableCell>)}
+                      {colVis.isVisible('ownership') && (<TableCell className="max-w-[110px] truncate text-muted-foreground" title={item.ownershipType}>{item.ownershipType}</TableCell>)}
+                      {colVis.isVisible('eia') && (
+                        <TableCell className="whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EIA {item.hasEia ? '✓' : '✗'}</span>
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EMP {item.hasEmp ? '✓' : '✗'}</span>
+                          </div>
+                        </TableCell>
+                      )}
+                      {colVis.isVisible('employees') && (
+                        <TableCell className="text-center">
+                          <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-teal-100 px-1.5 text-xs font-semibold text-teal-700">{item.employeeCount}</span>
+                          {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
+                            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleEmployees}</span> · <span className="font-medium text-pink-600">F {item.femaleEmployees}</span></p>
+                          )}
+                        </TableCell>
+                      )}
+                      {colVis.isVisible('capital') && (<TableCell className="text-right tabular-nums font-medium">{fmtCapital(item.startupCapital)}</TableCell>)}
+                      {colVis.isVisible('contact') && (
+                        <TableCell className="whitespace-nowrap">
+                          <p className="truncate max-w-[110px] font-medium" title={item.contactName}>{item.contactName}</p>
+                          <a href={`tel:${item.contactPhone}`} className="text-[11px] font-medium text-teal-600 hover:underline">{item.contactPhone}</a>
+                        </TableCell>
+                      )}
+                      {colVis.isVisible('surveyor') && (<TableCell className="max-w-[90px] truncate text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '—'}</TableCell>)}
+                      {colVis.isVisible('collected') && (<TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(item.createdAt)}</TableCell>)}
                       <TableCell>
                         <div className="flex justify-center gap-0.5">{actionButtons(item)}</div>
                       </TableCell>

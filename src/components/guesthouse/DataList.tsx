@@ -39,6 +39,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { ColumnVisibilityMenu, useColumnVisibility, type ColumnDef } from '@/components/shared/column-visibility';
 import {
   Search,
   Download,
@@ -105,7 +106,26 @@ interface DataListProps {
   refreshTrigger: number;
 }
 
+// Selectable table columns (fixed: row number + actions)
+const HOTEL_COLUMNS: ColumnDef[] = [
+  { key: 'organization', label: 'Organization' },
+  { key: 'subCity', label: 'Sub-City' },
+  { key: 'werreda', label: 'Werreda' },
+  { key: 'address', label: 'Address' },
+  { key: 'rooms', label: 'Rooms' },
+  { key: 'licenseType', label: 'License Type' },
+  { key: 'licenseLevel', label: 'License Level' },
+  { key: 'licenseNo', label: 'License No.' },
+  { key: 'owner', label: 'Owner' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'surveyor', label: 'Surveyor' },
+  { key: 'sign', label: 'Sign' },
+  { key: 'date', label: 'Date' },
+];
+
 export default function DataList({ refreshTrigger }: DataListProps) {
+  const colVis = useColumnVisibility('hotel-records', HOTEL_COLUMNS);
   const { subCities, areasFor } = useSettings();
   const { toast } = useToast();
   const [data, setData] = useState<GuestHouse[]>([]);
@@ -417,6 +437,7 @@ export default function DataList({ refreshTrigger }: DataListProps) {
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
               <Upload className="mr-1 h-4 w-4" /> Import Excel
             </Button>
+            <ColumnVisibilityMenu columns={HOTEL_COLUMNS} visibility={colVis} label="Hotel" />
             <Button variant="outline" size="sm" onClick={fetchData}>
               <RefreshCw className="mr-1 h-4 w-4" /> Refresh
             </Button>
@@ -459,20 +480,20 @@ export default function DataList({ refreshTrigger }: DataListProps) {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">#</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Organization / Dhaabbataa</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Sub-City</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Werreda</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Address</th>
-                    <th className="px-3 py-3 text-center font-semibold text-muted-foreground whitespace-nowrap">Rooms</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">License Type</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">License Level</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">License No.</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Owner</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Contact</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Phone</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Surveyor</th>
-                    <th className="px-3 py-3 text-center font-semibold text-muted-foreground whitespace-nowrap">Sign</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Date</th>
+{colVis.isVisible('organization') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Organization / Dhaabbataa</th>)}
+{colVis.isVisible('subCity') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Sub-City</th>)}
+{colVis.isVisible('werreda') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Werreda</th>)}
+{colVis.isVisible('address') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Address</th>)}
+{colVis.isVisible('rooms') && (<th className="px-3 py-3 text-center font-semibold text-muted-foreground whitespace-nowrap">Rooms</th>)}
+{colVis.isVisible('licenseType') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">License Type</th>)}
+{colVis.isVisible('licenseLevel') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">License Level</th>)}
+{colVis.isVisible('licenseNo') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">License No.</th>)}
+{colVis.isVisible('owner') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Owner</th>)}
+{colVis.isVisible('contact') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Contact</th>)}
+{colVis.isVisible('phone') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Phone</th>)}
+{colVis.isVisible('surveyor') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Surveyor</th>)}
+{colVis.isVisible('sign') && (<th className="px-3 py-3 text-center font-semibold text-muted-foreground whitespace-nowrap">Sign</th>)}
+{colVis.isVisible('date') && (<th className="px-3 py-3 text-left font-semibold text-muted-foreground whitespace-nowrap">Date</th>)}
                     <th className="px-3 py-3 text-center font-semibold text-muted-foreground whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
@@ -480,34 +501,34 @@ export default function DataList({ refreshTrigger }: DataListProps) {
                   {data.map((item, idx) => (
                     <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
                       <td className="px-3 py-2.5 text-muted-foreground text-xs">{(page - 1) * 50 + idx + 1}</td>
-                      <td className="px-3 py-2.5 font-medium max-w-[160px] truncate" title={item.organizationName || item.guestHouseName}>
+                      {colVis.isVisible('organization') && (<td className="px-3 py-2.5 font-medium max-w-[160px] truncate" title={item.organizationName || item.guestHouseName}>
                         {item.organizationName || item.guestHouseName}
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{item.subCity}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{item.area}</td>
-                      <td className="px-3 py-2.5 max-w-[140px] truncate" title={item.specificAddress}>{item.specificAddress}</td>
-                      <td className="px-3 py-2.5 text-center">
+                      </td>)}
+                      {colVis.isVisible('subCity') && (<td className="px-3 py-2.5 whitespace-nowrap">{item.subCity}</td>)}
+                      {colVis.isVisible('werreda') && (<td className="px-3 py-2.5 whitespace-nowrap">{item.area}</td>)}
+                      {colVis.isVisible('address') && (<td className="px-3 py-2.5 max-w-[140px] truncate" title={item.specificAddress}>{item.specificAddress}</td>)}
+                      {colVis.isVisible('rooms') && (<td className="px-3 py-2.5 text-center">
                         <span className="inline-flex items-center justify-center h-6 min-w-[24px] rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold px-1.5">
                           {item.numberOfRooms}
                         </span>
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap"><Badge variant="outline" className="text-xs font-normal">{item.licenseType}</Badge></td>
-                      <td className="px-3 py-2.5 whitespace-nowrap"><Badge variant="secondary" className="text-xs font-normal">{item.licenseLevel}</Badge></td>
-                      <td className="px-3 py-2.5 whitespace-nowrap font-mono text-xs">{item.licenseNumber || '-'}</td>
-                      <td className="px-3 py-2.5 max-w-[120px] truncate" title={item.ownerName || undefined}>{item.ownerName || '-'}</td>
-                      <td className="px-3 py-2.5 max-w-[120px] truncate" title={item.contactName || undefined}>{item.contactName || '-'}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
+                      </td>)}
+                      {colVis.isVisible('licenseType') && (<td className="px-3 py-2.5 whitespace-nowrap"><Badge variant="outline" className="text-xs font-normal">{item.licenseType}</Badge></td>)}
+                      {colVis.isVisible('licenseLevel') && (<td className="px-3 py-2.5 whitespace-nowrap"><Badge variant="secondary" className="text-xs font-normal">{item.licenseLevel}</Badge></td>)}
+                      {colVis.isVisible('licenseNo') && (<td className="px-3 py-2.5 whitespace-nowrap font-mono text-xs">{item.licenseNumber || '-'}</td>)}
+                      {colVis.isVisible('owner') && (<td className="px-3 py-2.5 max-w-[120px] truncate" title={item.ownerName || undefined}>{item.ownerName || '-'}</td>)}
+                      {colVis.isVisible('contact') && (<td className="px-3 py-2.5 max-w-[120px] truncate" title={item.contactName || undefined}>{item.contactName || '-'}</td>)}
+                      {colVis.isVisible('phone') && (<td className="px-3 py-2.5 whitespace-nowrap">
                         <a href={`tel:${item.contactPhone || ''}`} className="text-emerald-600 hover:underline text-xs">{item.contactPhone || '-'}</a>
-                      </td>
-                      <td className="px-3 py-2.5 max-w-[100px] truncate text-xs text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '-'}</td>
-                      <td className="px-3 py-2.5 text-center">
+                      </td>)}
+                      {colVis.isVisible('surveyor') && (<td className="px-3 py-2.5 max-w-[100px] truncate text-xs text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '-'}</td>)}
+                      {colVis.isVisible('sign') && (<td className="px-3 py-2.5 text-center">
                         {item.signature ? (
                           <img src={item.signature} alt="Signed" className="h-5 w-auto mx-auto rounded" />
                         ) : (
                           <span className="text-xs text-muted-foreground">-</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString('en-GB')}</td>
+                      </td>)}
+                      {colVis.isVisible('date') && (<td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString('en-GB')}</td>)}
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-center gap-0.5">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)}>

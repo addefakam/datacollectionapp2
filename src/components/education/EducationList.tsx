@@ -39,6 +39,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { ColumnVisibilityMenu, useColumnVisibility, type ColumnDef } from '@/components/shared/column-visibility';
 import {
   Search,
   Download,
@@ -137,7 +138,25 @@ function fmtDate(value: string): string {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB');
 }
 
+// Selectable table columns (fixed: row number + actions)
+const EDUCATION_COLUMNS: ColumnDef[] = [
+  { key: 'institution', label: 'Institution' },
+  { key: 'type', label: 'Type' },
+  { key: 'subCity', label: 'Sub-City' },
+  { key: 'werreda', label: 'Werreda' },
+  { key: 'licenseNo', label: 'License No' },
+  { key: 'ownership', label: 'Ownership' },
+  { key: 'services', label: 'Services' },
+  { key: 'students', label: 'Students' },
+  { key: 'teachers', label: 'Teachers' },
+  { key: 'classrooms', label: 'Classrooms' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'surveyor', label: 'Surveyor' },
+  { key: 'collected', label: 'Collected' },
+];
+
 export default function EducationList({ refreshTrigger }: DataListProps) {
+  const colVis = useColumnVisibility('education-records', EDUCATION_COLUMNS);
   const { subCities, areasFor } = useSettings();
   const { toast } = useToast();
   const [data, setData] = useState<EducationCenter[]>([]);
@@ -425,6 +444,7 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="flex-1 text-xs sm:text-sm">
               <Upload className="h-3.5 w-3.5" /> Import
             </Button>
+            <ColumnVisibilityMenu columns={EDUCATION_COLUMNS} visibility={colVis} label="Education" />
             <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="shrink-0">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             </Button>
@@ -454,19 +474,19 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                 <thead>
                   <tr className="border-b bg-gradient-to-r from-slate-50 via-indigo-50/60 to-slate-50">
                     <th className="w-10 px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">#</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Institution</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Type</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Sub-City</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Werreda</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">License No</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Ownership</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Services</th>
-                    <th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Students</th>
-                    <th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Teachers</th>
-                    <th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Classrooms</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Contact</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Surveyor</th>
-                    <th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Collected</th>
+{colVis.isVisible('institution') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Institution</th>)}
+{colVis.isVisible('type') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Type</th>)}
+{colVis.isVisible('subCity') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Sub-City</th>)}
+{colVis.isVisible('werreda') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Werreda</th>)}
+{colVis.isVisible('licenseNo') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">License No</th>)}
+{colVis.isVisible('ownership') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Ownership</th>)}
+{colVis.isVisible('services') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Services</th>)}
+{colVis.isVisible('students') && (<th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Students</th>)}
+{colVis.isVisible('teachers') && (<th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Teachers</th>)}
+{colVis.isVisible('classrooms') && (<th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Classrooms</th>)}
+{colVis.isVisible('contact') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Contact</th>)}
+{colVis.isVisible('surveyor') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Surveyor</th>)}
+{colVis.isVisible('collected') && (<th className="px-2.5 py-2 text-left font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Collected</th>)}
                     <th className="px-2.5 py-2 text-center font-semibold text-[10px] uppercase tracking-wider text-indigo-900/60">Actions</th>
                   </tr>
                 </thead>
@@ -474,43 +494,43 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                   {data.map((item, i) => (
                     <tr key={item.id} className="border-b last:border-b-0 hover:bg-indigo-50/40 transition-colors">
                       <td className="px-2.5 py-2 text-center text-muted-foreground/70">{startIndex + i + 1}</td>
-                      <td className="max-w-[200px] px-2.5 py-2">
+                      {colVis.isVisible('institution') && (<td className="max-w-[200px] px-2.5 py-2">
                         <p className="truncate font-semibold text-foreground" title={item.institutionName}>{item.institutionName}</p>
                         <p className="truncate text-[10px] text-muted-foreground" title={item.specificAddress}>
                           <span className="inline-flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{item.specificAddress}</span>
                         </p>
-                      </td>
-                      <td className="max-w-[130px] px-2.5 py-2">
+                      </td>)}
+                      {colVis.isVisible('type') && (<td className="max-w-[130px] px-2.5 py-2">
                         <Badge variant="outline" className="max-w-full truncate bg-indigo-50 text-[10px] font-normal text-indigo-700" title={item.institutionType}>{item.institutionType}</Badge>
-                      </td>
-                      <td className="whitespace-nowrap px-2.5 py-2">{item.subCity}</td>
-                      <td className="whitespace-nowrap px-2.5 py-2">{item.area}</td>
-                      <td className="whitespace-nowrap px-2.5 py-2 font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</td>
-                      <td className="max-w-[110px] truncate px-2.5 py-2 text-muted-foreground" title={item.ownershipType}>{item.ownershipType}</td>
-                      <td className="whitespace-nowrap px-2.5 py-2">
+                      </td>)}
+                      {colVis.isVisible('subCity') && (<td className="whitespace-nowrap px-2.5 py-2">{item.subCity}</td>)}
+                      {colVis.isVisible('werreda') && (<td className="whitespace-nowrap px-2.5 py-2">{item.area}</td>)}
+                      {colVis.isVisible('licenseNo') && (<td className="whitespace-nowrap px-2.5 py-2 font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</td>)}
+                      {colVis.isVisible('ownership') && (<td className="max-w-[110px] truncate px-2.5 py-2 text-muted-foreground" title={item.ownershipType}>{item.ownershipType}</td>)}
+                      {colVis.isVisible('services') && (<td className="whitespace-nowrap px-2.5 py-2">
                         <div className="flex items-center gap-1">{serviceChips(item)}</div>
-                      </td>
-                      <td className="px-2.5 py-2 text-center">
+                      </td>)}
+                      {colVis.isVisible('students') && (<td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-indigo-100 px-1.5 text-xs font-semibold text-indigo-700">{item.studentCount}</span>
                         {hasSexBreakdown(item.maleStudents, item.femaleStudents) && (
                           <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleStudents}</span> · <span className="font-medium text-pink-600">F {item.femaleStudents}</span></p>
                         )}
-                      </td>
-                      <td className="px-2.5 py-2 text-center">
+                      </td>)}
+                      {colVis.isVisible('teachers') && (<td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-violet-100 px-1.5 text-xs font-semibold text-violet-700">{item.teacherCount}</span>
                         {hasSexBreakdown(item.maleTeachers, item.femaleTeachers) && (
                           <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground"><span className="font-medium text-sky-600">M {item.maleTeachers}</span> · <span className="font-medium text-pink-600">F {item.femaleTeachers}</span></p>
                         )}
-                      </td>
-                      <td className="px-2.5 py-2 text-center">
+                      </td>)}
+                      {colVis.isVisible('classrooms') && (<td className="px-2.5 py-2 text-center">
                         <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700">{item.classroomCount}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-2.5 py-2">
+                      </td>)}
+                      {colVis.isVisible('contact') && (<td className="whitespace-nowrap px-2.5 py-2">
                         <p className="max-w-[110px] truncate font-medium" title={item.contactName}>{item.contactName}</p>
                         <a href={`tel:${item.contactPhone}`} className="text-[11px] font-medium text-indigo-600 hover:underline">{item.contactPhone}</a>
-                      </td>
-                      <td className="max-w-[90px] truncate px-2.5 py-2 text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '—'}</td>
-                      <td className="whitespace-nowrap px-2.5 py-2 text-muted-foreground">{fmtDate(item.createdAt)}</td>
+                      </td>)}
+                      {colVis.isVisible('surveyor') && (<td className="max-w-[90px] truncate px-2.5 py-2 text-muted-foreground" title={item.surveyorName || undefined}>{item.surveyorName || '—'}</td>)}
+                      {colVis.isVisible('collected') && (<td className="whitespace-nowrap px-2.5 py-2 text-muted-foreground">{fmtDate(item.createdAt)}</td>)}
                       <td className="px-2.5 py-2">
                         <div className="flex justify-center gap-0.5">{actionButtons(item)}</div>
                       </td>
