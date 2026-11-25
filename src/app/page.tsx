@@ -24,6 +24,10 @@ import CollectorAttendance from '@/components/guesthouse/CollectorAttendance';
 import IndustrySurveyForm from '@/components/industry/IndustrySurveyForm';
 import IndustryList from '@/components/industry/IndustryList';
 import IndustryStats from '@/components/industry/IndustryStats';
+import {
+  IndustryQuestionnaireSection,
+  IndustryStatsConditionSection,
+} from '@/components/industry/IndustrySurveySettings';
 import IndustryAttendance from '@/components/industry/IndustryAttendance';
 import IndustryAttendanceDashboard from '@/components/industry/IndustryAttendanceDashboard';
 import HealthSurveyForm from '@/components/health/HealthSurveyForm';
@@ -209,12 +213,15 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Industry manage workspace: records + stats in one place (admin) */}
+          {/* Industry manage workspace: records + stats + survey questionnaire
+              + stats attribution — everything for this module in one place (admin) */}
           {isAdmin && (
             <TabsContent value="indManage" className="mt-2 sm:mt-3">
               <div className="space-y-4">
                 <IndustryList refreshTrigger={refreshTrigger} />
                 <IndustryStats />
+                <IndustryQuestionnaireSection />
+                <IndustryStatsConditionSection />
               </div>
             </TabsContent>
           )}
