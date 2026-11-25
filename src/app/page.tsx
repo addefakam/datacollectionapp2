@@ -209,6 +209,16 @@ export default function Home() {
             />
           </TabsContent>
 
+          {/* Industry manage workspace: records + stats in one place (admin) */}
+          {isAdmin && (
+            <TabsContent value="indManage" className="mt-2 sm:mt-3">
+              <div className="space-y-4">
+                <IndustryList refreshTrigger={refreshTrigger} />
+                <IndustryStats />
+              </div>
+            </TabsContent>
+          )}
+
           {isAdmin && (
             <TabsContent value="indData" className="mt-2 sm:mt-3">
               <IndustryList refreshTrigger={refreshTrigger} />
@@ -231,6 +241,16 @@ export default function Home() {
               onOfflineSave={(data) => saveOffline(data, 'guesthouse')}
             />
           </TabsContent>
+
+          {/* Hotel manage workspace: records + dashboard in one place (admin) */}
+          {isAdmin && (
+            <TabsContent value="hotelManage" className="mt-2 sm:mt-3">
+              <div className="space-y-4">
+                <DataList refreshTrigger={refreshTrigger} />
+                <Dashboard />
+              </div>
+            </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="hotelData" className="mt-2 sm:mt-3">
@@ -255,6 +275,16 @@ export default function Home() {
             />
           </TabsContent>
 
+          {/* Health manage workspace: records + stats in one place (admin) */}
+          {isAdmin && (
+            <TabsContent value="healthManage" className="mt-2 sm:mt-3">
+              <div className="space-y-4">
+                <HealthList refreshTrigger={refreshTrigger} />
+                <HealthStats />
+              </div>
+            </TabsContent>
+          )}
+
           {isAdmin && (
             <TabsContent value="healthData" className="mt-2 sm:mt-3">
               <HealthList refreshTrigger={refreshTrigger} />
@@ -277,6 +307,16 @@ export default function Home() {
               onOfflineSave={(data) => saveOffline(data, 'education')}
             />
           </TabsContent>
+
+          {/* Education manage workspace: records + stats in one place (admin) */}
+          {isAdmin && (
+            <TabsContent value="eduManage" className="mt-2 sm:mt-3">
+              <div className="space-y-4">
+                <EducationList refreshTrigger={refreshTrigger} />
+                <EducationStats />
+              </div>
+            </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="eduData" className="mt-2 sm:mt-3">
@@ -301,6 +341,16 @@ export default function Home() {
             />
           </TabsContent>
 
+          {/* Agriculture manage workspace: records + stats in one place (admin) */}
+          {isAdmin && (
+            <TabsContent value="agriManage" className="mt-2 sm:mt-3">
+              <div className="space-y-4">
+                <AgricultureList refreshTrigger={refreshTrigger} />
+                <AgricultureStats />
+              </div>
+            </TabsContent>
+          )}
+
           {isAdmin && (
             <TabsContent value="agriData" className="mt-2 sm:mt-3">
               <AgricultureList refreshTrigger={refreshTrigger} />
@@ -323,6 +373,16 @@ export default function Home() {
               onOfflineSave={(data) => saveOffline(data, 'small-enterprise')}
             />
           </TabsContent>
+
+          {/* Small Enterprise manage workspace: records + performance dashboard in one place (admin) */}
+          {isAdmin && (
+            <TabsContent value="mseManage" className="mt-2 sm:mt-3">
+              <div className="space-y-4">
+                <SmallEnterpriseList refreshTrigger={refreshTrigger} />
+                <SmePerformanceDashboard />
+              </div>
+            </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="mseData" className="mt-2 sm:mt-3">
@@ -362,6 +422,16 @@ export default function Home() {
           {isAdmin && (
             <TabsContent value="charityOfficeReport" className="mt-2 sm:mt-3">
               <CampaignReport refreshTrigger={refreshTrigger} />
+            </TabsContent>
+          )}
+
+          {/* Charity manage workspace: office report + goal management in one place (admin) */}
+          {isAdmin && (
+            <TabsContent value="charityManage" className="mt-2 sm:mt-3">
+              <div className="space-y-4">
+                <CampaignReport refreshTrigger={refreshTrigger} />
+                <CampaignGoalForm refreshTrigger={refreshTrigger} />
+              </div>
             </TabsContent>
           )}
 

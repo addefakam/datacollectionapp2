@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Rocket,
   Shield,
+  SlidersHorizontal,
   Sprout,
   Store,
   Stethoscope,
@@ -67,6 +68,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: 'data',
     items: [
       { tab: 'survey', label: 'Survey', icon: ClipboardList },
+      { tab: 'indManage', label: 'Manage', icon: SlidersHorizontal, adminOnly: true },
       { tab: 'indData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'indStats', label: 'Stats', icon: BarChart3, adminOnly: true },
       { tab: 'attInd', label: 'Attendance', icon: Users },
@@ -79,6 +81,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: 'data',
     items: [
       { tab: 'hotelSurvey', label: 'Survey', icon: ClipboardList },
+      { tab: 'hotelManage', label: 'Manage', icon: SlidersHorizontal, adminOnly: true },
       { tab: 'hotelData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'hotelStats', label: 'Stats', icon: BarChart3, adminOnly: true },
       { tab: 'attHotel', label: 'Attendance', icon: Users },
@@ -91,6 +94,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: 'data',
     items: [
       { tab: 'healthSurvey', label: 'Survey', icon: ClipboardList },
+      { tab: 'healthManage', label: 'Manage', icon: SlidersHorizontal, adminOnly: true },
       { tab: 'healthData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'healthStats', label: 'Stats', icon: BarChart3, adminOnly: true },
     ],
@@ -102,6 +106,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: 'data',
     items: [
       { tab: 'eduSurvey', label: 'Survey', icon: ClipboardList },
+      { tab: 'eduManage', label: 'Manage', icon: SlidersHorizontal, adminOnly: true },
       { tab: 'eduData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'eduStats', label: 'Stats', icon: BarChart3, adminOnly: true },
     ],
@@ -113,6 +118,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: 'data',
     items: [
       { tab: 'agriSurvey', label: 'Survey', icon: ClipboardList },
+      { tab: 'agriManage', label: 'Manage', icon: SlidersHorizontal, adminOnly: true },
       { tab: 'agriData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'agriStats', label: 'Stats', icon: BarChart3, adminOnly: true },
     ],
@@ -124,6 +130,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: 'initiatives',
     items: [
       { tab: 'mseSurvey', label: 'Survey', icon: ClipboardList },
+      { tab: 'mseManage', label: 'Manage', icon: SlidersHorizontal, adminOnly: true },
       { tab: 'mseData', label: 'Records', icon: Database, adminOnly: true },
       { tab: 'mseTargets', label: 'Set Targets', icon: Target, adminOnly: true },
       { tab: 'mseDash', label: 'Performance Dashboard', icon: LineChart, adminOnly: true },
@@ -137,6 +144,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { tab: 'charityCampaignSet', label: 'Set Goal & Distribute', icon: Target, adminOnly: true },
       { tab: 'charityAchievements', label: 'Record Achievement', icon: HandCoins },
+      { tab: 'charityManage', label: 'Manage', icon: SlidersHorizontal, adminOnly: true },
       { tab: 'charityOfficeReport', label: 'Office Goal Report', icon: FileBarChart2, adminOnly: true },
     ],
   },
