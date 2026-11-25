@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
 
     const where: Record<string, unknown> = {};
-    if (subCity) where.subCity = subCity;
-    if (area) where.area = area;
+    if (subCity) where.subCity = { equals: subCity, mode: 'insensitive' };
+    if (area) where.area = { equals: area, mode: 'insensitive' };
     if (enterpriseType) where.enterpriseType = enterpriseType;
     if (status && isSmeStatus(status)) where.status = status;
 

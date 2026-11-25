@@ -192,7 +192,9 @@ export async function GET(request: NextRequest) {
     // Enterprise-type breakdown — standing pipeline + period registrations
     // per enterprise type (for the "By Enterprise Type" report).
     // ------------------------------------------------------------------
-    const scopeWhere: { subCity?: string } = drillName ? { subCity: drillName } : {};
+    const scopeWhere: Record<string, unknown> = drillName
+      ? { subCity: { equals: drillName, mode: 'insensitive' } }
+      : {};
     const [typeStanding, typeRegistered] = (await Promise.all([
       db.smallEnterprise.groupBy({
         by: ['enterpriseType', 'status'],

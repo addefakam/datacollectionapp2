@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
 import { isSmeStatus } from '@/lib/sme';
+import { canonicalArea, canonicalSubCity } from '@/lib/sme-server';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -71,13 +72,18 @@ export async function POST(request: NextRequest) {
     // Establishment status — defaults to REGISTERED, must be a known lifecycle value
     const status = isSmeStatus(body.status) ? body.status : 'REGISTERED';
 
+    // Canonical scope names — store the Settings spelling so the target and
+    // performance aggregates match these records (tolerates import casing).
+    const scopeSubCity = await canonicalSubCity(String(subCity));
+    const scopeArea = await canonicalArea(scopeSubCity, String(area));
+
     const smallEnterprise = await db.smallEnterprise.create({
       data: {
         enterpriseName,
         enterpriseType,
         ownershipType,
-        subCity,
-        area,
+        subCity: scopeSubCity,
+        area: scopeArea,
         specificAddress: specificAddress || '',
         licenseNumber: licenseNumber || null,
         employeeCount: Math.round(employees),
@@ -121,8 +127,8 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {};
 
-    if (subCity) where.subCity = subCity;
-    if (area) where.area = area;
+    if (subCity) where.subCity = { equals: subCity, mode: 'insensitive' };
+    if (area) where.area = { equals: area, mode: 'insensitive' };
     if (enterpriseType) where.enterpriseType = enterpriseType;
     // Click-through filters for the stats dimensions
     if (ownershipType) where.ownershipType = ownershipType;

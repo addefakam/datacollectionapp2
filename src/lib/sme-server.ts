@@ -14,14 +14,44 @@ export interface SmeScopeStanding {
   femaleMembers: number;
 }
 
+/**
+ * Case-insensitive scope match. Records may arrive through imports or edits
+ * whose spelling differs in case from the Settings names — strict equality
+ * would silently zero every scoped aggregate (standing, progress, KPIs).
+ */
+function scopeFilter(value?: string): { equals: string; mode: 'insensitive' } | undefined {
+  if (!value) return undefined;
+  return { equals: value, mode: 'insensitive' };
+}
+
+/** Resolve a sub-city name to the canonical Settings name (case-insensitive); falls back to the trimmed input. */
+export async function canonicalSubCity(input: string): Promise<string> {
+  const v = String(input ?? '').trim();
+  if (!v) return '';
+  const sc = await db.subCity.findFirst({ where: { name: { equals: v, mode: 'insensitive' } } });
+  return sc ? sc.name : v;
+}
+
+/** Resolve a woreda name under a canonical sub-city to the Settings name (case-insensitive); falls back to the trimmed input. */
+export async function canonicalArea(subCity: string, input: string): Promise<string> {
+  const v = String(input ?? '').trim();
+  if (!v || !subCity) return v;
+  const w = await db.subCityArea.findFirst({
+    where: { name: { equals: v, mode: 'insensitive' }, subCity: { name: subCity } },
+  });
+  return w ? w.name : v;
+}
+
 /** Current standing of SMEs in a scope: counts by status + total members. */
 export async function smeScopeStanding(
   subCity?: string,
   area?: string
 ): Promise<SmeScopeStanding> {
   const where: Record<string, unknown> = {};
-  if (subCity) where.subCity = subCity;
-  if (area) where.area = area;
+  const sc = scopeFilter(subCity);
+  const ar = scopeFilter(area);
+  if (sc) where.subCity = sc;
+  if (ar) where.area = ar;
 
   const grouped = await db.smallEnterprise.groupBy({
     by: ['status'],
@@ -59,8 +89,10 @@ export async function smeRegisteredInPeriod(
   end: Date
 ): Promise<number> {
   const where: Record<string, unknown> = { createdAt: { gte: start, lte: end } };
-  if (subCity) where.subCity = subCity;
-  if (area) where.area = area;
+  const sc = scopeFilter(subCity);
+  const ar = scopeFilter(area);
+  if (sc) where.subCity = sc;
+  if (ar) where.area = ar;
   return db.smallEnterprise.count({ where });
 }
 

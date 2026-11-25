@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { canonicalArea, canonicalSubCity } from '@/lib/sme-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -154,13 +155,17 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // Canonical scope names — imported spellings are matched to the
+        // Settings names case-insensitively so aggregates pick the rows up.
+        const subCityCanonical = await canonicalSubCity(subCity);
+        const areaCanonical = await canonicalArea(subCityCanonical, area);
         await db.smallEnterprise.create({
           data: {
             enterpriseName,
             enterpriseType,
             ownershipType,
-            subCity,
-            area,
+            subCity: subCityCanonical,
+            area: areaCanonical,
             specificAddress,
             licenseNumber: licenseNumber || null,
             employeeCount: Math.round(employees),
