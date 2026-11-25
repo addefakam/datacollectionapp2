@@ -55,9 +55,7 @@ import {
   Save,
   Upload,
   Phone,
-  MapPin,
   FileBadge,
-  Coins,
   Home,
   GraduationCap,
   ArrowRightCircle,
@@ -568,93 +566,108 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                 Select all on this page
               </label>
             </div>
-            <div className="space-y-2.5">
-              {data.map((item) => {
-                const meta = statusMetaOf(item.status);
-                return (
-                <div
-                  key={item.id}
-                  className={`rounded-xl border bg-white p-3.5 transition-shadow hover:shadow-md ${
-                    selectedIds.has(item.id) ? 'border-teal-300 ring-1 ring-teal-200' : 'border-teal-100'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                      <Checkbox
-                        className="mt-1"
-                        checked={selectedIds.has(item.id)}
-                        onCheckedChange={(v) => {
-                          setSelectedIds((prev) => {
-                            const next = new Set(prev);
-                            if (v) next.add(item.id);
-                            else next.delete(item.id);
-                            return next;
-                          });
-                        }}
-                        aria-label={`Select ${item.enterpriseName}`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <p className="truncate text-sm font-semibold text-teal-950">{item.enterpriseName}</p>
-                          <Badge variant="outline" className={`text-[10px] ${meta.badgeClass}`}>{meta.label}</Badge>
-                          {item.licenseNumber && (
-                            <Badge variant="outline" className="gap-1 text-[10px] text-teal-700"><FileBadge className="h-2.5 w-2.5" />{item.licenseNumber}</Badge>
-                          )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <Badge variant="secondary" className="bg-slate-100 text-[10px] font-medium text-slate-700">{item.enterpriseType}</Badge>
-                          <Badge variant="outline" className="text-[10px] text-slate-500">{item.ownershipType}</Badge>
-                        </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{item.subCity} · {item.area}{item.specificAddress ? ` · ${item.specificAddress}` : ''}</span>
-                          <a href={`tel:${item.contactPhone}`} className="flex items-center gap-1 font-medium text-amber-600 hover:underline">
-                            <Phone className="h-3 w-3" />{item.contactName}
-                          </a>
-                          <span className="text-teal-900/40">{fmtDate(item.createdAt)}{item.surveyorName ? ` · by ${item.surveyorName}` : ''}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-row gap-1">
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setViewItem(item)} title="View">
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8 border-teal-200 text-teal-700 hover:bg-teal-50" onClick={() => openStatusUpdate(item)} title="Update Status">
-                        <ArrowRightCircle className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => openEdit(item)} title="Edit">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50" onClick={() => setDeleteId(item.id)} title="Delete">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  {/* Quick facts */}
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-teal-50 pt-2 text-[11px]">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 font-medium text-teal-800">
-                      <Store className="h-3 w-3" />{item.employeeCount} employees
-                    </span>
-                    {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
-                      <>
-                        <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-slate-600">M {item.maleEmployees}</span>
-                        <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700">F {item.femaleEmployees}</span>
-                      </>
-                    )}
-                    {item.startupCapital != null && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
-                        <Coins className="h-3 w-3" />{fmtMoney(item.startupCapital)}
-                      </span>
-                    )}
-                    {item.hasPremises && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-teal-100 px-1.5 py-0.5 text-teal-700"><Home className="h-3 w-3" />Premises</span>
-                    )}
-                    {item.hasTraining && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-teal-100 px-1.5 py-0.5 text-teal-700"><GraduationCap className="h-3 w-3" />Trained</span>
-                    )}
-                  </div>
-                </div>
-                );
-              })}
+            <div className="overflow-hidden rounded-xl border border-teal-100 bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[940px] text-left text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-teal-100 bg-teal-50/50 text-[10px] uppercase tracking-wide text-teal-900/60">
+                      <th className="w-10 py-2.5 pl-3 pr-2"><span className="sr-only">Select</span></th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Enterprise</th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Type</th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Ownership</th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Sub-City</th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Woreda</th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Contact</th>
+                      <th className="py-2.5 pr-1.5 text-right font-semibold">Members</th>
+                      <th className="py-2.5 pr-1.5 text-right font-semibold">Capital</th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Status</th>
+                      <th className="py-2.5 pr-1.5 font-semibold">Registered</th>
+                      <th className="sticky right-0 border-l border-teal-100 bg-teal-50/95 py-2.5 pr-3 text-right font-semibold"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.map((item) => {
+                      const meta = statusMetaOf(item.status);
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`border-b border-teal-50 transition-colors last:border-b-0 hover:bg-teal-50/60 ${
+                            selectedIds.has(item.id) ? 'bg-teal-50/80' : ''
+                          }`}
+                        >
+                          <td className="py-2.5 pl-3 pr-2 align-middle">
+                            <Checkbox
+                              checked={selectedIds.has(item.id)}
+                              onCheckedChange={(v) => {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (v) next.add(item.id);
+                                  else next.delete(item.id);
+                                  return next;
+                                });
+                              }}
+                              aria-label={`Select ${item.enterpriseName}`}
+                            />
+                          </td>
+                          <td className="max-w-[200px] py-2.5 pr-2">
+                            <p className="truncate font-semibold text-teal-950" title={item.enterpriseName}>{item.enterpriseName}</p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                              {item.licenseNumber && (
+                                <Badge variant="outline" className="gap-1 text-[10px] text-teal-700"><FileBadge className="h-2.5 w-2.5" />{item.licenseNumber}</Badge>
+                              )}
+                              {item.hasPremises && (
+                                <span className="inline-flex items-center gap-0.5 rounded-md border border-teal-100 px-1 py-0.5 text-[9px] text-teal-700"><Home className="h-2.5 w-2.5" />Premises</span>
+                              )}
+                              {item.hasTraining && (
+                                <span className="inline-flex items-center gap-0.5 rounded-md border border-teal-100 px-1 py-0.5 text-[9px] text-teal-700"><GraduationCap className="h-2.5 w-2.5" />Trained</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="max-w-[120px] truncate py-2.5 pr-1.5 text-slate-600" title={item.enterpriseType}>{item.enterpriseType}</td>
+                          <td className="max-w-[110px] truncate py-2.5 pr-1.5 text-slate-500" title={item.ownershipType}>{item.ownershipType}</td>
+                          <td className="py-2.5 pr-1.5 text-slate-600">{item.subCity}</td>
+                          <td className="py-2.5 pr-1.5 text-slate-600" title={item.specificAddress || undefined}>{item.area || '—'}</td>
+                          <td className="py-2.5 pr-2">
+                            <a href={`tel:${item.contactPhone}`} className="font-medium text-amber-600 hover:underline">{item.contactName}</a>
+                          </td>
+                          <td className="py-2.5 pr-1.5 text-right">
+                            <span className="font-semibold text-slate-900">{item.employeeCount}</span>
+                            {hasSexBreakdown(item.maleEmployees, item.femaleEmployees) && (
+                              <span className="block text-[10px] text-muted-foreground">M {item.maleEmployees} · F {item.femaleEmployees}</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-1.5 text-right text-slate-600">{item.startupCapital != null ? fmtMoney(item.startupCapital) : '—'}</td>
+                          <td className="py-2.5 pr-2">
+                            <Badge variant="outline" className={`text-[10px] ${meta.badgeClass}`}>{meta.label}</Badge>
+                          </td>
+                          <td className="py-2.5 pr-1.5 text-muted-foreground">
+                            {fmtDate(item.createdAt)}
+                            {item.surveyorName ? <span className="block text-[10px]">by {item.surveyorName}</span> : null}
+                          </td>
+                          <td className={`sticky right-0 border-l border-teal-50 py-2.5 pr-3 ${
+                            selectedIds.has(item.id) ? 'bg-[#f2fbf9]' : 'bg-white'
+                          }`}>
+                            <div className="flex justify-end gap-0.5">
+                              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setViewItem(item)} title="View">
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                              <Button variant="outline" size="icon" className="h-7 w-7 border-teal-200 text-teal-700 hover:bg-teal-50" onClick={() => openStatusUpdate(item)} title="Update Status">
+                                <ArrowRightCircle className="h-3 w-3" />
+                              </Button>
+                              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => openEdit(item)} title="Edit">
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button variant="outline" size="icon" className="h-7 w-7 border-red-200 text-red-500 hover:bg-red-50" onClick={() => setDeleteId(item.id)} title="Delete">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
             </>
           )}
