@@ -1,6 +1,9 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { loadSurveyFields } from '@/lib/industry-survey-server';
+import { sanitizeCustomAnswers } from '@/lib/survey-fields';
 
 /** Parse an approval date ('YYYY-MM-DD' from the date input) — null when empty/invalid. */
 function toDate(v: unknown): Date | null {
@@ -79,6 +82,25 @@ export async function PUT(
 
     const capital = body.startupCapital != null && body.startupCapital !== '' ? Number(body.startupCapital) : null;
 
+    // Admin-added custom questions (Settings → Survey → Add question) — when
+    // the payload mentions them, sanitize against the saved questionnaire and
+    // enforce the required ones; otherwise keep the stored answers untouched.
+    let customAnswers: Prisma.InputJsonValue | typeof Prisma.DbNull | undefined = undefined;
+    if (body.customAnswers !== undefined) {
+      const surveyFields = await loadSurveyFields();
+      const clean = sanitizeCustomAnswers(surveyFields, body.customAnswers);
+      const missingCustom = surveyFields.filter(
+        (f) => f.custom && f.enabled && f.required && !clean[f.key]
+      );
+      if (missingCustom.length > 0) {
+        return NextResponse.json(
+          { error: `Required question not answered: ${missingCustom[0].labelEn}` },
+          { status: 400 }
+        );
+      }
+      customAnswers = Object.keys(clean).length > 0 ? clean : Prisma.DbNull;
+    }
+
     const updated = await db.industry.update({
       where: { id },
       data: {
@@ -106,6 +128,7 @@ export async function PUT(
         startupCapital: capital != null && Number.isFinite(capital) ? capital : existing.startupCapital,
         contactName: body.contactName ?? existing.contactName,
         contactPhone: body.contactPhone ?? existing.contactPhone,
+        ...(body.customAnswers !== undefined ? { customAnswers } : {}),
       },
     });
 

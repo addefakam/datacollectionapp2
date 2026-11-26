@@ -49,6 +49,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ColumnVisibilityMenu, useColumnVisibility, type ColumnDef } from '@/components/shared/column-visibility';
 import {
+  CustomQuestionEditFields,
+  CustomQuestionViewRows,
+} from '@/components/shared/custom-survey-fields';
+import { sanitizeCustomAnswers, type SurveyFieldConfig } from '@/lib/survey-fields';
+import {
   Search,
   Download,
   Trash2,
@@ -66,6 +71,7 @@ import {
   MapPin,
   FileBadge,
   Leaf,
+  ClipboardList,
   Check,
   X,
 } from 'lucide-react';
@@ -95,6 +101,7 @@ interface Industry {
   startupCapital: number | null;
   contactName: string;
   contactPhone: string;
+  customAnswers?: Record<string, string> | null;
   surveyorName: string | null;
   createdAt: string;
   updatedAt: string;
@@ -164,6 +171,27 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
   const [editItem, setEditItem] = useState<Industry | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [editAreas, setEditAreas] = useState<string[]>([]);
+  // Admin-added custom questionnaire questions (Administration → Settings →
+  // Survey / Industry Manage → "Add question") shown in the view / edit
+  // dialogs. Empty while loading — the dialogs simply show no extra questions.
+  const [customQs, setCustomQs] = useState<SurveyFieldConfig[]>([]);
+  const [editCustom, setEditCustom] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields)) {
+          setCustomQs(d.fields.filter((f: SurveyFieldConfig) => f.custom && f.enabled));
+        }
+      })
+      .catch(() => {
+        // offline / unavailable — dialogs simply show no custom questions
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -245,6 +273,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       contactName: item.contactName,
       contactPhone: item.contactPhone,
     });
+    setEditCustom((item.customAnswers as Record<string, string>) || {});
     setEditAreas(areasFor(item.subCity));
   };
 
@@ -263,6 +292,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
         eiaApprovalDate: editForm.eiaApprovalDate || null,
         empApprovalDate: editForm.empApprovalDate || null,
         currentStatus: editForm.currentStatus,
+        ...(customQs.length > 0 ? { customAnswers: sanitizeCustomAnswers(customQs, editCustom) } : {}),
       };
       const res = await fetch(`/api/industries/${editItem.id}`, {
         method: 'PUT',
@@ -742,6 +772,9 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   </div>
                 </div>
 
+                {/* Admin-added custom questions + stored answers */}
+                <CustomQuestionViewRows fields={customQs} answers={viewItem.customAnswers ?? null} />
+
                 {/* Contact */}
                 <div>
                   <div className="mb-1.5 flex items-center gap-1.5">
@@ -917,6 +950,16 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Admin-added custom questions — answers ride with the save payload */}
+              {customQs.length > 0 && (
+                <div className="space-y-3 rounded-lg border p-3">
+                  <h4 className="flex items-center gap-1.5 text-sm font-semibold text-teal-700">
+                    <ClipboardList className="h-3.5 w-3.5" /> Gaaffii Dabalataa / Additional Questions
+                  </h4>
+                  <CustomQuestionEditFields fields={customQs} value={editCustom} onChange={setEditCustom} />
+                </div>
+              )}
 
               {/* Contact */}
               <div className="space-y-3 rounded-lg border p-3">

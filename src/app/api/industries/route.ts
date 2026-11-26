@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
 import { loadSurveyFields } from '@/lib/industry-survey-server';
 import { surveyFieldRequired } from '@/lib/industry-survey-fields';
+import { sanitizeCustomAnswers } from '@/lib/survey-fields';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
       startupCapital,
       contactName,
       contactPhone,
+      customAnswers,
       surveyorName,
       surveyorId,
     } = body;
@@ -101,6 +103,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Admin-added custom questions (Settings → Survey → Add question): keep
+    // only the answers of enabled questions and enforce the required ones.
+    const cleanAnswers = sanitizeCustomAnswers(surveyFields, customAnswers);
+    const missingCustom = surveyFields.filter(
+      (f) => f.custom && f.enabled && f.required && !cleanAnswers[f.key]
+    );
+    if (missingCustom.length > 0) {
+      return NextResponse.json(
+        { error: `Required question not answered: ${missingCustom[0].labelEn}` },
+        { status: 400 }
+      );
+    }
+
     const capital = startupCapital != null && startupCapital !== '' ? Number(startupCapital) : null;
 
     const industry = await db.industry.create({
@@ -123,6 +138,7 @@ export async function POST(request: NextRequest) {
         startupCapital: capital != null && Number.isFinite(capital) ? capital : null,
         contactName,
         contactPhone,
+        customAnswers: Object.keys(cleanAnswers).length > 0 ? cleanAnswers : undefined,
         surveyorName: surveyorName || null,
         surveyorId: surveyorId || null,
       },

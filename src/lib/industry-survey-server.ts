@@ -4,6 +4,7 @@ import {
   SURVEY_FIELDS_DEFAULT,
   mergeSurveyFields,
   normalizeSurveyFields,
+  type IndustrySurveyFieldConfig,
 } from '@/lib/industry-survey-fields';
 
 /**
@@ -33,9 +34,7 @@ export async function loadSurveyFields() {
 }
 
 /** Persists the admin-managed questionnaire (already validated/normalized). */
-export async function saveSurveyFields(
-  fields: { key: string; labelEn: string; labelOr: string; enabled: boolean; required: boolean }[]
-): Promise<void> {
+export async function saveSurveyFields(fields: IndustrySurveyFieldConfig[]): Promise<void> {
   await db.appSetting.upsert({
     where: { key: SURVEY_FIELDS_SETTING_KEY },
     update: { value: JSON.stringify(fields) },

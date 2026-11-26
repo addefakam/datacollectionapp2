@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { loadSurveyFields } from '@/lib/industry-survey-server';
 
 // GET /api/industries/export/excel — styled Excel export of industry records
 export async function GET(request: NextRequest) {
@@ -14,6 +15,11 @@ export async function GET(request: NextRequest) {
     if (subCity) where.subCity = subCity;
     if (area) where.area = area;
     if (sector) where.sector = sector;
+
+    // Admin-added custom questions (Settings → Survey → Add question) ride
+    // along as their own columns.
+    const surveyFields = await loadSurveyFields();
+    const customQs = surveyFields.filter((f) => f.custom && f.enabled);
 
     const industries = await db.industry.findMany({
       where,
@@ -52,6 +58,7 @@ export async function GET(request: NextRequest) {
       { header: 'Contact Phone', key: 'contactPhone', width: 18 },
       { header: 'Surveyor Name', key: 'surveyorName', width: 20 },
       { header: 'Date Collected', key: 'createdAt', width: 18 },
+      ...customQs.map((f) => ({ header: f.labelEn, key: f.key, width: 22 })),
     ];
 
     sheet.columns = columns;
@@ -91,6 +98,12 @@ export async function GET(request: NextRequest) {
         contactPhone: ind.contactPhone,
         surveyorName: ind.surveyorName || '',
         createdAt: new Date(ind.createdAt).toLocaleDateString('en-GB'),
+        ...Object.fromEntries(
+          customQs.map((f) => {
+            const ca = (ind.customAnswers ?? {}) as Record<string, unknown>;
+            return [f.key, ca[f.key] != null ? String(ca[f.key]) : ''];
+          })
+        ),
       });
 
       // Alternating row colors

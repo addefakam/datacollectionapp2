@@ -5,7 +5,11 @@
  * "Manage" workspace (page.tsx) and Administration → Settings (SettingsManager).
  *
  * - IndustryQuestionnaireSection: the survey questionnaire — hide/show
- *   questions, required flags, bilingual labels and per-step ordering.
+ *   questions, required flags, bilingual labels and per-step ordering, and
+ *   ADD new custom questions ("Add question" — text / number / paragraph /
+ *   dropdown / yes-no) plus remove them again. Answers ride on each record's
+ *   customAnswers column; the form, the Records dialogs and the exports all
+ *   follow.
  * - IndustryStatsConditionSection: the "Sector Distribution" chart attribution —
  *   which groupings the stats offer and the default one.
  */
@@ -19,14 +23,24 @@ import {
   Loader2,
   Plus,
   RotateCcw,
+  Trash2,
   X,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -40,8 +54,14 @@ import { STATS_ATTRIBUTES } from '@/lib/stats-attributes';
 import {
   SURVEY_FIELDS_DEFAULT,
   industrySurveyFieldDef,
+  stepOfIndustryField,
   type IndustrySurveyFieldConfig,
 } from '@/lib/industry-survey-fields';
+import {
+  CUSTOM_SURVEY_INPUTS,
+  makeCustomSurveyKey,
+  type CustomSurveyInput,
+} from '@/lib/survey-fields';
 
 interface AttributeOption {
   key: string;
@@ -65,11 +85,23 @@ const SURVEY_STEP_TITLES: Record<number, string> = {
   3: 'Step 3 — Contact / Quunnamtii',
 };
 
+interface AddDraft {
+  labelEn: string;
+  labelOr: string;
+  input: CustomSurveyInput;
+  optionsText: string;
+  required: boolean;
+}
+
+const EMPTY_DRAFT: AddDraft = { labelEn: '', labelOr: '', input: 'text', optionsText: '', required: false };
+
 export function IndustryQuestionnaireSection() {
   const { toast } = useToast();
   const [fields, setFields] = useState<IndustrySurveyFieldConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [addStep, setAddStep] = useState<1 | 2 | 3 | null>(null);
+  const [draft, setDraft] = useState<AddDraft>(EMPTY_DRAFT);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,14 +129,14 @@ export function IndustryQuestionnaireSection() {
 
   const def = (key: string) => industrySurveyFieldDef(key);
 
-  /** Move a question up/down within its own wizard step. */
+  /** Move a question up/down within its own wizard step (custom ones included). */
   const move = (key: string, dir: -1 | 1) => {
     const idx = fields.findIndex((f) => f.key === key);
-    const step = def(key)?.step;
-    if (idx < 0 || step == null) return;
+    if (idx < 0) return;
+    const step = stepOfIndustryField(fields[idx]);
     // positions of this step's questions inside the flat array
     const stepIdxs = fields
-      .map((f, i) => (def(f.key)?.step === step ? i : -1))
+      .map((f, i) => (stepOfIndustryField(f) === step ? i : -1))
       .filter((i) => i >= 0);
     const pos = stepIdxs.indexOf(idx);
     const targetPos = pos + dir;
@@ -128,7 +160,59 @@ export function IndustryQuestionnaireSection() {
         title: 'Question hidden / Gaaffii dhokatee',
         description: 'Hidden yes/no questions are stored as "No" for new records / Gaaffii dhokame "Lakki" jedhamuun galmeefama',
       });
+    } else if (!enabled && d == null) {
+      toast({
+        title: 'Question hidden / Gaaffii dhokatee',
+        description: 'Hidden custom questions are not collected for new records / Gaaffii dhokame hin kuufamu',
+      });
     }
+  };
+
+  const removeCustom = (key: string) => {
+    setFields((cur) => cur.filter((f) => f.key !== key));
+  };
+
+  const draftOptions = () =>
+    draft.optionsText
+      .split('\n')
+      .map((o) => o.trim())
+      .filter((o) => o.length > 0);
+
+  const draftValid =
+    draft.labelEn.trim().length > 0 && (draft.input !== 'select' || draftOptions().length >= 2);
+
+  /** Appends the new custom question at the end of the chosen wizard step. */
+  const addQuestion = () => {
+    if (!addStep || !draftValid) return;
+    const labelEn = draft.labelEn.trim().slice(0, 120);
+    const key = makeCustomSurveyKey(labelEn, fields.map((f) => f.key));
+    const newField: IndustrySurveyFieldConfig = {
+      key,
+      labelEn,
+      labelOr: draft.labelOr.trim().slice(0, 120),
+      enabled: true,
+      required: draft.required,
+      custom: true,
+      step: addStep,
+      input: draft.input,
+      ...(draft.input === 'select' ? { options: draftOptions() } : {}),
+    };
+    const stepIdxs = fields
+      .map((f, i) => (stepOfIndustryField(f) === addStep ? i : -1))
+      .filter((i) => i >= 0);
+    const next = [...fields];
+    if (stepIdxs.length > 0) {
+      next.splice(stepIdxs[stepIdxs.length - 1] + 1, 0, newField);
+    } else {
+      next.push(newField);
+    }
+    setFields(next);
+    setAddStep(null);
+    setDraft(EMPTY_DRAFT);
+    toast({
+      title: 'Question added / Gaaffii dabalame',
+      description: 'Press Save to apply it to the survey form / Save tuqeen foonkii irratti hojjeta',
+    });
   };
 
   const save = async () => {
@@ -192,28 +276,35 @@ export function IndustryQuestionnaireSection() {
         </CardTitle>
         <CardDescription className="text-xs">
           Manage the Industry survey questionnaire: hide questions, change required flags, edit
-          labels and reorder them inside their step. Core identification questions (name, sector,
-          location, employee count, contact) cannot be removed. The survey form, its validation and
-          the server follow this questionnaire immediately.
+          labels, reorder them inside their step, and add new questions to any step ("Add
+          question" — bilingual label + answer type). Core identification questions (name, sector,
+          location, employee count, contact) cannot be removed. The survey form, its validation,
+          the Records dialogs, the exports and the server follow this questionnaire immediately.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {[1, 2, 3].map((step) => {
-          const stepFields = fields.filter((f) => def(f.key)?.step === step);
+        {([1, 2, 3] as const).map((step) => {
+          const stepFields = fields.filter((f) => stepOfIndustryField(f) === step);
           return (
             <div key={step} className="space-y-1.5">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {SURVEY_STEP_TITLES[step]}
               </p>
               <div className="overflow-hidden rounded-lg border">
+                {stepFields.length === 0 && (
+                  <p className="p-3 text-xs text-muted-foreground">No questions on this step yet.</p>
+                )}
                 {stepFields.map((f, i) => {
-                  const d = def(f.key)!;
-                  const requiredLockable = !d.requiredFixed && f.enabled && d.input !== 'radio-yesno';
+                  const d = def(f.key);
+                  const isCustom = !!f.custom;
+                  const requiredLockable = isCustom
+                    ? f.enabled && f.input !== 'radio-yesno'
+                    : !!d && !d.requiredFixed && f.enabled && d.input !== 'radio-yesno';
                   return (
                     <div
                       key={f.key}
                       data-field-key={f.key}
-                      className={`flex flex-col gap-2 p-2.5 sm:flex-row sm:items-center ${i > 0 ? 'border-t' : ''} ${f.enabled ? '' : 'bg-muted/40'}`}
+                      className={`flex flex-col gap-2 p-2.5 sm:flex-row sm:items-start ${i > 0 ? 'border-t' : ''} ${f.enabled ? '' : 'bg-muted/40'}`}
                     >
                       {/* Order controls */}
                       <div className="flex shrink-0 gap-1">
@@ -236,24 +327,64 @@ export function IndustryQuestionnaireSection() {
                           <ChevronDown className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      {/* Labels */}
-                      <div className="min-w-0 flex-1 space-y-1">
+                      {/* Labels + custom question config */}
+                      <div className="min-w-0 flex-1 space-y-1.5">
                         <Input
                           value={f.labelEn}
                           onChange={(e) => update(f.key, { labelEn: e.target.value })}
                           className="h-8 text-xs sm:text-sm"
-                          placeholder={d.labelEn}
+                          placeholder={d?.labelEn ?? 'Question label'}
                         />
                         <Input
                           value={f.labelOr}
                           onChange={(e) => update(f.key, { labelOr: e.target.value })}
                           className="h-7 border-dashed text-[11px] text-muted-foreground sm:text-xs"
-                          placeholder={d.labelOr}
+                          placeholder={d?.labelOr ?? 'Afaan Oromoo label'}
                         />
+                        {isCustom && (
+                          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                            <p className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Answer type
+                            </p>
+                            <Select
+                              value={f.input ?? 'text'}
+                              onValueChange={(v) =>
+                                update(f.key, {
+                                  input: v as CustomSurveyInput,
+                                  ...(v === 'select' && !(f.options ?? []).length ? { options: ['Option 1', 'Option 2'] } : {}),
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-7 w-full text-[11px] sm:w-56"><SelectValue /></SelectTrigger>
+                              <SelectContent className="max-h-64">
+                                {CUSTOM_SURVEY_INPUTS.map((t) => (
+                                  <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {isCustom && f.input === 'select' && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Choices (one per line, 2-30)
+                            </p>
+                            <Textarea
+                              value={(f.options ?? []).join('\n')}
+                              onChange={(e) =>
+                                update(f.key, {
+                                  options: e.target.value.split('\n').map((o) => o.trim().slice(0, 80)).filter((o) => o.length > 0),
+                                })
+                              }
+                              rows={Math.min(Math.max((f.options ?? []).length, 2), 6)}
+                              className="text-[11px]"
+                            />
+                          </div>
+                        )}
                       </div>
                       {/* Flags */}
                       <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-                        {d.locked ? (
+                        {d?.locked ? (
                           <Badge className="bg-teal-100 text-[10px] text-teal-700">Core</Badge>
                         ) : (
                           <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -274,11 +405,35 @@ export function IndustryQuestionnaireSection() {
                           />
                           Required
                         </label>
+                        {isCustom && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removeCustom(f.key)}
+                            className="h-7 w-7 border-red-200 text-red-500 hover:bg-red-50"
+                            title="Remove question"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
+              {/* Add a question to this step — the survey form picks it up after Save */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDraft(EMPTY_DRAFT);
+                  setAddStep(step);
+                }}
+                className="h-7 border-dashed text-[11px] text-teal-700 hover:bg-teal-50"
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                Add question
+              </Button>
             </div>
           );
         })}
@@ -293,10 +448,86 @@ export function IndustryQuestionnaireSection() {
             Reset to Default / Deebi’a
           </Button>
           <p className="text-[10px] text-muted-foreground">
-            Hidden questions store empty values for new records / Gaaffii dhokame duwwaa galmeefama
+            Changes apply when you press Save — hidden questions store empty/default values for new
+            records / Dhuunfaa Save booda hojjeta
           </p>
         </div>
       </CardContent>
+
+      {/* Add-question dialog — same flow as the other modules' questionnaire editors */}
+      <Dialog open={addStep != null} onOpenChange={(open) => (open ? null : setAddStep(null))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Add question / Gaaffii Dabaluu</DialogTitle>
+            <DialogDescription className="text-xs">
+              {addStep ? SURVEY_STEP_TITLES[addStep] : ''} — the question appears on this step of
+              the survey form right after you press Save.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Question (English) <span className="text-red-500">*</span></Label>
+              <Input
+                value={draft.labelEn}
+                onChange={(e) => setDraft({ ...draft, labelEn: e.target.value })}
+                placeholder="e.g., Water access on premises"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Gaaffii (Afaan Oromoo)</Label>
+              <Input
+                value={draft.labelOr}
+                onChange={(e) => setDraft({ ...draft, labelOr: e.target.value })}
+                placeholder="Fakkeenya: Paanee keessatti banyii dhaabbee"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Answer type</Label>
+              <Select
+                value={draft.input}
+                onValueChange={(v) => setDraft({ ...draft, input: v as CustomSurveyInput })}
+              >
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {CUSTOM_SURVEY_INPUTS.map((t) => (
+                    <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {draft.input === 'select' && (
+              <div className="space-y-1">
+                <Label className="text-xs">Choices (one per line, 2-30)</Label>
+                <Textarea
+                  value={draft.optionsText}
+                  onChange={(e) => setDraft({ ...draft, optionsText: e.target.value })}
+                  placeholder={'Yes / Eyee\nNo / Lakki'}
+                  rows={4}
+                  className="text-xs"
+                />
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={draft.required}
+                onCheckedChange={(v) => setDraft({ ...draft, required: v })}
+                disabled={draft.input === 'radio-yesno'}
+                className="data-[state=checked]:bg-amber-500"
+              />
+              Required — must be filled before submitting
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddStep(null)} className="h-8 text-sm">Cancel</Button>
+            <Button onClick={addQuestion} disabled={!draftValid} className="h-8 bg-teal-600 text-sm text-white hover:bg-teal-700">
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add question
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

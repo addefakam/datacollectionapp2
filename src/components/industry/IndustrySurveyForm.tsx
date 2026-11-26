@@ -40,6 +40,13 @@ import {
   surveyFieldRequired,
   type IndustrySurveyFieldConfig,
 } from '@/lib/industry-survey-fields';
+import {
+  CustomQuestionField,
+  customQuestionsForStep,
+  customReviewRows,
+  customStepIssue,
+} from '@/components/shared/custom-survey-fields';
+import { sanitizeCustomAnswers } from '@/lib/survey-fields';
 
 interface IndustrySurveyFormProps {
   onSubmit: () => void;
@@ -112,6 +119,11 @@ export default function IndustrySurveyForm({
     const f = fields.find((x) => x.key === key);
     return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
   };
+
+  // Admin-added custom questionnaire questions (Administration → Settings →
+  // Survey / Industry Manage → "Add question") — answers live on the record.
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
+  const setCustom = (key: string, v: string) => setCustomAnswers((cur) => ({ ...cur, [key]: v }));
 
   const emptyForm = {
     establishmentName: '',
@@ -193,6 +205,17 @@ export default function IndustrySurveyForm({
   };
 
   const validateStep = (step: number): boolean => {
+    /** Required/format checks for the admin-added custom questions of a step. */
+    const checkCustom = (stepNo: number): boolean => {
+      const issue = customStepIssue(fields, customAnswers, stepNo);
+      if (!issue) return true;
+      toast({
+        title: issue.kind === 'missing' ? 'Field Missing / Qabiyyee Hin Jiru' : 'Invalid Answer / Deebii Dogoggora',
+        description: issue.message,
+        variant: 'destructive',
+      });
+      return false;
+    };
     switch (step) {
       case 1: {
         const missing = missingRequired(['establishmentName', 'sector', 'subCity', 'area', 'specificAddress']);
@@ -200,7 +223,7 @@ export default function IndustrySurveyForm({
           toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
-        return true;
+        return checkCustom(1);
       }
       case 2: {
         const missing = missingRequired(['ownershipType']);
@@ -213,7 +236,7 @@ export default function IndustrySurveyForm({
           return false;
         }
         if (shown('employeeSex') && !validateSexPair(formData.maleEmployees, formData.femaleEmployees, formData.employeeCount, 'Employee Count')) return false;
-        return true;
+        return checkCustom(2);
       }
       case 3: {
         const missing = missingRequired(['contactName', 'contactPhone']);
@@ -229,7 +252,7 @@ export default function IndustrySurveyForm({
             return false;
           }
         }
-        return true;
+        return checkCustom(3);
       }
       case 4:
         if (dataConfirmed !== 'yes') {
@@ -250,6 +273,7 @@ export default function IndustrySurveyForm({
     setSelectedSubCity('');
     setAreas([]);
     setDataConfirmed('');
+    setCustomAnswers({});
     setCurrentStep(1);
   };
 
@@ -269,6 +293,7 @@ export default function IndustrySurveyForm({
       currentStatus: formData.currentStatus,
       surveyorName,
       surveyorId,
+      customAnswers: sanitizeCustomAnswers(fields, customAnswers),
     };
     setIsSubmitting(true);
     if (isOnline) {
@@ -320,6 +345,7 @@ export default function IndustrySurveyForm({
     shown('startupCapital') && { label: label('startupCapital').en, value: formData.startupCapital ? `${formData.startupCapital} ETB` : '—' },
     shown('contactName') && { label: label('contactName').en, value: formData.contactName },
     shown('contactPhone') && { label: label('contactPhone').en, value: formData.contactPhone },
+    ...customReviewRows(fields, customAnswers),
   ].filter(Boolean) as { label: string; value: string }[];
 
   return (
@@ -409,6 +435,10 @@ export default function IndustrySurveyForm({
                     <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                   </div>
                 )}
+                {/* Admin-added custom questions of this step (Settings → Survey → Add question) */}
+                {customQuestionsForStep(fields, 1).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="ind-custom" />
+                ))}
               </CardContent>
             </>
           )}
@@ -538,6 +568,10 @@ export default function IndustrySurveyForm({
                     </RadioGroup>
                   </div>
                 )}
+                {/* Admin-added custom questions of this step (Settings → Survey → Add question) */}
+                {customQuestionsForStep(fields, 2).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="ind-custom" />
+                ))}
               </CardContent>
             </>
           )}
@@ -562,6 +596,10 @@ export default function IndustrySurveyForm({
                   <Input id="contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>
+                {/* Admin-added custom questions of this step (Settings → Survey → Add question) */}
+                {customQuestionsForStep(fields, 3).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="ind-custom" />
+                ))}
               </CardContent>
             </>
           )}

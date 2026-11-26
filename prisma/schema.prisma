@@ -120,6 +120,7 @@ model Industry {
   startupCapital    Float?
   contactName       String
   contactPhone      String
+  customAnswers     Json? // answers to admin-added custom questionnaire questions (key = "custom_*")
   surveyorName      String?
   surveyorId        String?
   createdAt         DateTime @default(now())

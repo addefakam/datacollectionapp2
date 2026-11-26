@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { loadSurveyFields } from '@/lib/industry-survey-server';
 
 // GET /api/industries/export — CSV export of industry records
 export async function GET(request: NextRequest) {
@@ -13,6 +14,11 @@ export async function GET(request: NextRequest) {
     if (subCity) where.subCity = subCity;
     if (area) where.area = area;
     if (sector) where.sector = sector;
+
+    // Admin-added custom questions (Settings → Survey → Add question) ride
+    // along as their own columns.
+    const surveyFields = await loadSurveyFields();
+    const customQs = surveyFields.filter((f) => f.custom && f.enabled);
 
     const industries = await db.industry.findMany({
       where,
@@ -44,6 +50,7 @@ export async function GET(request: NextRequest) {
       'Contact Phone',
       'Surveyor Name',
       'Date Collected',
+      ...customQs.map((f) => f.labelEn),
     ];
 
     const isoDate = (d: Date | null) => (d ? d.toISOString().split('T')[0] : '');
@@ -69,6 +76,10 @@ export async function GET(request: NextRequest) {
       ind.contactPhone,
       ind.surveyorName || '',
       ind.createdAt.toISOString().split('T')[0],
+      ...customQs.map((f) => {
+        const ca = (ind.customAnswers ?? {}) as Record<string, unknown>;
+        return ca[f.key] != null ? String(ca[f.key]) : '';
+      }),
     ]);
 
     const csvContent = [
