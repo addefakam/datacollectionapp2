@@ -59,6 +59,12 @@ import {
 } from 'lucide-react';
 import { LICENSE_TYPES, LICENSE_LEVELS } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
+import { sanitizeCustomAnswers } from '@/lib/survey-fields';
+import {
+  CustomQuestionEditFields,
+  CustomQuestionViewRows,
+  useCustomSurveyQuestions,
+} from '@/components/shared/custom-survey-fields';
 
 interface GuestHouse {
   id: string;
@@ -84,6 +90,7 @@ interface GuestHouse {
   additionalServices: string | null;
   surveyorName: string | null;
   signature: string | null;
+  customAnswers?: Record<string, string> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -141,6 +148,9 @@ export default function DataList({ refreshTrigger }: DataListProps) {
   const [viewItem, setViewItem] = useState<GuestHouse | null>(null);
   const [editItem, setEditItem] = useState<GuestHouse | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
+  // Admin-added custom questionnaire answers edited alongside the fixed fields
+  const [editCustom, setEditCustom] = useState<Record<string, string>>({});
+  const customQs = useCustomSurveyQuestions('guesthouse');
   const [editAreas, setEditAreas] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -281,6 +291,7 @@ export default function DataList({ refreshTrigger }: DataListProps) {
       contactName: item.contactName || '',
       contactPhone: item.contactPhone || '',
     });
+    setEditCustom(item.customAnswers || {});
     setEditAreas(areasFor(item.subCity));
   };
 
@@ -297,7 +308,7 @@ export default function DataList({ refreshTrigger }: DataListProps) {
       const res = await fetch(`/api/guesthouses/${editItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({ ...editForm, customAnswers: sanitizeCustomAnswers(customQs, editCustom) }),
       });
       if (!res.ok) throw new Error('Update failed');
       toast({ title: 'Updated', description: 'Record updated successfully.' });
@@ -722,6 +733,9 @@ export default function DataList({ refreshTrigger }: DataListProps) {
                   </div>
                 </div>
 
+                {/* Admin-added custom questions (Administration → Settings → Survey) */}
+                <CustomQuestionViewRows fields={customQs} answers={viewItem.customAnswers} />
+
                 {/* Signature */}
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5">
@@ -847,6 +861,8 @@ export default function DataList({ refreshTrigger }: DataListProps) {
                   <Label className="text-xs">Phone Number / Lakkoofsa Bilbila <span className="text-red-500">*</span></Label>
                   <Input type="tel" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value.replace(/[^0-9+\s-]/g, '') })} />
                 </div>
+
+                <CustomQuestionEditFields fields={customQs} value={editCustom} onChange={setEditCustom} />
               </div>
 
               <DialogFooter className="gap-2 sm:gap-0">

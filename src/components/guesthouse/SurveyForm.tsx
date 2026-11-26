@@ -36,11 +36,18 @@ import SignaturePad, { SignaturePadHandle } from '@/components/SignaturePad';
 import { LICENSE_TYPES, LICENSE_LEVELS } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
 import {
+  sanitizeCustomAnswers,
   sectorSurveyFieldEnabled,
   sectorSurveyFieldRequired,
   sectorSurveyFieldsDefault,
   type SurveyFieldConfig,
 } from '@/lib/survey-fields';
+import {
+  CustomQuestionField,
+  customQuestionsForStep,
+  customReviewRows,
+  customStepIssue,
+} from '@/components/shared/custom-survey-fields';
 
 interface SurveyFormProps {
   onSubmit: () => void;
@@ -107,6 +114,11 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
     return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
   };
 
+  // Admin-added custom questionnaire questions (Administration → Settings →
+  // Survey / Manage → Survey Questions) — answers live on the record.
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
+  const setCustom = (key: string, v: string) => setCustomAnswers((cur) => ({ ...cur, [key]: v }));
+
   const emptyForm = {
     guestHouseName: '',
     organizationName: '',
@@ -142,6 +154,17 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
   };
 
   const validateStep = (step: number): boolean => {
+    /** Required/format checks for the admin-added custom questions of a step. */
+    const checkCustom = (stepNo: number): boolean => {
+      const issue = customStepIssue(fields, customAnswers, stepNo);
+      if (!issue) return true;
+      toast({
+        title: issue.kind === 'missing' ? 'Field Missing / Qabiyyee Hin Jiru' : 'Invalid Answer / Deebii Dogoggora',
+        description: issue.message,
+        variant: 'destructive',
+      });
+      return false;
+    };
     /** First missing required field of a step (missing = empty AND questionnaire-required). */
     const missingRequired = (keys: string[]): string | null => {
       for (const key of keys) {
@@ -156,7 +179,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
           toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
-        return true;
+        return checkCustom(1);
       }
       case 2: {
         const missing = missingRequired(['numberOfRooms', 'licenseType', 'licenseLevel', 'licenseNumber']);
@@ -164,7 +187,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
           toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
-        return true;
+        return checkCustom(2);
       }
       case 3: {
         const missing = missingRequired(['ownerName', 'contactName', 'contactPhone']);
@@ -189,7 +212,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
           toast({ title: 'Name Required / Maqaa Barbaachisaa', description: 'Second contact person name is required when phone is provided / Bilbila 2 qofatu yoo galmeessame maqaan isaa barbaachisaa', variant: 'destructive' });
           return false;
         }
-        return true;
+        return checkCustom(3);
       }
       case 4:
         if (dataConfirmed !== 'yes') {
@@ -214,6 +237,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
     setSelectedSubCity('');
     setAreas([]);
     setDataConfirmed('');
+    setCustomAnswers({});
     setCurrentStep(1);
     signaturePadRef.current?.clear();
   };
@@ -222,7 +246,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
     e.preventDefault();
     if (!validateStep(currentStep)) return;
     const signatureData = signaturePadRef.current?.getSignature() || null;
-    const payload = { ...formData, serviceRating: 0, surveyorName, surveyorId, signature: signatureData };
+    const payload = { ...formData, serviceRating: 0, surveyorName, surveyorId, signature: signatureData, customAnswers: sanitizeCustomAnswers(fields, customAnswers) };
     setIsSubmitting(true);
     if (isOnline) {
       try {
@@ -269,6 +293,7 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
       shown('ownerName') && { label: label('ownerName').en, value: formData.ownerName },
       shown('contactName') && { label: 'Contact 1 / Quunnamtaa 1', value: `${formData.contactName} — ${formData.contactPhone}` },
       (shown('contactName2') || shown('contactPhone2')) && { label: 'Contact 2 / Quunnamtaa 2', value: formData.contactName2 ? `${formData.contactName2} — ${formData.contactPhone2}` : formData.contactPhone2 },
+      ...customReviewRows(fields, customAnswers),
     ].filter(Boolean) as { label: string; value: string }[]
   );
 
@@ -352,6 +377,9 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
                   <Input id="specificAddress" name="specificAddress" placeholder="Street name, landmark..." value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
                 )}
+                {customQuestionsForStep(fields, 1).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="gh-custom" />
+                ))}
               </CardContent>
             </>
           )}
@@ -397,6 +425,9 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
                   <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., GH-2024-001" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
                 )}
+                {customQuestionsForStep(fields, 2).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="gh-custom" />
+                ))}
               </CardContent>
             </>
           )}
@@ -446,6 +477,9 @@ export default function SurveyForm({ onSubmit, surveyorName, surveyorId, isOnlin
                   )}
                 </div>
                 )}
+                {customQuestionsForStep(fields, 3).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="gh-custom" />
+                ))}
               </CardContent>
             </>
           )}

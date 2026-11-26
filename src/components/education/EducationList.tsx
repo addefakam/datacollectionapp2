@@ -68,6 +68,12 @@ import { EDUCATION_INSTITUTION_TYPES, EDUCATION_OWNERSHIP_TYPES, splitInstitutio
 import { hasSexBreakdown } from '@/lib/sex-counts';
 import { useSettings } from '@/components/SettingsProvider';
 import { InstitutionTypeMultiSelect } from './InstitutionTypeMultiSelect';
+import { sanitizeCustomAnswers } from '@/lib/survey-fields';
+import {
+  CustomQuestionEditFields,
+  CustomQuestionViewRows,
+  useCustomSurveyQuestions,
+} from '@/components/shared/custom-survey-fields';
 
 interface EducationCenter {
   id: string;
@@ -93,6 +99,7 @@ interface EducationCenter {
   contactPhone: string;
   surveyorName: string | null;
   surveyorId: string | null;
+  customAnswers?: Record<string, string> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -173,6 +180,9 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
   const [viewItem, setViewItem] = useState<EducationCenter | null>(null);
   const [editItem, setEditItem] = useState<EducationCenter | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
+  // Admin-added custom questionnaire answers edited alongside the fixed fields
+  const [editCustom, setEditCustom] = useState<Record<string, string>>({});
+  const customQs = useCustomSurveyQuestions('education');
   const [editAreas, setEditAreas] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -267,6 +277,7 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
       contactName: item.contactName,
       contactPhone: item.contactPhone,
     });
+    setEditCustom(item.customAnswers || {});
     setEditAreas(areasFor(item.subCity));
   };
 
@@ -283,7 +294,7 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
       const res = await fetch(`/api/educationcenters/${editItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({ ...editForm, customAnswers: sanitizeCustomAnswers(customQs, editCustom) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -765,6 +776,9 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                   </div>
                 </div>
 
+                {/* Admin-added custom questions (Administration → Settings → Survey) */}
+                <CustomQuestionViewRows fields={customQs} answers={viewItem.customAnswers} />
+
                 {/* Footer / Surveyor */}
                 <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
                   <span className="text-[10px] text-muted-foreground">Sakatta&#39;aa / Surveyor</span>
@@ -918,6 +932,8 @@ export default function EducationList({ refreshTrigger }: DataListProps) {
                     <Input type="tel" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} className="text-sm" />
                   </div>
                 </div>
+
+                <CustomQuestionEditFields fields={customQs} value={editCustom} onChange={setEditCustom} />
               </div>
             </div>
           )}

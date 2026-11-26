@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 // GET /api/agriculturecenters/export/excel — styled Excel export of farm establishment records
 export async function GET(request: NextRequest) {
@@ -30,6 +32,11 @@ export async function GET(request: NextRequest) {
 
     const sheet = workbook.addWorksheet('Agriculture Survey');
 
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('agriculture')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
+
     const columns: { header: string; key: string; width: number }[] = [
       { header: '#', key: 'row', width: 6 },
       { header: 'Farm Name / Maqaa Mana Qonnaa', key: 'farmName', width: 32 },
@@ -51,6 +58,7 @@ export async function GET(request: NextRequest) {
       { header: 'Contact Phone', key: 'contactPhone', width: 18 },
       { header: 'Surveyor Name', key: 'surveyorName', width: 20 },
       { header: 'Date Collected', key: 'createdAt', width: 18 },
+      ...customQs.map((f) => ({ header: f.labelEn, key: f.key, width: 22 })),
     ];
 
     sheet.columns = columns;
@@ -89,6 +97,12 @@ export async function GET(request: NextRequest) {
         contactPhone: ac.contactPhone,
         surveyorName: ac.surveyorName || '',
         createdAt: new Date(ac.createdAt).toLocaleDateString('en-GB'),
+        ...Object.fromEntries(
+          customQs.map((f) => {
+            const ca = (ac.customAnswers ?? {}) as Record<string, unknown>;
+            return [f.key, ca[f.key] != null ? String(ca[f.key]) : ''];
+          })
+        ),
       });
 
       // Alternating row colors

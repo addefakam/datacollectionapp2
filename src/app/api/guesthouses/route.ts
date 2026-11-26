@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import { loadSectorSurveyFields, resolveCustomAnswers } from '@/lib/survey-fields-server';
 import { sectorSurveyFieldRequired } from '@/lib/survey-fields';
 
 export async function POST(request: NextRequest) {
@@ -56,6 +56,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Admin-added custom questions (Administration → Settings → Survey):
+    // keep only enabled ones, validate the required ones.
+    const { answers: customAnswers, missing: missingCustom } = resolveCustomAnswers(surveyFields, body.customAnswers);
+    if (missingCustom.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Missing required fields',
+          missing: Object.fromEntries(missingCustom.map((f) => [f.key, true])),
+        },
+        { status: 400 }
+      );
+    }
+
     // Validate Ethiopian phone number
     const phoneClean = String(contactPhone).replace(/[\s-]/g, '');
     const ethPhoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
@@ -91,6 +104,7 @@ export async function POST(request: NextRequest) {
         surveyorName: surveyorName || null,
         surveyorId: surveyorId || null,
         signature: signature || null,
+        customAnswers: Object.keys(customAnswers).length > 0 ? customAnswers : undefined,
       },
     });
 

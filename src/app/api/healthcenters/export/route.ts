@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 // GET /api/healthcenters/export — CSV export of health facility records
 export async function GET(request: NextRequest) {
@@ -23,6 +25,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No data to export' }, { status: 404 });
     }
 
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('health')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
+
     const headers = [
       'Facility Name',
       'Facility Type',
@@ -43,6 +50,7 @@ export async function GET(request: NextRequest) {
       'Contact Phone',
       'Surveyor Name',
       'Date Collected',
+      ...customQs.map((f) => f.labelEn),
     ];
 
     const rows = healthCenters.map((hc) => [
@@ -65,6 +73,10 @@ export async function GET(request: NextRequest) {
       hc.contactPhone,
       hc.surveyorName || '',
       hc.createdAt.toISOString().split('T')[0],
+      ...customQs.map((f) => {
+        const ca = (hc.customAnswers ?? {}) as Record<string, unknown>;
+        return ca[f.key] != null ? String(ca[f.key]) : '';
+      }),
     ]);
 
     const csvContent = [

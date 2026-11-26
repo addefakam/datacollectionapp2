@@ -1,7 +1,9 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { normalizeInstitutionTypes } from '@/lib/location-data';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { loadSectorSurveyFields, resolveCustomAnswers } from '@/lib/survey-fields-server';
 
 // GET /api/educationcenters/[id]
 export async function GET(
@@ -58,6 +60,24 @@ export async function PUT(
     const classrooms = body.classroomCount != null ? Number(body.classroomCount) : null;
     if (classrooms != null && (!Number.isFinite(classrooms) || classrooms < 0)) {
       return NextResponse.json({ error: 'Classroom count must be a non-negative number' }, { status: 400 });
+    }
+
+    // Admin-added custom questionnaire answers — sanitize against the current
+    // questionnaire when the edit payload mentions them, otherwise keep stored.
+    let customAnswers: Record<string, string> | undefined = undefined;
+    if (body.customAnswers !== undefined) {
+      const surveyFields = await loadSectorSurveyFields('education');
+      const { answers, missing } = resolveCustomAnswers(surveyFields, body.customAnswers);
+      if (missing.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Missing required fields',
+            missing: Object.fromEntries(missing.map((f) => [f.key, true])),
+          },
+          { status: 400 }
+        );
+      }
+      customAnswers = answers;
     }
 
     // Sex breakdowns: fall back to the stored value per side, then validate
@@ -128,6 +148,9 @@ export async function PUT(
           : existing.hasFeedingProgram,
         contactName: body.contactName ?? existing.contactName,
         contactPhone: body.contactPhone ?? existing.contactPhone,
+        customAnswers: body.customAnswers !== undefined
+          ? (Object.keys(customAnswers ?? {}).length > 0 ? customAnswers : Prisma.DbNull)
+          : undefined,
       },
     });
 

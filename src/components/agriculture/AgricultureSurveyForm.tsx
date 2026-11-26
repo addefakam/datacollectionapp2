@@ -35,11 +35,18 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AGRICULTURE_FARM_TYPES, AGRICULTURE_OWNERSHIP_TYPES } from '@/lib/location-data';
 import { useSettings } from '@/components/SettingsProvider';
 import {
+  sanitizeCustomAnswers,
   sectorSurveyFieldEnabled,
   sectorSurveyFieldRequired,
   sectorSurveyFieldsDefault,
   type SurveyFieldConfig,
 } from '@/lib/survey-fields';
+import {
+  CustomQuestionField,
+  customQuestionsForStep,
+  customReviewRows,
+  customStepIssue,
+} from '@/components/shared/custom-survey-fields';
 
 interface AgricultureSurveyFormProps {
   onSubmit: () => void;
@@ -118,6 +125,11 @@ export default function AgricultureSurveyForm({
     return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
   };
 
+  // Admin-added custom questionnaire questions (Administration → Settings →
+  // Survey / Manage → Survey Questions) — answers live on the record.
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
+  const setCustom = (key: string, v: string) => setCustomAnswers((cur) => ({ ...cur, [key]: v }));
+
   const emptyForm = {
     farmName: '',
     farmType: '',
@@ -189,6 +201,17 @@ export default function AgricultureSurveyForm({
   };
 
   const validateStep = (step: number): boolean => {
+    /** Required/format checks for the admin-added custom questions of a step. */
+    const checkCustom = (stepNo: number): boolean => {
+      const issue = customStepIssue(fields, customAnswers, stepNo);
+      if (!issue) return true;
+      toast({
+        title: issue.kind === 'missing' ? 'Field Missing / Qabiyyee Hin Jiru' : 'Invalid Answer / Deebii Dogoggora',
+        description: issue.message,
+        variant: 'destructive',
+      });
+      return false;
+    };
     /** First missing required field of a step (missing = empty AND questionnaire-required). */
     const missingRequired = (keys: string[]): string | null => {
       for (const key of keys) {
@@ -203,7 +226,7 @@ export default function AgricultureSurveyForm({
           toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
-        return true;
+        return checkCustom(1);
       }
       case 2: {
         const missing = missingRequired(['ownershipType', 'landSizeHectares']);
@@ -220,7 +243,7 @@ export default function AgricultureSurveyForm({
           toast({ title: 'Invalid Land Size', description: 'Land size cannot be negative', variant: 'destructive' });
           return false;
         }
-        return true;
+        return checkCustom(2);
       }
       case 3: {
         const missing = missingRequired(['contactName', 'contactPhone']);
@@ -236,7 +259,7 @@ export default function AgricultureSurveyForm({
             return false;
           }
         }
-        return true;
+        return checkCustom(3);
       }
       case 4:
         if (dataConfirmed !== 'yes') {
@@ -257,6 +280,7 @@ export default function AgricultureSurveyForm({
     setSelectedSubCity('');
     setAreas([]);
     setDataConfirmed('');
+    setCustomAnswers({});
     setCurrentStep(1);
   };
 
@@ -275,6 +299,7 @@ export default function AgricultureSurveyForm({
       hasStorage: formData.hasStorage === 'yes',
       surveyorName,
       surveyorId,
+      customAnswers: sanitizeCustomAnswers(fields, customAnswers),
     };
     setIsSubmitting(true);
     if (isOnline) {
@@ -327,6 +352,7 @@ export default function AgricultureSurveyForm({
       shown('hasMachinery') && { label: 'Machinery / Meeshaa Qonnaa', value: formData.hasMachinery === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
       shown('hasStorage') && { label: 'Storage', value: formData.hasStorage === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
       shown('contactName') && { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
+      ...customReviewRows(fields, customAnswers),
     ].filter(Boolean) as { label: string; value: string }[]
   );
 
@@ -417,6 +443,9 @@ export default function AgricultureSurveyForm({
                   <Input id="a-specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
                 </div>
                 )}
+                {customQuestionsForStep(fields, 1).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="a-custom" />
+                ))}
               </CardContent>
             </>
           )}
@@ -501,6 +530,9 @@ export default function AgricultureSurveyForm({
                     </div>
                   ))}
                 </div>
+                {customQuestionsForStep(fields, 2).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="a-custom" />
+                ))}
               </CardContent>
             </>
           )}
@@ -525,6 +557,9 @@ export default function AgricultureSurveyForm({
                   <Input id="a-contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>
+                {customQuestionsForStep(fields, 3).map((f) => (
+                  <CustomQuestionField key={f.key} field={f} value={customAnswers[f.key] ?? ''} onChange={(v) => setCustom(f.key, v)} idPrefix="a-custom" />
+                ))}
               </CardContent>
             </>
           )}

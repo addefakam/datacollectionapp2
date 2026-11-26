@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 // GET /api/agriculturecenters/export — CSV export of farm establishment records
 export async function GET(request: NextRequest) {
@@ -23,6 +25,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No data to export' }, { status: 404 });
     }
 
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('agriculture')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
+
     const headers = [
       'Farm Name',
       'Farm Type',
@@ -43,6 +50,7 @@ export async function GET(request: NextRequest) {
       'Contact Phone',
       'Surveyor Name',
       'Date Collected',
+      ...customQs.map((f) => f.labelEn),
     ];
 
     const rows = agricultureCenters.map((ac) => [
@@ -65,6 +73,10 @@ export async function GET(request: NextRequest) {
       ac.contactPhone,
       ac.surveyorName || '',
       ac.createdAt.toISOString().split('T')[0],
+      ...customQs.map((f) => {
+        const ca = (ac.customAnswers ?? {}) as Record<string, unknown>;
+        return ca[f.key] != null ? String(ca[f.key]) : '';
+      }),
     ]);
 
     const csvContent = [

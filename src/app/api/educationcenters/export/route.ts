@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 // GET /api/educationcenters/export — CSV export of education institution records
 export async function GET(request: NextRequest) {
@@ -22,6 +24,11 @@ export async function GET(request: NextRequest) {
     if (educationCenters.length === 0) {
       return NextResponse.json({ error: 'No data to export' }, { status: 404 });
     }
+
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('education')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
 
     const headers = [
       'Institution Name',
@@ -46,6 +53,7 @@ export async function GET(request: NextRequest) {
       'Contact Phone',
       'Surveyor Name',
       'Date Collected',
+      ...customQs.map((f) => f.labelEn),
     ];
 
     const rows = educationCenters.map((ec) => [
@@ -71,6 +79,10 @@ export async function GET(request: NextRequest) {
       ec.contactPhone,
       ec.surveyorName || '',
       ec.createdAt.toISOString().split('T')[0],
+      ...customQs.map((f) => {
+        const ca = (ec.customAnswers ?? {}) as Record<string, unknown>;
+        return ca[f.key] != null ? String(ca[f.key]) : '';
+      }),
     ]);
 
     const csvContent = [

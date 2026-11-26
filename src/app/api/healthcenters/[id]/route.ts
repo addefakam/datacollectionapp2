@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { parseSexCounts } from '@/lib/sex-counts';
+import { loadSectorSurveyFields, resolveCustomAnswers } from '@/lib/survey-fields-server';
 
 // GET /api/healthcenters/[id]
 export async function GET(
@@ -74,6 +76,24 @@ export async function PUT(
       return NextResponse.json({ error: 'Bed count must be a non-negative number' }, { status: 400 });
     }
 
+    // Admin-added custom questionnaire answers — sanitize against the current
+    // questionnaire when the edit payload mentions them, otherwise keep stored.
+    let customAnswers: Record<string, string> | undefined = undefined;
+    if (body.customAnswers !== undefined) {
+      const surveyFields = await loadSectorSurveyFields('health');
+      const { answers, missing } = resolveCustomAnswers(surveyFields, body.customAnswers);
+      if (missing.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Missing required fields',
+            missing: Object.fromEntries(missing.map((f) => [f.key, true])),
+          },
+          { status: 400 }
+        );
+      }
+      customAnswers = answers;
+    }
+
     const updated = await db.healthCenter.update({
       where: { id },
       data: {
@@ -102,6 +122,9 @@ export async function PUT(
           : existing.hasEmergency,
         contactName: body.contactName ?? existing.contactName,
         contactPhone: body.contactPhone ?? existing.contactPhone,
+        customAnswers: body.customAnswers !== undefined
+          ? (Object.keys(customAnswers ?? {}).length > 0 ? customAnswers : Prisma.DbNull)
+          : undefined,
       },
     });
 

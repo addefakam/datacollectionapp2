@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
-import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import { loadSectorSurveyFields, resolveCustomAnswers } from '@/lib/survey-fields-server';
 import { sectorSurveyFieldRequired } from '@/lib/survey-fields';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
@@ -57,6 +57,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Admin-added custom questions (Administration → Settings → Survey):
+    // keep only enabled ones, validate the required ones.
+    const { answers: customAnswers, missing: missingCustom } = resolveCustomAnswers(surveyFields, body.customAnswers);
+    if (missingCustom.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Missing required fields',
+          missing: Object.fromEntries(missingCustom.map((f) => [f.key, true])),
+        },
+        { status: 400 }
+      );
+    }
+
     // Validate staff and bed counts
     const staff = Number(staffCount ?? 0);
     const beds = Number(bedCount ?? 0);
@@ -104,6 +117,7 @@ export async function POST(request: NextRequest) {
         contactPhone,
         surveyorName: surveyorName || null,
         surveyorId: surveyorId || null,
+        customAnswers: Object.keys(customAnswers).length > 0 ? customAnswers : undefined,
       },
     });
 

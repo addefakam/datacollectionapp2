@@ -51,6 +51,7 @@ model GuestHouse {
   surveyorName       String?
   surveyorId         String?
   signature          String?
+  customAnswers      Json? // answers to admin-added custom questionnaire questions (key = "custom_*")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -163,6 +164,7 @@ model HealthCenter {
   contactPhone    String
   surveyorName    String?
   surveyorId      String?
+  customAnswers   Json? // answers to admin-added custom questionnaire questions (key = "custom_*")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -192,6 +194,7 @@ model EducationCenter {
   contactPhone      String
   surveyorName      String?
   surveyorId        String?
+  customAnswers     Json? // answers to admin-added custom questionnaire questions (key = "custom_*")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -218,6 +221,7 @@ model AgricultureCenter {
   contactPhone     String
   surveyorName     String?
   surveyorId       String?
+  customAnswers    Json? // answers to admin-added custom questionnaire questions (key = "custom_*")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }

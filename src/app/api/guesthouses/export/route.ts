@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +25,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('guesthouse')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
+
     const headers = [
       'Guest House Name',
       'Organization Name',
@@ -44,6 +51,7 @@ export async function GET(request: NextRequest) {
       'Additional Services',
       'Surveyor Name',
       'Date Collected',
+      ...customQs.map((f) => f.labelEn),
     ];
 
     const rows = guestHouses.map((gh) => [
@@ -67,6 +75,10 @@ export async function GET(request: NextRequest) {
       gh.additionalServices || '',
       gh.surveyorName || '',
       gh.createdAt.toISOString().split('T')[0],
+      ...customQs.map((f) => {
+        const ca = (gh.customAnswers ?? {}) as Record<string, unknown>;
+        return ca[f.key] != null ? String(ca[f.key]) : '';
+      }),
     ]);
 
     const csvContent = [

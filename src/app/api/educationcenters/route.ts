@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeInstitutionTypes } from '@/lib/location-data';
 import { parseSexCounts } from '@/lib/sex-counts';
-import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import { loadSectorSurveyFields, resolveCustomAnswers } from '@/lib/survey-fields-server';
 import { sectorSurveyFieldRequired } from '@/lib/survey-fields';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
@@ -58,6 +58,19 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'Missing required fields', missing: { institutionName: !institutionName, institutionType: !normalizedInstitutionType, ownershipType: need('ownershipType') && !ownershipType, subCity: !subCity, area: !area, specificAddress: need('specificAddress') && !specificAddress, contactName: !contactName, contactPhone: !contactPhone } },
+        { status: 400 }
+      );
+    }
+
+    // Admin-added custom questions (Administration → Settings → Survey):
+    // keep only enabled ones, validate the required ones.
+    const { answers: customAnswers, missing: missingCustom } = resolveCustomAnswers(surveyFields, body.customAnswers);
+    if (missingCustom.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Missing required fields',
+          missing: Object.fromEntries(missingCustom.map((f) => [f.key, true])),
+        },
         { status: 400 }
       );
     }
@@ -120,6 +133,7 @@ export async function POST(request: NextRequest) {
         contactPhone,
         surveyorName: surveyorName || null,
         surveyorId: surveyorId || null,
+        customAnswers: Object.keys(customAnswers).length > 0 ? customAnswers : undefined,
       },
     });
 

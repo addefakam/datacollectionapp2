@@ -48,6 +48,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSettings, SubCityData } from '@/components/SettingsProvider';
 import { IndustryQuestionnaireSection, IndustryStatsConditionSection } from '@/components/industry/IndustrySurveySettings';
 import { SurveyQuestionsSection } from '@/components/admin/SectorSurveyQuestionsSection';
+import SmeQuestionnaireManager from '@/components/smallenterprise/SmeQuestionnaireManager';
 
 // ============ Sub-Cities & Areas section ============
 
@@ -622,7 +623,10 @@ export default function SettingsManager() {
             <SurveyQuestionsSection sector="health" />
             <SurveyQuestionsSection sector="education" />
             <SurveyQuestionsSection sector="agriculture" />
-            <SurveyQuestionsSection sector="small-enterprise" />
+            {/* Small Enterprise uses its full manager here too — add / modify /
+                remove stay consistent between this settings page and the
+                module's own Manage workspace. */}
+            <SmeQuestionnaireManager />
           </div>
         </TabsContent>
         <TabsContent value="stats" className="mt-3">

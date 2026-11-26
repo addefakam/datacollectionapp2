@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +25,11 @@ export async function GET(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('guesthouse')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Qorannoo Mana Keessummootaa Bishooftuu / Bishoftu Guest House Survey';
@@ -55,6 +62,7 @@ export async function GET(request: NextRequest) {
       { header: 'Additional Services', key: 'additionalServices', width: 28 },
       { header: 'Surveyor Name', key: 'surveyorName', width: 20 },
       { header: 'Date Collected', key: 'createdAt', width: 18 },
+      ...customQs.map((f) => ({ header: f.labelEn, key: f.key, width: 22 })),
     ];
 
     sheet.columns = columns;
@@ -109,6 +117,12 @@ export async function GET(request: NextRequest) {
         additionalServices: gh.additionalServices || '',
         surveyorName: gh.surveyorName || '',
         createdAt: new Date(gh.createdAt).toLocaleDateString('en-GB'),
+        ...Object.fromEntries(
+          customQs.map((f) => {
+            const ca = (gh.customAnswers ?? {}) as Record<string, unknown>;
+            return [f.key, ca[f.key] != null ? String(ca[f.key]) : ''];
+          })
+        ),
       });
 
       // Alternating row colors

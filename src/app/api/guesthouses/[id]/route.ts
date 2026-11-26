@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { loadSectorSurveyFields, resolveCustomAnswers } from '@/lib/survey-fields-server';
 
 export async function DELETE(
   _request: NextRequest,
@@ -73,6 +75,24 @@ export async function PUT(
       }
     }
 
+    // Admin-added custom questionnaire answers — sanitize against the current
+    // questionnaire when the edit payload mentions them, otherwise keep stored.
+    let customAnswers: Record<string, string> | undefined = undefined;
+    if (body.customAnswers !== undefined) {
+      const surveyFields = await loadSectorSurveyFields('guesthouse');
+      const { answers, missing } = resolveCustomAnswers(surveyFields, body.customAnswers);
+      if (missing.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Missing required fields',
+            missing: Object.fromEntries(missing.map((f) => [f.key, true])),
+          },
+          { status: 400 }
+        );
+      }
+      customAnswers = answers;
+    }
+
     const updated = await db.guestHouse.update({
       where: { id },
       data: {
@@ -88,6 +108,9 @@ export async function PUT(
         contactPhone: body.contactPhone ?? existing.contactPhone,
         contactName: body.contactName ?? existing.contactName,
         ownerName: body.ownerName ?? existing.ownerName,
+        customAnswers: body.customAnswers !== undefined
+          ? (Object.keys(customAnswers ?? {}).length > 0 ? customAnswers : Prisma.DbNull)
+          : undefined,
       },
     });
 
