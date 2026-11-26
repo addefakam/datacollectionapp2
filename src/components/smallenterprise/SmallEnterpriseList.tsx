@@ -302,7 +302,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
     setEditForm({
       enterpriseName: item.enterpriseName,
       enterpriseType: item.enterpriseType,
-      ownershipType: item.ownershipType,
+      ownershipType: 'SME',
       subCity: item.subCity,
       area: item.area,
       specificAddress: item.specificAddress,

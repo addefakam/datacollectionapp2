@@ -60,7 +60,7 @@ export async function GET() {
     sheet.addRow({
       enterpriseName: 'DUKAM METAL WORKS PLC',
       enterpriseType: SMALL_ENTERPRISE_TYPES[1],
-      ownershipType: SMALL_ENTERPRISE_OWNERSHIP_TYPES[1],
+      ownershipType: SMALL_ENTERPRISE_OWNERSHIP_TYPES[0],
       subCity: 'Bishoftu Central',
       area: 'Bishoftu 02',
       specificAddress: 'Along Dukam Road',

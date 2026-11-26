@@ -126,13 +126,8 @@ export const SMALL_ENTERPRISE_TYPES = [
   'Other Services',
 ];
 
-export const SMALL_ENTERPRISE_OWNERSHIP_TYPES = [
-  'Private',
-  'Cooperative',
-  'Government / Public',
-  'NGO',
-  'Faith-Based',
-];
+// Ownership is fixed to a single type — "SME" (legacy multi-option list removed)
+export const SMALL_ENTERPRISE_OWNERSHIP_TYPES = ['SME'];
 
 // Bussa Goonofa / Charity initiative data classification — Dhibayyuu survey
 export const CHARITY_TYPES = [

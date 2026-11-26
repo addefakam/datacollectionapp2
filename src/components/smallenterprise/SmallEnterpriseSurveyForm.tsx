@@ -115,7 +115,7 @@ export default function SmallEnterpriseSurveyForm({
   const emptyForm = {
     enterpriseName: '',
     enterpriseType: '',
-    ownershipType: '',
+    ownershipType: 'SME',
     subCity: '',
     area: '',
     specificAddress: '',
