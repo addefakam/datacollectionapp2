@@ -13,9 +13,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Columns3, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -75,6 +75,8 @@ export function useColumnVisibility(storageKey: string, columns: ColumnDef[]): C
 
   const isVisible = useCallback((key: string) => !hidden.has(key), [hidden]);
 
+  // `value` means "hide": true adds the key to the hidden set, false removes it.
+  // (Visibility menu maps checkbox states with `v !== true` — checked = show.)
   const toggle = useCallback(
     (key: string, value?: boolean) => {
       setHidden((cur) => {
@@ -130,14 +132,15 @@ export function ColumnVisibilityMenu({
         <DropdownMenuSeparator />
         <div className="max-h-64 overflow-y-auto">
           {columns.map((c) => (
-            <DropdownMenuItem key={c.key} className="gap-2" onSelect={(e) => e.preventDefault()}>
-              <Checkbox
-                checked={visibility.isVisible(c.key)}
-                onCheckedChange={(v) => visibility.toggle(c.key, v === true)}
-                className="data-[state=checked]:bg-teal-600 data-[state=checked]:border-teal-600"
-              />
+            <DropdownMenuCheckboxItem
+              key={c.key}
+              checked={visibility.isVisible(c.key)}
+              onCheckedChange={(v) => visibility.toggle(c.key, v !== true)}
+              onSelect={(e) => e.preventDefault()}
+              className="cursor-pointer"
+            >
               <span className="text-xs">{c.label}</span>
-            </DropdownMenuItem>
+            </DropdownMenuCheckboxItem>
           ))}
         </div>
         <DropdownMenuSeparator />
