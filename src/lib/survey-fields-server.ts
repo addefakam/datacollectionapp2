@@ -3,6 +3,7 @@ import {
   SURVEY_SECTORS,
   mergeSectorSurveyFields,
   normalizeSectorSurveyFields,
+  sanitizeCustomAnswers,
   type SurveyFieldConfig,
   type SurveySectorId,
 } from '@/lib/survey-fields';
@@ -49,3 +50,21 @@ export async function saveSectorSurveyFields(
 }
 
 export { normalizeSectorSurveyFields };
+
+/**
+ * Sanitizes the custom-question answers of an incoming record payload against
+ * the sector's saved questionnaire and reports the required ones that are
+ * missing (the POST routes answer 400 when any remain). Shared by every
+ * module POST route — questionnaires are edited in Administration → Settings
+ * → Survey / the module's Manage workspace.
+ */
+export function resolveCustomAnswers(
+  surveyFields: SurveyFieldConfig[],
+  raw: unknown
+): { answers: Record<string, string>; missing: SurveyFieldConfig[] } {
+  const answers = sanitizeCustomAnswers(surveyFields, raw);
+  const missing = surveyFields.filter(
+    (f: SurveyFieldConfig) => f.custom && f.enabled && f.required && !answers[f.key]
+  );
+  return { answers, missing };
+}

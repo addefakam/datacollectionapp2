@@ -1,0 +1,1188 @@
+     1→/**
+     2→ * Generic registry of the admin-managed survey questionnaires — one per data
+     3→ * collection module (Hotel & Guest House, Health, Education, Agriculture,
+     4→ * Small Enterprise). The Industry module keeps its own registry
+     5→ * (industry-survey-fields.ts) with identical semantics.
+     6→ *
+     7→ * Admins manage each questionnaire from the module's "Manage" workspace (and
+     8→ * Administration → Settings → Survey): hide/disable optional questions, flip
+     9→ * required flags, edit the bilingual labels and reorder questions inside
+    10→ * their step. The wizard form, its step validation, the review list and the
+    11→ * server-side POST validation all follow this config. Core identification
+    12→ * fields (name, type, location, headline count, contact) are locked — records
+    13→ * would lose their backbone without them. Male/female breakdowns count as ONE
+    14→ * question ("…Sex" pseudo-keys), like the Industry "employeeSex" precedent.
+    15→ *
+    16→ * Storage: AppSetting "<sectorId>SurveyFields" — an ordered array of
+    17→ * { key, labelEn, labelOr, enabled, required }. Order within a wizard step
+    18→ * follows the saved array order; locked fields keep their registry position.
+    19→ * Hidden questions store empty/default values for new records.
+    20→ */
+    21→
+    22→export type SurveyInput =
+    23→  | 'text'
+    24→  | 'number'
+    25→  | 'select'
+    26→  | 'select-multi'
+    27→  | 'radio-yesno'
+    28→  | 'sex-pair'
+    29→  | 'status-select';
+    30→
+    31→export interface SurveyFieldDef {
+    32→  /** Payload field name (matches the model column / form field). */
+    33→  key: string;
+    34→  /** Wizard step the question sits on (forms use 1..3 + a fixed review step). */
+    35→  step: 1 | 2 | 3;
+    36→  /** Default English label. */
+    37→  labelEn: string;
+    38→  /** Default Afaan Oromoo sub-label. */
+    39→  labelOr: string;
+    40→  /** How the form renders the question. */
+    41→  input: SurveyInput;
+    42→  /** Whether it is required by default. */
+    43→  required: boolean;
+    44→  /** Cannot be disabled (core identification fields). */
+    45→  locked: boolean;
+    46→  /** Required flag is fixed (cannot be toggled in Settings). */
+    47→  requiredFixed: boolean;
+    48→}
+    49→
+    50→export interface SurveyFieldConfig {
+    51→  key: string;
+    52→  labelEn: string;
+    53→  labelOr: string;
+    54→  enabled: boolean;
+    55→  required: boolean;
+    56→  /** Admin-added custom question (SME Manage tab) — carries its own input/step/options. */
+    57→  custom?: boolean;
+    58→  /** Custom questions only: wizard step the question sits on (1..3). */
+    59→  step?: 1 | 2 | 3;
+    60→  /** Custom questions only: how the form renders the question. */
+    61→  input?: CustomSurveyInput;
+    62→  /** Custom questions only: choices for a select input. */
+    63→  options?: string[];
+    64→}
+    65→
+    66→/** Input types available to admin-added custom questions. */
+    67→export type CustomSurveyInput = 'text' | 'number' | 'textarea' | 'select' | 'radio-yesno';
+    68→
+    69→export const CUSTOM_SURVEY_INPUTS: { value: CustomSurveyInput; label: string }[] = [
+    70→  { value: 'text', label: 'Short text' },
+    71→  { value: 'number', label: 'Number' },
+    72→  { value: 'textarea', label: 'Paragraph' },
+    73→  { value: 'select', label: 'Dropdown (single choice)' },
+    74→  { value: 'radio-yesno', label: 'Yes / No' },
+    75→];
+    76→
+    77→/** Prefix of admin-added custom question keys. */
+    78→export const CUSTOM_SURVEY_KEY_PREFIX = 'custom_';
+    79→
+    80→export function isCustomSurveyKey(key: unknown): key is string {
+    81→  return typeof key === 'string' && key.startsWith(CUSTOM_SURVEY_KEY_PREFIX) && key.length > CUSTOM_SURVEY_KEY_PREFIX.length;
+    82→}
+    83→
+    84→/** Builds a unique key for a new custom question from its English label. */
+    85→export function makeCustomSurveyKey(labelEn: string, existingKeys: string[]): string {
+    86→  const base = CUSTOM_SURVEY_KEY_PREFIX + (
+    87→    labelEn.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'question'
+    88→  );
+    89→  let key = base;
+    90→  let i = 2;
+    91→  while (existingKeys.includes(key)) {
+    92→    key = `${base}_${i}`;
+    93→    i += 1;
+    94→  }
+    95→  return key;
+    96→}
+    97→
+    98→/**
+    99→ * Keeps only the answers of enabled custom questions, as plain strings.
+   100→ * Unknown / disabled keys are dropped; values are trimmed and capped.
+   101→ */
+   102→export function sanitizeCustomAnswers(
+   103→  fields: SurveyFieldConfig[],
+   104→  raw: unknown
+   105→): Record<string, string> {
+   106→  const customKeys = new Set(fields.filter((f) => f.custom && f.enabled).map((f) => f.key));
+   107→  const out: Record<string, string> = {};
+   108→  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+   109→  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+   110→    if (!customKeys.has(k)) continue;
+   111→    if (v == null) continue;
+   112→    const s = String(v).trim().slice(0, 500);
+   113→    if (s) out[k] = s;
+   114→  }
+   115→  return out;
+   116→}
+   117→
+   118→/** The modules whose questionnaires are managed outside the Industry registry. */
+   119→export type SurveySectorId =
+   120→  | 'guesthouse'
+   121→  | 'health'
+   122→  | 'education'
+   123→  | 'agriculture'
+   124→  | 'small-enterprise';
+   125→
+   126→export interface SurveySectorDef {
+   127→  id: SurveySectorId;
+   128→  /** Display name used in the editor heading. */
+   129→  label: string;
+   130→  /** AppSetting key that stores the questionnaire. */
+   131→  settingKey: string;
+   132→  /** Wizard step titles shown by the editor, per question step. */
+   133→  stepTitles: Record<number, string>;
+   134→  /** Ordered question registry. */
+   135→  fields: SurveyFieldDef[];
+   136→}
+   137→
+   138→// ============ Hotel & Guest House (GuestHouse model) ============
+   139→
+   140→const GUESTHOUSE_FIELDS: SurveyFieldDef[] = [
+   141→  // ---- Step 1: Establishment ----
+   142→  {
+   143→    key: 'organizationName',
+   144→    step: 1,
+   145→    labelEn: 'Organization Name',
+   146→    labelOr: 'Maqaa Dhaabbataa',
+   147→    input: 'text',
+   148→    required: true,
+   149→    locked: true,
+   150→    requiredFixed: true,
+   151→  },
+   152→  {
+   153→    key: 'subCity',
+   154→    step: 1,
+   155→    labelEn: 'Sub-City',
+   156→    labelOr: 'Kuttaa Maggalaa',
+   157→    input: 'select',
+   158→    required: true,
+   159→    locked: true,
+   160→    requiredFixed: true,
+   161→  },
+   162→  {
+   163→    key: 'area',
+   164→    step: 1,
+   165→    labelEn: 'Woreda',
+   166→    labelOr: 'Werreda',
+   167→    input: 'select',
+   168→    required: true,
+   169→    locked: true,
+   170→    requiredFixed: true,
+   171→  },
+   172→  {
+   173→    key: 'specificAddress',
+   174→    step: 1,
+   175→    labelEn: 'Specific Address',
+   176→    labelOr: 'Baka Addaa',
+   177→    input: 'text',
+   178→    required: true,
+   179→    locked: false,
+   180→    requiredFixed: false,
+   181→  },
+   182→  // ---- Step 2: Capacity & License ----
+   183→  {
+   184→    key: 'numberOfRooms',
+   185→    step: 2,
+   186→    labelEn: 'Number of Rooms',
+   187→    labelOr: 'Lakkoofsa Qubeettii',
+   188→    input: 'number',
+   189→    required: true,
+   190→    locked: true,
+   191→    requiredFixed: true,
+   192→  },
+   193→  {
+   194→    key: 'licenseType',
+   195→    step: 2,
+   196→    labelEn: 'License Type',
+   197→    labelOr: 'Goossa Eyyema',
+   198→    input: 'select',
+   199→    required: true,
+   200→    locked: false,
+   201→    requiredFixed: false,
+   202→  },
+   203→  {
+   204→    key: 'licenseLevel',
+   205→    step: 2,
+   206→    labelEn: 'License Level',
+   207→    labelOr: 'Saddarkaa Eyyema',
+   208→    input: 'select',
+   209→    required: true,
+   210→    locked: false,
+   211→    requiredFixed: false,
+   212→  },
+   213→  {
+   214→    key: 'licenseNumber',
+   215→    step: 2,
+   216→    labelEn: 'License Number',
+   217→    labelOr: 'Lakofsaa Eyyema',
+   218→    input: 'text',
+   219→    required: true,
+   220→    locked: false,
+   221→    requiredFixed: false,
+   222→  },
+   223→  // ---- Step 3: Contact ----
+   224→  {
+   225→    key: 'ownerName',
+   226→    step: 3,
+   227→    labelEn: 'Owner Name',
+   228→    labelOr: 'Maqaa Abbaa Qaabeyee',
+   229→    input: 'text',
+   230→    required: true,
+   231→    locked: false,
+   232→    requiredFixed: false,
+   233→  },
+   234→  {
+   235→    key: 'contactName',
+   236→    step: 3,
+   237→    labelEn: 'Contact Person',
+   238→    labelOr: 'Nama Adadura Qunnamnu',
+   239→    input: 'text',
+   240→    required: true,
+   241→    locked: true,
+   242→    requiredFixed: true,
+   243→  },
+   244→  {
+   245→    key: 'contactPhone',
+   246→    step: 3,
+   247→    labelEn: 'Phone Number',
+   248→    labelOr: 'Lakkoofsa Bilbila',
+   249→    input: 'text',
+   250→    required: true,
+   251→    locked: true,
+   252→    requiredFixed: true,
+   253→  },
+   254→  {
+   255→    key: 'contactPhone2',
+   256→    step: 3,
+   257→    labelEn: 'Phone Number 2',
+   258→    labelOr: 'Lakkoofsa Bilbila 2',
+   259→    input: 'text',
+   260→    required: false,
+   261→    locked: false,
+   262→    requiredFixed: false,
+   263→  },
+   264→  {
+   265→    key: 'contactName2',
+   266→    step: 3,
+   267→    labelEn: 'Contact Person 2',
+   268→    labelOr: 'Nama Adadura Qunnamnu 2',
+   269→    input: 'text',
+   270→    required: false,
+   271→    locked: false,
+   272→    requiredFixed: false,
+   273→  },
+   274→];
+   275→
+   276→// ============ Health facility (HealthCenter model) ============
+   277→
+   278→/** "Staff by Sex" counts male + female as one question. */
+   279→export const HEALTH_SEX_PAIR_KEY = 'staffSex';
+   280→
+   281→const HEALTH_FIELDS: SurveyFieldDef[] = [
+   282→  // ---- Step 1: Facility ----
+   283→  {
+   284→    key: 'facilityName',
+   285→    step: 1,
+   286→    labelEn: 'Facility Name',
+   287→    labelOr: 'Maqaa Manaa Yaalaa',
+   288→    input: 'text',
+   289→    required: true,
+   290→    locked: true,
+   291→    requiredFixed: true,
+   292→  },
+   293→  {
+   294→    key: 'facilityType',
+   295→    step: 1,
+   296→    labelEn: 'Facility Type',
+   297→    labelOr: 'Gosa Manaa Yaalaa',
+   298→    input: 'select',
+   299→    required: true,
+   300→    locked: true,
+   301→    requiredFixed: true,
+   302→  },
+   303→  {
+   304→    key: 'subCity',
+   305→    step: 1,
+   306→    labelEn: 'Sub-City',
+   307→    labelOr: 'Kuttaa Maggalaa',
+   308→    input: 'select',
+   309→    required: true,
+   310→    locked: true,
+   311→    requiredFixed: true,
+   312→  },
+   313→  {
+   314→    key: 'area',
+   315→    step: 1,
+   316→    labelEn: 'Woreda',
+   317→    labelOr: 'Werreda',
+   318→    input: 'select',
+   319→    required: true,
+   320→    locked: true,
+   321→    requiredFixed: true,
+   322→  },
+   323→  {
+   324→    key: 'specificAddress',
+   325→    step: 1,
+   326→    labelEn: 'Specific Address',
+   327→    labelOr: 'Baka Addaa',
+   328→    input: 'text',
+   329→    required: true,
+   330→    locked: false,
+   331→    requiredFixed: false,
+   332→  },
+   333→  // ---- Step 2: Capacity & services ----
+   334→  {
+   335→    key: 'licenseNumber',
+   336→    step: 2,
+   337→    labelEn: 'License Number',
+   338→    labelOr: 'Lakofsaa Eyyeema',
+   339→    input: 'text',
+   340→    required: false,
+   341→    locked: false,
+   342→    requiredFixed: false,
+   343→  },
+   344→  {
+   345→    key: 'ownershipType',
+   346→    step: 2,
+   347→    labelEn: 'Ownership Type',
+   348→    labelOr: 'Gosa Abbaa Qabuu',
+   349→    input: 'select',
+   350→    required: true,
+   351→    locked: false,
+   352→    requiredFixed: false,
+   353→  },
+   354→  {
+   355→    key: 'staffCount',
+   356→    step: 2,
+   357→    labelEn: 'Staff Count',
+   358→    labelOr: 'Lakkoofsa Hojjetaa',
+   359→    input: 'number',
+   360→    required: true,
+   361→    locked: true,
+   362→    requiredFixed: true,
+   363→  },
+   364→  {
+   365→    key: HEALTH_SEX_PAIR_KEY,
+   366→    step: 2,
+   367→    labelEn: 'Staff by Sex',
+   368→    labelOr: 'Hojjetaa Dhiira fi Dubartii',
+   369→    input: 'sex-pair',
+   370→    required: false,
+   371→    locked: false,
+   372→    requiredFixed: false,
+   373→  },
+   374→  {
+   375→    key: 'bedCount',
+   376→    step: 2,
+   377→    labelEn: 'Inpatient Beds',
+   378→    labelOr: 'Lakkoofsa Siree',
+   379→    input: 'number',
+   380→    required: false,
+   381→    locked: false,
+   382→    requiredFixed: false,
+   383→  },
+   384→  {
+   385→    key: 'hasLaboratory',
+   386→    step: 2,
+   387→    labelEn: 'Laboratory service',
+   388→    labelOr: 'Laboratoire',
+   389→    input: 'radio-yesno',
+   390→    required: false,
+   391→    locked: false,
+   392→    requiredFixed: true, // yes/no always has an answer — required is meaningless
+   393→  },
+   394→  {
+   395→    key: 'hasPharmacy',
+   396→    step: 2,
+   397→    labelEn: 'Pharmacy service',
+   398→    labelOr: 'Faayinmaa',
+   399→    input: 'radio-yesno',
+   400→    required: false,
+   401→    locked: false,
+   402→    requiredFixed: true,
+   403→  },
+   404→  {
+   405→    key: 'hasMaternity',
+   406→    step: 2,
+   407→    labelEn: 'Maternity / delivery service',
+   408→    labelOr: 'Dhalachaa',
+   409→    input: 'radio-yesno',
+   410→    required: false,
+   411→    locked: false,
+   412→    requiredFixed: true,
+   413→  },
+   414→  {
+   415→    key: 'hasEmergency',
+   416→    step: 2,
+   417→    labelEn: 'Emergency service (24/7)',
+   418→    labelOr: 'Ethiirtii 24/7',
+   419→    input: 'radio-yesno',
+   420→    required: false,
+   421→    locked: false,
+   422→    requiredFixed: true,
+   423→  },
+   424→  // ---- Step 3: Contact ----
+   425→  {
+   426→    key: 'contactName',
+   427→    step: 3,
+   428→    labelEn: 'Contact Person',
+   429→    labelOr: 'Nama Quunnamtu',
+   430→    input: 'text',
+   431→    required: true,
+   432→    locked: true,
+   433→    requiredFixed: true,
+   434→  },
+   435→  {
+   436→    key: 'contactPhone',
+   437→    step: 3,
+   438→    labelEn: 'Contact Phone',
+   439→    labelOr: 'Bilbila Quunnamtii',
+   440→    input: 'text',
+   441→    required: true,
+   442→    locked: true,
+   443→    requiredFixed: true,
+   444→  },
+   445→];
+   446→
+   447→// ============ Education institution (EducationCenter model) ============
+   448→
+   449→/** "Students by Sex" / "Teachers by Sex" count as one question each. */
+   450→export const EDUCATION_STUDENT_SEX_KEY = 'studentsSex';
+   451→export const EDUCATION_TEACHER_SEX_KEY = 'teachersSex';
+   452→
+   453→const EDUCATION_FIELDS: SurveyFieldDef[] = [
+   454→  // ---- Step 1: Institution ----
+   455→  {
+   456→    key: 'institutionName',
+   457→    step: 1,
+   458→    labelEn: 'Institution Name',
+   459→    labelOr: 'Maqaa Mana Barumsaa',
+   460→    input: 'text',
+   461→    required: true,
+   462→    locked: true,
+   463→    requiredFixed: true,
+   464→  },
+   465→  {
+   466→    key: 'institutionTypes',
+   467→    step: 1,
+   468→    labelEn: 'Institution Type',
+   469→    labelOr: 'Gosa Mana Barumsaa',
+   470→    input: 'select-multi',
+   471→    required: true,
+   472→    locked: true,
+   473→    requiredFixed: true,
+   474→  },
+   475→  {
+   476→    key: 'subCity',
+   477→    step: 1,
+   478→    labelEn: 'Sub-City',
+   479→    labelOr: 'Kuttaa Maggalaa',
+   480→    input: 'select',
+   481→    required: true,
+   482→    locked: true,
+   483→    requiredFixed: true,
+   484→  },
+   485→  {
+   486→    key: 'area',
+   487→    step: 1,
+   488→    labelEn: 'Woreda',
+   489→    labelOr: 'Werreda',
+   490→    input: 'select',
+   491→    required: true,
+   492→    locked: true,
+   493→    requiredFixed: true,
+   494→  },
+   495→  {
+   496→    key: 'specificAddress',
+   497→    step: 1,
+   498→    labelEn: 'Specific Address',
+   499→    labelOr: 'Baka Addaa',
+   500→    input: 'text',
+   501→    required: true,
+   502→    locked: false,
+   503→    requiredFixed: false,
+   504→  },
+   505→  // ---- Step 2: Capacity & services ----
+   506→  {
+   507→    key: 'licenseNumber',
+   508→    step: 2,
+   509→    labelEn: 'License Number',
+   510→    labelOr: 'Lakofsaa Eyyeema',
+   511→    input: 'text',
+   512→    required: false,
+   513→    locked: false,
+   514→    requiredFixed: false,
+   515→  },
+   516→  {
+   517→    key: 'ownershipType',
+   518→    step: 2,
+   519→    labelEn: 'Ownership Type',
+   520→    labelOr: 'Gosa Abbaa Qabuu',
+   521→    input: 'select',
+   522→    required: true,
+   523→    locked: false,
+   524→    requiredFixed: false,
+   525→  },
+   526→  {
+   527→    key: 'studentCount',
+   528→    step: 2,
+   529→    labelEn: 'Student Count',
+   530→    labelOr: 'Lakkoofsa Barataa',
+   531→    input: 'number',
+   532→    required: true,
+   533→    locked: true,
+   534→    requiredFixed: true,
+   535→  },
+   536→  {
+   537→    key: EDUCATION_STUDENT_SEX_KEY,
+   538→    step: 2,
+   539→    labelEn: 'Students by Sex',
+   540→    labelOr: 'Barattoota Dhiira fi Dubartii',
+   541→    input: 'sex-pair',
+   542→    required: false,
+   543→    locked: false,
+   544→    requiredFixed: false,
+   545→  },
+   546→  {
+   547→    key: 'teacherCount',
+   548→    step: 2,
+   549→    labelEn: 'Teacher Count',
+   550→    labelOr: 'Lakkoofsa Barsiisaa',
+   551→    input: 'number',
+   552→    required: true,
+   553→    locked: false,
+   554→    requiredFixed: false,
+   555→  },
+   556→  {
+   557→    key: EDUCATION_TEACHER_SEX_KEY,
+   558→    step: 2,
+   559→    labelEn: 'Teachers by Sex',
+   560→    labelOr: 'Barsiisota Dhiira fi Dubartii',
+   561→    input: 'sex-pair',
+   562→    required: false,
+   563→    locked: false,
+   564→    requiredFixed: false,
+   565→  },
+   566→  {
+   567→    key: 'classroomCount',
+   568→    step: 2,
+   569→    labelEn: 'Classroom Count',
+   570→    labelOr: 'Lakkoofsa Kutaa Barumsaa',
+   571→    input: 'number',
+   572→    required: true,
+   573→    locked: false,
+   574→    requiredFixed: false,
+   575→  },
+   576→  {
+   577→    key: 'hasLibrary',
+   578→    step: 2,
+   579→    labelEn: 'Library service',
+   580→    labelOr: 'Mana Maxxantaa',
+   581→    input: 'radio-yesno',
+   582→    required: false,
+   583→    locked: false,
+   584→    requiredFixed: true,
+   585→  },
+   586→  {
+   587→    key: 'hasLaboratory',
+   588→    step: 2,
+   589→    labelEn: 'Laboratory service',
+   590→    labelOr: 'Laboratoire',
+   591→    input: 'radio-yesno',
+   592→    required: false,
+   593→    locked: false,
+   594→    requiredFixed: true,
+   595→  },
+   596→  {
+   597→    key: 'hasComputerLab',
+   598→    step: 2,
+   599→    labelEn: 'Computer lab',
+   600→    labelOr: 'Kompiyuutaraa',
+   601→    input: 'radio-yesno',
+   602→    required: false,
+   603→    locked: false,
+   604→    requiredFixed: true,
+   605→  },
+   606→  {
+   607→    key: 'hasFeedingProgram',
+   608→    step: 2,
+   609→    labelEn: 'School feeding program',
+   610→    labelOr: 'Soorataa',
+   611→    input: 'radio-yesno',
+   612→    required: false,
+   613→    locked: false,
+   614→    requiredFixed: true,
+   615→  },
+   616→  // ---- Step 3: Contact ----
+   617→  {
+   618→    key: 'contactName',
+   619→    step: 3,
+   620→    labelEn: 'Contact Person',
+   621→    labelOr: 'Nama Quunnamtu',
+   622→    input: 'text',
+   623→    required: true,
+   624→    locked: true,
+   625→    requiredFixed: true,
+   626→  },
+   627→  {
+   628→    key: 'contactPhone',
+   629→    step: 3,
+   630→    labelEn: 'Contact Phone',
+   631→    labelOr: 'Bilbila Quunnamtii',
+   632→    input: 'text',
+   633→    required: true,
+   634→    locked: true,
+   635→    requiredFixed: true,
+   636→  },
+   637→];
+   638→
+   639→// ============ Agriculture (AgricultureCenter model) ============
+   640→
+   641→/** "Workers by Sex" counts male + female as one question. */
+   642→export const AGRICULTURE_SEX_PAIR_KEY = 'workersSex';
+   643→
+   644→const AGRICULTURE_FIELDS: SurveyFieldDef[] = [
+   645→  // ---- Step 1: Farm ----
+   646→  {
+   647→    key: 'farmName',
+   648→    step: 1,
+   649→    labelEn: 'Farm / Establishment Name',
+   650→    labelOr: 'Maqaa Mana Qonnaa',
+   651→    input: 'text',
+   652→    required: true,
+   653→    locked: true,
+   654→    requiredFixed: true,
+   655→  },
+   656→  {
+   657→    key: 'farmType',
+   658→    step: 1,
+   659→    labelEn: 'Farm Type',
+   660→    labelOr: 'Gosa Qonnaa',
+   661→    input: 'select',
+   662→    required: true,
+   663→    locked: true,
+   664→    requiredFixed: true,
+   665→  },
+   666→  {
+   667→    key: 'subCity',
+   668→    step: 1,
+   669→    labelEn: 'Sub-City',
+   670→    labelOr: 'Kuttaa Maggalaa',
+   671→    input: 'select',
+   672→    required: true,
+   673→    locked: true,
+   674→    requiredFixed: true,
+   675→  },
+   676→  {
+   677→    key: 'area',
+   678→    step: 1,
+   679→    labelEn: 'Woreda',
+   680→    labelOr: 'Werreda',
+   681→    input: 'select',
+   682→    required: true,
+   683→    locked: true,
+   684→    requiredFixed: true,
+   685→  },
+   686→  {
+   687→    key: 'specificAddress',
+   688→    step: 1,
+   689→    labelEn: 'Specific Address',
+   690→    labelOr: 'Baka Addaa',
+   691→    input: 'text',
+   692→    required: true,
+   693→    locked: false,
+   694→    requiredFixed: false,
+   695→  },
+   696→  // ---- Step 2: Land & capacity ----
+   697→  {
+   698→    key: 'licenseNumber',
+   699→    step: 2,
+   700→    labelEn: 'License Number',
+   701→    labelOr: 'Lakofsaa Eyyeema',
+   702→    input: 'text',
+   703→    required: false,
+   704→    locked: false,
+   705→    requiredFixed: false,
+   706→  },
+   707→  {
+   708→    key: 'ownershipType',
+   709→    step: 2,
+   710→    labelEn: 'Ownership Type',
+   711→    labelOr: 'Gosa Abbaa Qabuu',
+   712→    input: 'select',
+   713→    required: true,
+   714→    locked: false,
+   715→    requiredFixed: false,
+   716→  },
+   717→  {
+   718→    key: 'landSizeHectares',
+   719→    step: 2,
+   720→    labelEn: 'Land Size (ha)',
+   721→    labelOr: 'Dachaa',
+   722→    input: 'number',
+   723→    required: true,
+   724→    locked: false,
+   725→    requiredFixed: false,
+   726→  },
+   727→  {
+   728→    key: 'workerCount',
+   729→    step: 2,
+   730→    labelEn: 'Worker Count',
+   731→    labelOr: 'Lakkoofsa Hojjetaa',
+   732→    input: 'number',
+   733→    required: true,
+   734→    locked: true,
+   735→    requiredFixed: true,
+   736→  },
+   737→  {
+   738→    key: AGRICULTURE_SEX_PAIR_KEY,
+   739→    step: 2,
+   740→    labelEn: 'Workers by Sex',
+   741→    labelOr: 'Hojjettoota Dhiira fi Dubartii',
+   742→    input: 'sex-pair',
+   743→    required: false,
+   744→    locked: false,
+   745→    requiredFixed: false,
+   746→  },
+   747→  {
+   748→    key: 'hasIrrigation',
+   749→    step: 2,
+   750→    labelEn: 'Irrigation',
+   751→    labelOr: '',
+   752→    input: 'radio-yesno',
+   753→    required: false,
+   754→    locked: false,
+   755→    requiredFixed: true,
+   756→  },
+   757→  {
+   758→    key: 'hasGreenhouse',
+   759→    step: 2,
+   760→    labelEn: 'Greenhouse',
+   761→    labelOr: '',
+   762→    input: 'radio-yesno',
+   763→    required: false,
+   764→    locked: false,
+   765→    requiredFixed: true,
+   766→  },
+   767→  {
+   768→    key: 'hasMachinery',
+   769→    step: 2,
+   770→    labelEn: 'Farm machinery',
+   771→    labelOr: 'Meeshaa Qonnaa',
+   772→    input: 'radio-yesno',
+   773→    required: false,
+   774→    locked: false,
+   775→    requiredFixed: true,
+   776→  },
+   777→  {
+   778→    key: 'hasStorage',
+   779→    step: 2,
+   780→    labelEn: 'Storage',
+   781→    labelOr: '',
+   782→    input: 'radio-yesno',
+   783→    required: false,
+   784→    locked: false,
+   785→    requiredFixed: true,
+   786→  },
+   787→  // ---- Step 3: Contact ----
+   788→  {
+   789→    key: 'contactName',
+   790→    step: 3,
+   791→    labelEn: 'Contact Person',
+   792→    labelOr: 'Nama Quunnamtu',
+   793→    input: 'text',
+   794→    required: true,
+   795→    locked: true,
+   796→    requiredFixed: true,
+   797→  },
+   798→  {
+   799→    key: 'contactPhone',
+   800→    step: 3,
+   801→    labelEn: 'Contact Phone',
+   802→    labelOr: 'Bilbila Quunnamtii',
+   803→    input: 'text',
+   804→    required: true,
+   805→    locked: true,
+   806→    requiredFixed: true,
+   807→  },
+   808→];
+   809→
+   810→// ============ Small Enterprise (SmallEnterprise model) ============
+   811→
+   812→/** "Employees by Sex" counts male + female as one question. */
+   813→export const SME_SEX_PAIR_KEY = 'employeesSex';
+   814→
+   815→const SME_FIELDS: SurveyFieldDef[] = [
+   816→  // ---- Step 1: Enterprise ----
+   817→  {
+   818→    key: 'enterpriseName',
+   819→    step: 1,
+   820→    labelEn: 'Enterprise Name',
+   821→    labelOr: '',
+   822→    input: 'text',
+   823→    required: true,
+   824→    locked: true,
+   825→    requiredFixed: true,
+   826→  },
+   827→  {
+   828→    key: 'enterpriseType',
+   829→    step: 1,
+   830→    labelEn: 'Enterprise Type',
+   831→    labelOr: 'Gosa Midhaalee',
+   832→    input: 'select',
+   833→    required: true,
+   834→    locked: true,
+   835→    requiredFixed: true,
+   836→  },
+   837→  {
+   838→    key: 'subCity',
+   839→    step: 1,
+   840→    labelEn: 'Sub-City',
+   841→    labelOr: 'Kuttaa Maggalaa',
+   842→    input: 'select',
+   843→    required: true,
+   844→    locked: true,
+   845→    requiredFixed: true,
+   846→  },
+   847→  {
+   848→    key: 'area',
+   849→    step: 1,
+   850→    labelEn: 'Woreda',
+   851→    labelOr: 'Werreda',
+   852→    input: 'select',
+   853→    required: true,
+   854→    locked: true,
+   855→    requiredFixed: true,
+   856→  },
+   857→  {
+   858→    key: 'specificAddress',
+   859→    step: 1,
+   860→    labelEn: 'Specific Address',
+   861→    labelOr: 'Baka Addaa',
+   862→    input: 'text',
+   863→    required: true,
+   864→    locked: false,
+   865→    requiredFixed: false,
+   866→  },
+   867→  {
+   868→    key: 'status',
+   869→    step: 1,
+   870→    labelEn: 'Current Status',
+   871→    labelOr: 'Sadarkaa Ammaa',
+   872→    input: 'status-select',
+   873→    required: false,
+   874→    locked: false,
+   875→    requiredFixed: true, // always has a value — defaults to REGISTERED
+   876→  },
+   877→  // ---- Step 2: Capacity & support ----
+   878→  {
+   879→    key: 'licenseNumber',
+   880→    step: 2,
+   881→    labelEn: 'License Number',
+   882→    labelOr: 'Lakofsaa Eyyeema',
+   883→    input: 'text',
+   884→    required: false,
+   885→    locked: false,
+   886→    requiredFixed: false,
+   887→  },
+   888→  {
+   889→    key: 'ownershipType',
+   890→    step: 2,
+   891→    labelEn: 'Ownership Type',
+   892→    labelOr: 'Gosa Abbaa Qabuu',
+   893→    input: 'select',
+   894→    required: true,
+   895→    locked: false,
+   896→    requiredFixed: false,
+   897→  },
+   898→  {
+   899→    key: 'employeeCount',
+   900→    step: 2,
+   901→    labelEn: 'Employee Count',
+   902→    labelOr: 'Lakkoofsa Hojjetaa',
+   903→    input: 'number',
+   904→    required: true,
+   905→    locked: true,
+   906→    requiredFixed: true,
+   907→  },
+   908→  {
+   909→    key: SME_SEX_PAIR_KEY,
+   910→    step: 2,
+   911→    labelEn: 'Employees by Sex',
+   912→    labelOr: 'Hojjetaa Dhiira fi Dubartii',
+   913→    input: 'sex-pair',
+   914→    required: false,
+   915→    locked: false,
+   916→    requiredFixed: false,
+   917→  },
+   918→  {
+   919→    key: 'startupCapital',
+   920→    step: 2,
+   921→    labelEn: 'Startup Capital (ETB)',
+   922→    labelOr: 'Maallaqa Jalqabaa',
+   923→    input: 'number',
+   924→    required: false,
+   925→    locked: false,
+   926→    requiredFixed: false,
+   927→  },
+   928→  {
+   929→    key: 'hasPremises',
+   930→    step: 2,
+   931→    labelEn: 'Own Working Premises',
+   932→    labelOr: 'Iddoo hojii mataa isaa',
+   933→    input: 'radio-yesno',
+   934→    required: false,
+   935→    locked: false,
+   936→    requiredFixed: true,
+   937→  },
+   938→  {
+   939→    key: 'hasTraining',
+   940→    step: 2,
+   941→    labelEn: 'MSE Training / Support',
+   942→    labelOr: 'Deeggarsa fi leenjii',
+   943→    input: 'radio-yesno',
+   944→    required: false,
+   945→    locked: false,
+   946→    requiredFixed: true,
+   947→  },
+   948→  // ---- Step 3: Contact ----
+   949→  {
+   950→    key: 'contactName',
+   951→    step: 3,
+   952→    labelEn: 'Contact Person',
+   953→    labelOr: 'Nama Quunnamtu',
+   954→    input: 'text',
+   955→    required: true,
+   956→    locked: true,
+   957→    requiredFixed: true,
+   958→  },
+   959→  {
+   960→    key: 'contactPhone',
+   961→    step: 3,
+   962→    labelEn: 'Contact Phone',
+   963→    labelOr: 'Bilbila Quunnamtii',
+   964→    input: 'text',
+   965→    required: true,
+   966→    locked: true,
+   967→    requiredFixed: true,
+   968→  },
+   969→];
+   970→
+   971→// ============ Sector registry map ============
+   972→
+   973→export const SURVEY_SECTORS: Record<SurveySectorId, SurveySectorDef> = {
+   974→  guesthouse: {
+   975→    id: 'guesthouse',
+   976→    label: 'Hotel & Guest House',
+   977→    settingKey: 'guesthouseSurveyFields',
+   978→    stepTitles: {
+   979→      1: 'Step 1 — Establishment / Hundeeffama',
+   980→      2: 'Step 2 — Capacity & License / Dandeettii fi Laisansii',
+   981→      3: 'Step 3 — Contact / Quunnamtii',
+   982→    },
+   983→    fields: GUESTHOUSE_FIELDS,
+   984→  },
+   985→  health: {
+   986→    id: 'health',
+   987→    label: 'Health Facility',
+   988→    settingKey: 'healthSurveyFields',
+   989→    stepTitles: {
+   990→      1: 'Step 1 — Facility / Manaa Yaalaa',
+   991→      2: 'Step 2 — Capacity & Services / Dandeettii fi Tajaajila',
+   992→      3: 'Step 3 — Contact / Quunnamtii',
+   993→    },
+   994→    fields: HEALTH_FIELDS,
+   995→  },
+   996→  education: {
+   997→    id: 'education',
+   998→    label: 'Education Institution',
+   999→    settingKey: 'educationSurveyFields',
+  1000→    stepTitles: {
+  1001→      1: 'Step 1 — Institution / Mana Barumsaa',
+  1002→      2: 'Step 2 — Capacity & Services / Dandeettii fi Tajaajila',
+  1003→      3: 'Step 3 — Contact / Quunnamtii',
+  1004→    },
+  1005→    fields: EDUCATION_FIELDS,
+  1006→  },
+  1007→  agriculture: {
+  1008→    id: 'agriculture',
+  1009→    label: 'Agriculture',
+  1010→    settingKey: 'agricultureSurveyFields',
+  1011→    stepTitles: {
+  1012→      1: 'Step 1 — Farm / Mana Qonnaa',
+  1013→      2: 'Step 2 — Land & Capacity / Dachaa fi Dandeettii',
+  1014→      3: 'Step 3 — Contact / Quunnamtii',
+  1015→    },
+  1016→    fields: AGRICULTURE_FIELDS,
+  1017→  },
+  1018→  'small-enterprise': {
+  1019→    id: 'small-enterprise',
+  1020→    label: 'Small Enterprise',
+  1021→    settingKey: 'smallEnterpriseSurveyFields',
+  1022→    stepTitles: {
+  1023→      1: 'Step 1 — Enterprise / Midhaalee',
+  1024→      2: 'Step 2 — Capacity & Support / Dandeettii fi Deeggarsa',
+  1025→      3: 'Step 3 — Contact / Quunnamtii',
+  1026→    },
+  1027→    fields: SME_FIELDS,
+  1028→  },
+  1029→};
+  1030→
+  1031→export const SURVEY_SECTOR_IDS = Object.keys(SURVEY_SECTORS) as SurveySectorId[];
+  1032→
+  1033→export function isSurveySectorId(value: unknown): value is SurveySectorId {
+  1034→  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(SURVEY_SECTORS, value);
+  1035→}
+  1036→
+  1037→// ============ Per-sector helpers (mirror industry-survey-fields.ts) ============
+  1038→
+  1039→export function sectorSurveyFieldDef(sector: SurveySectorId, key: string): SurveyFieldDef | undefined {
+  1040→  return SURVEY_SECTORS[sector].fields.find((f) => f.key === key);
+  1041→}
+  1042→
+  1043→export function isSectorSurveyFieldKey(sector: SurveySectorId, key: unknown): key is string {
+  1044→  return typeof key === 'string' && SURVEY_SECTORS[sector].fields.some((f) => f.key === key);
+  1045→}
+  1046→
+  1047→/** Default config for a sector: every registry question enabled with default labels. */
+  1048→export function sectorSurveyFieldsDefault(sector: SurveySectorId): SurveyFieldConfig[] {
+  1049→  return SURVEY_SECTORS[sector].fields.map((f) => ({
+  1050→    key: f.key,
+  1051→    labelEn: f.labelEn,
+  1052→    labelOr: f.labelOr,
+  1053→    enabled: true,
+  1054→    required: f.required,
+  1055→  }));
+  1056→}
+  1057→
+  1058→/**
+  1059→ * Validates an admin-managed questionnaire for a sector. Keeps the saved order
+  1060→ * for known keys (per step, since steps are fixed), drops unknown keys and
+  1061→ * duplicates, forces locked fields enabled and fixed-required fields required,
+  1062→ * trims labels (falls back to the registry default when empty). Returns null
+  1063→ * when nothing valid remains (the caller rejects the save).
+  1064→ */
+  1065→export function normalizeSectorSurveyFields(
+  1066→  sector: SurveySectorId,
+  1067→  raw: unknown
+  1068→): SurveyFieldConfig[] | null {
+  1069→  if (!Array.isArray(raw)) return null;
+  1070→  const registry = SURVEY_SECTORS[sector].fields;
+  1071→  const seen = new Set<string>();
+  1072→  const out: SurveyFieldConfig[] = [];
+  1073→  for (const item of raw) {
+  1074→    const key = (item as { key?: unknown })?.key;
+  1075→    // Admin-added custom questions ride along with their own shape.
+  1076→    if (isCustomSurveyKey(key)) {
+  1077→      if (seen.has(key)) continue;
+  1078→      seen.add(key);
+  1079→      const it = item as {
+  1080→        labelEn?: unknown; labelOr?: unknown; enabled?: unknown;
+  1081→        required?: unknown; step?: unknown; input?: unknown; options?: unknown;
+  1082→      };
+  1083→      const step = it.step === 1 || it.step === 2 || it.step === 3 ? it.step : 3;
+  1084→      const input = CUSTOM_SURVEY_INPUTS.some((i) => i.value === it.input)
+  1085→        ? (it.input as CustomSurveyInput)
+  1086→        : 'text';
+  1087→      const options = input === 'select' && Array.isArray(it.options)
+  1088→        ? it.options
+  1089→            .map((o) => (typeof o === 'string' ? o.trim().slice(0, 80) : ''))
+  1090→            .filter((o) => o.length > 0)
+  1091→            .slice(0, 30)
+  1092→        : undefined;
+  1093→      out.push({
+  1094→        key,
+  1095→        labelEn: typeof it.labelEn === 'string' && it.labelEn.trim()
+  1096→          ? it.labelEn.trim().slice(0, 120)
+  1097→          : 'Custom question',
+  1098→        labelOr: typeof it.labelOr === 'string' ? it.labelOr.trim().slice(0, 120) : '',
+  1099→        enabled: it.enabled !== false,
+  1100→        required: it.required === true,
+  1101→        custom: true,
+  1102→        step,
+  1103→        input,
+  1104→        ...(options ? { options } : {}),
+  1105→      });
+  1106→      continue;
+  1107→    }
+  1108→    if (!isSectorSurveyFieldKey(sector, key) || seen.has(key)) continue;
+  1109→    seen.add(key);
+  1110→    const def = registry.find((f) => f.key === key)!;
+  1111→    const labelEn =
+  1112→      typeof (item as { labelEn?: unknown })?.labelEn === 'string' &&
+  1113→      (item as { labelEn?: string }).labelEn!.trim()
+  1114→        ? (item as { labelEn?: string }).labelEn!.trim().slice(0, 120)
+  1115→        : def.labelEn;
+  1116→    const labelOr =
+  1117→      typeof (item as { labelOr?: unknown })?.labelOr === 'string' &&
+  1118→      (item as { labelOr?: string }).labelOr!.trim()
+  1119→        ? (item as { labelOr?: string }).labelOr!.trim().slice(0, 120)
+  1120→        : def.labelOr;
+  1121→    out.push({
+  1122→      key,
+  1123→      labelEn,
+  1124→      labelOr,
+  1125→      enabled: def.locked ? true : (item as { enabled?: unknown })?.enabled !== false,
+  1126→      required: def.requiredFixed ? true : (item as { required?: unknown })?.required === true,
+  1127→    });
+  1128→  }
+  1129→  // Every registry field must be present — append any the admin list missed so
+  1130→  // a stale config can never drop a locked field.
+  1131→  for (const def of registry) {
+  1132→    if (!seen.has(def.key)) {
+  1133→      out.push({
+  1134→        key: def.key,
+  1135→        labelEn: def.labelEn,
+  1136→        labelOr: def.labelOr,
+  1137→        enabled: true,
+  1138→        required: def.required,
+  1139→      });
+  1140→    }
+  1141→  }
+  1142→  return out.length > 0 ? out : null;
+  1143→}
+  1144→
+  1145→/**
+  1146→ * Merges a saved config with the registry — the read-side equivalent of
+  1147→ * normalizeSectorSurveyFields for configs persisted earlier. Falls back to
+  1148→ * the defaults when nothing valid was saved.
+  1149→ */
+  1150→export function mergeSectorSurveyFields(
+  1151→  sector: SurveySectorId,
+  1152→  saved: unknown
+  1153→): SurveyFieldConfig[] {
+  1154→  return normalizeSectorSurveyFields(sector, saved) ?? sectorSurveyFieldsDefault(sector);
+  1155→}
+  1156→
+  1157→/** Ordered fields of one wizard step (saved order within the step). */
+  1158→export function sectorSurveyFieldsForStep(
+  1159→  sector: SurveySectorId,
+  1160→  fields: SurveyFieldConfig[],
+  1161→  step: 1 | 2 | 3
+  1162→): SurveyFieldConfig[] {
+  1163→  return fields.filter((f) => sectorSurveyFieldDef(sector, f.key)?.step === step && f.enabled);
+  1164→}
+  1165→
+  1166→/** Whether a field is currently shown on the form. */
+  1167→export function sectorSurveyFieldEnabled(
+  1168→  sector: SurveySectorId,
+  1169→  fields: SurveyFieldConfig[],
+  1170→  key: string
+  1171→): boolean {
+  1172→  const cfg = fields.find((f) => f.key === key);
+  1173→  if (!cfg) return sectorSurveyFieldDef(sector, key)?.locked ?? false;
+  1174→  return cfg.enabled;
+  1175→}
+  1176→
+  1177→/** Whether a shown field must be filled before submission. */
+  1178→export function sectorSurveyFieldRequired(
+  1179→  sector: SurveySectorId,
+  1180→  fields: SurveyFieldConfig[],
+  1181→  key: string
+  1182→): boolean {
+  1183→  const cfg = fields.find((f) => f.key === key);
+  1184→  const def = sectorSurveyFieldDef(sector, key);
+  1185→  if (!cfg) return def?.required ?? false;
+  1186→  return def?.requiredFixed ? true : cfg.required;
+  1187→}
+  1188→
