@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { isSmeStatus } from '@/lib/sme';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 // GET /api/smallenterprises/export — CSV export of small-enterprise records
 export async function GET(request: NextRequest) {
@@ -26,6 +28,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No data to export' }, { status: 404 });
     }
 
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('small-enterprise')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
+
     const headers = [
       'Enterprise Name',
       'Enterprise Type',
@@ -44,6 +51,7 @@ export async function GET(request: NextRequest) {
       'Contact Phone',
       'Surveyor Name',
       'Date Collected',
+      ...customQs.map((f) => f.labelEn),
     ];
 
     const rows = smallEnterprises.map((se) => [
@@ -64,6 +72,10 @@ export async function GET(request: NextRequest) {
       se.contactPhone,
       se.surveyorName || '',
       se.createdAt.toISOString().split('T')[0],
+      ...customQs.map((f) => {
+        const ca = (se.customAnswers ?? {}) as Record<string, unknown>;
+        return ca[f.key] != null ? String(ca[f.key]) : '';
+      }),
     ]);
 
     const csvContent = [

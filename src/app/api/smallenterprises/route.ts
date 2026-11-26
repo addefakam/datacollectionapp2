@@ -4,7 +4,11 @@ import { parseSexCounts } from '@/lib/sex-counts';
 import { isSmeStatus } from '@/lib/sme';
 import { canonicalArea, canonicalSubCity } from '@/lib/sme-server';
 import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
-import { sectorSurveyFieldRequired } from '@/lib/survey-fields';
+import {
+  sanitizeCustomAnswers,
+  sectorSurveyFieldRequired,
+  type SurveyFieldConfig,
+} from '@/lib/survey-fields';
 
 /** Accept booleans from JSON, or 'yes'/'true'/1 from offline-synced payloads. */
 function toBool(v: unknown): boolean {
@@ -63,6 +67,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Employee count must be a non-negative number' }, { status: 400 });
     }
 
+    // Admin-added custom questions: keep only enabled ones, validate required
+    const customAnswers = sanitizeCustomAnswers(surveyFields, body.customAnswers);
+    const missingCustom = surveyFields.filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled && f.required && !customAnswers[f.key]
+    );
+    if (missingCustom.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Missing required fields',
+          missing: Object.fromEntries(missingCustom.map((f) => [f.key, true])),
+        },
+        { status: 400 }
+      );
+    }
+
     // Optional sex breakdown (male/female) — must add up to the total when given
     const sex = parseSexCounts(maleEmployees, femaleEmployees, employees, 'Employee Count');
     if (!sex.ok) {
@@ -114,6 +133,7 @@ export async function POST(request: NextRequest) {
         contactPhone,
         surveyorName: surveyorName || null,
         surveyorId: surveyorId || null,
+        customAnswers: Object.keys(customAnswers).length > 0 ? customAnswers : undefined,
       },
     });
 

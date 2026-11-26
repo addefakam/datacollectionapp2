@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ import {
   sectorSurveyFieldEnabled,
   sectorSurveyFieldRequired,
   sectorSurveyFieldsDefault,
+  sanitizeCustomAnswers,
   type SurveyFieldConfig,
 } from '@/lib/survey-fields';
 
@@ -82,6 +84,8 @@ export default function SmallEnterpriseSurveyForm({
   const [selectedSubCity, setSelectedSubCity] = useState('');
   const [areas, setAreas] = useState<string[]>([]);
   const [dataConfirmed, setDataConfirmed] = useState('');
+  // Answers to admin-added custom questions (key = custom_*)
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
 
   // Admin-managed questionnaire (Manage workspace → Survey Questions);
   // registry defaults until it loads (offline keeps the defaults).
@@ -105,6 +109,10 @@ export default function SmallEnterpriseSurveyForm({
   }, []);
 
   // Questionnaire accessors: shown / required / admin-managed bilingual label.
+  // Admin-added custom questionnaire questions (Manage → Survey Questions).
+  const customFields = fields.filter((f) => f.custom && f.enabled);
+  const customForStep = (step: number) => customFields.filter((f) => (f.step ?? 3) === step);
+
   const shown = (key: string) => sectorSurveyFieldEnabled('small-enterprise', fields, key);
   const req = (key: string) => sectorSurveyFieldRequired('small-enterprise', fields, key);
   const label = (key: string) => {
@@ -181,6 +189,25 @@ export default function SmallEnterpriseSurveyForm({
     return true;
   };
 
+  /** Required/format checks for the admin-added custom questions of one step. */
+  const validateCustomStep = (step: number): boolean => {
+    for (const f of customForStep(step)) {
+      const v = (customAnswers[f.key] ?? '').trim();
+      if (f.required && !v) {
+        toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${f.labelEn} / Barbaachisaadha`, variant: 'destructive' });
+        return false;
+      }
+      if (v && f.input === 'number') {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < 0) {
+          toast({ title: 'Invalid Number / Lakkoofsa Dogoggora', description: `${f.labelEn} must be a non-negative number`, variant: 'destructive' });
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const validateStep = (step: number): boolean => {
     /** First missing required field of a step (missing = empty AND questionnaire-required). */
     const missingRequired = (keys: string[]): string | null => {
@@ -196,7 +223,7 @@ export default function SmallEnterpriseSurveyForm({
           toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
           return false;
         }
-        return true;
+        return validateCustomStep(1);
       }
       case 2: {
         const missing = missingRequired(['ownershipType']);
@@ -213,7 +240,7 @@ export default function SmallEnterpriseSurveyForm({
           toast({ title: 'Invalid Capital / Maallaqa Dogoggora', description: 'Startup capital cannot be negative / Maallaqa jalqabaa diidaa hin qabaatu', variant: 'destructive' });
           return false;
         }
-        return true;
+        return validateCustomStep(2);
       }
       case 3: {
         const missing = missingRequired(['contactName', 'contactPhone']);
@@ -229,7 +256,7 @@ export default function SmallEnterpriseSurveyForm({
             return false;
           }
         }
-        return true;
+        return validateCustomStep(3);
       }
       case 4:
         if (dataConfirmed !== 'yes') {
@@ -250,6 +277,7 @@ export default function SmallEnterpriseSurveyForm({
     setSelectedSubCity('');
     setAreas([]);
     setDataConfirmed('');
+    setCustomAnswers({});
     setCurrentStep(1);
   };
 
@@ -264,6 +292,7 @@ export default function SmallEnterpriseSurveyForm({
       startupCapital: formData.startupCapital === '' ? null : Number(formData.startupCapital),
       hasPremises: formData.hasPremises === 'yes',
       hasTraining: formData.hasTraining === 'yes',
+      customAnswers: sanitizeCustomAnswers(fields, customAnswers),
       surveyorName,
       surveyorId,
     };
@@ -300,6 +329,48 @@ export default function SmallEnterpriseSurveyForm({
     }
   };
 
+  /** Renders one admin-added custom question by input type. */
+  const renderCustomField = (f: SurveyFieldConfig) => {
+    const id = `mse-custom-${f.key}`;
+    const value = customAnswers[f.key] ?? '';
+    const set = (v: string) => setCustomAnswers((cur) => ({ ...cur, [f.key]: v }));
+    return (
+      <div key={f.key} data-custom-key={f.key} className="space-y-1.5 sm:space-y-2">
+        <FieldLabel id={id} en={f.labelEn} or={f.labelOr} required={req(f.key)} />
+        {f.input === 'textarea' ? (
+          <Textarea id={id} value={value} onChange={(e) => set(e.target.value)} rows={3} className="text-sm sm:text-base" />
+        ) : f.input === 'select' ? (
+          <Select value={value} onValueChange={set}>
+            <SelectTrigger id={id} className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+            <SelectContent className="max-h-64">
+              {(f.options ?? []).map((o) => (<SelectItem key={o} value={o}>{o}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        ) : f.input === 'radio-yesno' ? (
+          <RadioGroup value={value} onValueChange={set} className="flex gap-4">
+            <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-amber-500 has-data-[state=checked]:bg-amber-50">
+              <RadioGroupItem value="yes" id={`${id}-yes`} />
+              <Label htmlFor={`${id}-yes`} className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+            </div>
+            <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-amber-500 has-data-[state=checked]:bg-amber-50">
+              <RadioGroupItem value="no" id={`${id}-no`} />
+              <Label htmlFor={`${id}-no`} className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+            </div>
+          </RadioGroup>
+        ) : (
+          <Input
+            id={id}
+            type={f.input === 'number' ? 'number' : 'text'}
+            min={f.input === 'number' ? '0' : undefined}
+            value={value}
+            onChange={(e) => set(e.target.value)}
+            className="text-sm sm:text-base"
+          />
+        )}
+      </div>
+    );
+  };
+
   const reviewItems = (
     [
       shown('enterpriseName') && { label: 'Enterprise / Midhaalee', value: formData.enterpriseName },
@@ -317,6 +388,10 @@ export default function SmallEnterpriseSurveyForm({
       shown('hasPremises') && { label: 'Own Premises', value: formData.hasPremises === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
       shown('hasTraining') && { label: 'MSE Training', value: formData.hasTraining === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
       shown('contactName') && { label: 'Contact / Quunnamtii', value: `${formData.contactName} — ${formData.contactPhone}` },
+      ...customFields.map((f) => ({
+        label: `${f.labelEn}${f.labelOr ? ' / ' + f.labelOr : ''}`,
+        value: customAnswers[f.key] || '—',
+      })),
     ].filter(Boolean) as { label: string; value: string }[]
   );
 
@@ -424,6 +499,7 @@ export default function SmallEnterpriseSurveyForm({
                   <p className="text-[10px] text-muted-foreground">Establishment lifecycle: registered → fully legalized → awaiting operation → operational</p>
                 </div>
                 )}
+                {customForStep(1).map((f) => renderCustomField(f))}
               </CardContent>
             </>
           )}
@@ -508,6 +584,7 @@ export default function SmallEnterpriseSurveyForm({
                     </div>
                   ))}
                 </div>
+                {customForStep(2).map((f) => renderCustomField(f))}
               </CardContent>
             </>
           )}
@@ -532,6 +609,7 @@ export default function SmallEnterpriseSurveyForm({
                   <Input id="contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
                   <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
                 </div>
+                {customForStep(3).map((f) => renderCustomField(f))}
               </CardContent>
             </>
           )}

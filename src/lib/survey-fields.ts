@@ -53,6 +53,66 @@ export interface SurveyFieldConfig {
   labelOr: string;
   enabled: boolean;
   required: boolean;
+  /** Admin-added custom question (SME Manage tab) — carries its own input/step/options. */
+  custom?: boolean;
+  /** Custom questions only: wizard step the question sits on (1..3). */
+  step?: 1 | 2 | 3;
+  /** Custom questions only: how the form renders the question. */
+  input?: CustomSurveyInput;
+  /** Custom questions only: choices for a select input. */
+  options?: string[];
+}
+
+/** Input types available to admin-added custom questions. */
+export type CustomSurveyInput = 'text' | 'number' | 'textarea' | 'select' | 'radio-yesno';
+
+export const CUSTOM_SURVEY_INPUTS: { value: CustomSurveyInput; label: string }[] = [
+  { value: 'text', label: 'Short text' },
+  { value: 'number', label: 'Number' },
+  { value: 'textarea', label: 'Paragraph' },
+  { value: 'select', label: 'Dropdown (single choice)' },
+  { value: 'radio-yesno', label: 'Yes / No' },
+];
+
+/** Prefix of admin-added custom question keys. */
+export const CUSTOM_SURVEY_KEY_PREFIX = 'custom_';
+
+export function isCustomSurveyKey(key: unknown): key is string {
+  return typeof key === 'string' && key.startsWith(CUSTOM_SURVEY_KEY_PREFIX) && key.length > CUSTOM_SURVEY_KEY_PREFIX.length;
+}
+
+/** Builds a unique key for a new custom question from its English label. */
+export function makeCustomSurveyKey(labelEn: string, existingKeys: string[]): string {
+  const base = CUSTOM_SURVEY_KEY_PREFIX + (
+    labelEn.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'question'
+  );
+  let key = base;
+  let i = 2;
+  while (existingKeys.includes(key)) {
+    key = `${base}_${i}`;
+    i += 1;
+  }
+  return key;
+}
+
+/**
+ * Keeps only the answers of enabled custom questions, as plain strings.
+ * Unknown / disabled keys are dropped; values are trimmed and capped.
+ */
+export function sanitizeCustomAnswers(
+  fields: SurveyFieldConfig[],
+  raw: unknown
+): Record<string, string> {
+  const customKeys = new Set(fields.filter((f) => f.custom && f.enabled).map((f) => f.key));
+  const out: Record<string, string> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!customKeys.has(k)) continue;
+    if (v == null) continue;
+    const s = String(v).trim().slice(0, 500);
+    if (s) out[k] = s;
+  }
+  return out;
 }
 
 /** The modules whose questionnaires are managed outside the Industry registry. */
@@ -1012,6 +1072,39 @@ export function normalizeSectorSurveyFields(
   const out: SurveyFieldConfig[] = [];
   for (const item of raw) {
     const key = (item as { key?: unknown })?.key;
+    // Admin-added custom questions ride along with their own shape.
+    if (isCustomSurveyKey(key)) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const it = item as {
+        labelEn?: unknown; labelOr?: unknown; enabled?: unknown;
+        required?: unknown; step?: unknown; input?: unknown; options?: unknown;
+      };
+      const step = it.step === 1 || it.step === 2 || it.step === 3 ? it.step : 3;
+      const input = CUSTOM_SURVEY_INPUTS.some((i) => i.value === it.input)
+        ? (it.input as CustomSurveyInput)
+        : 'text';
+      const options = input === 'select' && Array.isArray(it.options)
+        ? it.options
+            .map((o) => (typeof o === 'string' ? o.trim().slice(0, 80) : ''))
+            .filter((o) => o.length > 0)
+            .slice(0, 30)
+        : undefined;
+      out.push({
+        key,
+        labelEn: typeof it.labelEn === 'string' && it.labelEn.trim()
+          ? it.labelEn.trim().slice(0, 120)
+          : 'Custom question',
+        labelOr: typeof it.labelOr === 'string' ? it.labelOr.trim().slice(0, 120) : '',
+        enabled: it.enabled !== false,
+        required: it.required === true,
+        custom: true,
+        step,
+        input,
+        ...(options ? { options } : {}),
+      });
+      continue;
+    }
     if (!isSectorSurveyFieldKey(sector, key) || seen.has(key)) continue;
     seen.add(key);
     const def = registry.find((f) => f.key === key)!;

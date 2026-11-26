@@ -1,7 +1,10 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { parseSexCounts } from '@/lib/sex-counts';
 import { isSmeStatus } from '@/lib/sme';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import { sanitizeCustomAnswers } from '@/lib/survey-fields';
 
 // GET /api/smallenterprises/[id]
 export async function GET(
@@ -101,6 +104,26 @@ export async function PUT(
       statusNote = body.statusNote ? String(body.statusNote).trim() || null : null;
     }
 
+    // Admin-added custom questionnaire answers — sanitize against the current
+    // questionnaire when the edit payload mentions them, otherwise keep stored.
+    let customAnswers: Record<string, string> | undefined = undefined;
+    if (body.customAnswers !== undefined) {
+      const surveyFields = await loadSectorSurveyFields('small-enterprise');
+      customAnswers = sanitizeCustomAnswers(surveyFields, body.customAnswers);
+      const missingCustom = surveyFields.filter(
+        (f) => f.custom && f.enabled && f.required && !customAnswers![f.key]
+      );
+      if (missingCustom.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Missing required fields',
+            missing: Object.fromEntries(missingCustom.map((f) => [f.key, true])),
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const updated = await db.smallEnterprise.update({
       where: { id },
       data: {
@@ -124,6 +147,9 @@ export async function PUT(
         statusNote,
         contactName: body.contactName ?? existing.contactName,
         contactPhone: body.contactPhone ?? existing.contactPhone,
+        customAnswers: body.customAnswers !== undefined
+          ? (Object.keys(customAnswers ?? {}).length > 0 ? customAnswers : Prisma.DbNull)
+          : undefined,
       },
     });
 

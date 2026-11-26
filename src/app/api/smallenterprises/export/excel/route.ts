@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { loadSectorSurveyFields } from '@/lib/survey-fields-server';
+import type { SurveyFieldConfig } from '@/lib/survey-fields';
 
 // GET /api/smallenterprises/export/excel — Excel export of small-enterprise records
 export async function GET(request: NextRequest) {
@@ -29,6 +31,11 @@ export async function GET(request: NextRequest) {
 
     const sheet = workbook.addWorksheet('Small Enterprises');
 
+    // Admin-added custom questionnaire questions become extra columns
+    const customQs = (await loadSectorSurveyFields('small-enterprise')).filter(
+      (f: SurveyFieldConfig) => f.custom && f.enabled
+    );
+
     sheet.columns = [
       { header: 'Enterprise Name', key: 'enterpriseName', width: 32 },
       { header: 'Enterprise Type', key: 'enterpriseType', width: 24 },
@@ -47,6 +54,7 @@ export async function GET(request: NextRequest) {
       { header: 'Contact Phone', key: 'contactPhone', width: 20 },
       { header: 'Surveyor Name', key: 'surveyorName', width: 20 },
       { header: 'Date Collected', key: 'createdAt', width: 15 },
+      ...customQs.map((f) => ({ header: f.labelEn, key: f.key, width: 22 })),
     ];
 
     // Style header
@@ -78,11 +86,17 @@ export async function GET(request: NextRequest) {
         contactPhone: se.contactPhone,
         surveyorName: se.surveyorName || '',
         createdAt: se.createdAt.toISOString().split('T')[0],
+        ...Object.fromEntries(
+          customQs.map((f) => {
+            const ca = (se.customAnswers ?? {}) as Record<string, unknown>;
+            return [f.key, ca[f.key] != null ? String(ca[f.key]) : ''];
+          })
+        ),
       });
     }
 
     // Auto-filter + freeze header row
-    sheet.autoFilter = { from: 'A1', to: { row: 1, column: 17 } };
+    sheet.autoFilter = { from: 'A1', to: { row: 1, column: 17 + customQs.length } };
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     const buffer = await workbook.xlsx.writeBuffer();

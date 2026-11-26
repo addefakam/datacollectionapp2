@@ -245,6 +245,7 @@ model SmallEnterprise {
   contactPhone    String
   surveyorName    String?
   surveyorId      String?
+  customAnswers   Json? // answers to admin-added custom questionnaire questions (key = "custom_*")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

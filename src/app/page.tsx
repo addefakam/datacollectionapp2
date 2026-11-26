@@ -48,6 +48,7 @@ import CampaignAchievementForm from '@/components/charity/campaign/CampaignAchie
 import CampaignReport from '@/components/charity/campaign/CampaignReport';
 import SettingsManager from '@/components/admin/SettingsManager';
 import { SurveyQuestionsSection } from '@/components/admin/SectorSurveyQuestionsSection';
+import SmeQuestionnaireManager from '@/components/smallenterprise/SmeQuestionnaireManager';
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
 import { AppSidebar, MobileSidebar } from '@/components/admin/ManageSidebar';
 import { SettingsProvider } from '@/components/SettingsProvider';
@@ -385,11 +386,12 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Small Enterprise manage workspace: survey questionnaire only —
-              performance dashboard lives in its own tab, records in Records */}
+          {/* Small Enterprise manage workspace: full questionnaire manager —
+              modify, add or remove survey questions; records in Records tab,
+              performance dashboard on its own tab */}
           {isAdmin && (
             <TabsContent value="mseManage" className="mt-2 sm:mt-3">
-              <SurveyQuestionsSection sector="small-enterprise" />
+              <SmeQuestionnaireManager />
             </TabsContent>
           )}
 

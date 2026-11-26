@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -65,6 +66,7 @@ import { SMALL_ENTERPRISE_TYPES, SMALL_ENTERPRISE_OWNERSHIP_TYPES } from '@/lib/
 import { hasSexBreakdown } from '@/lib/sex-counts';
 import { SME_STATUSES, SME_STATUS_META, type SmeStatus } from '@/lib/sme';
 import { useSettings } from '@/components/SettingsProvider';
+import { sanitizeCustomAnswers, type SurveyFieldConfig } from '@/lib/survey-fields';
 
 interface SmallEnterprise {
   id: string;
@@ -88,6 +90,7 @@ interface SmallEnterprise {
   contactPhone: string;
   surveyorName: string | null;
   surveyorId: string | null;
+  customAnswers?: Record<string, string> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -160,6 +163,9 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
   const [statusItem, setStatusItem] = useState<SmallEnterprise | null>(null);
   const [statusForm, setStatusForm] = useState<{ status: string; note: string }>({ status: 'REGISTERED', note: '' });
   const [savingStatus, setSavingStatus] = useState(false);
+  // Admin-added custom questionnaire questions (Manage → Survey Questions)
+  const [customQs, setCustomQs] = useState<SurveyFieldConfig[]>([]);
+  const [editCustom, setEditCustom] = useState<Record<string, string>>({});
 
   // Bulk establishment-status modification (select records → apply / advance)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -200,6 +206,24 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
   useEffect(() => {
     fetchData();
   }, [fetchData, refreshTrigger]);
+
+  // Load the admin-managed questionnaire's custom questions for view/edit dialogs
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/survey-fields/small-enterprise')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d.fields)) {
+          setCustomQs(d.fields.filter((f: SurveyFieldConfig) => f.custom && f.enabled));
+        }
+      })
+      .catch(() => {
+        // offline / unavailable — dialogs simply show no custom questions
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubCityFilterChange = (value: string) => {
     setFilterSubCity(value);
@@ -317,6 +341,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
       contactName: item.contactName,
       contactPhone: item.contactPhone,
     });
+    setEditCustom({ ...(item.customAnswers || {}) });
     setEditAreas(areasFor(item.subCity));
   };
 
@@ -333,7 +358,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
       const res = await fetch(`/api/smallenterprises/${editItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({ ...editForm, customAnswers: sanitizeCustomAnswers(customQs, editCustom) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -342,6 +367,7 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
       toast({ title: 'Saved / Nuusame', description: 'Record updated successfully' });
       setEditItem(null);
       setEditForm(null);
+      setEditCustom({});
       fetchData();
     } catch (error) {
       toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to save', variant: 'destructive' });
@@ -727,6 +753,13 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                   { label: 'Contact Phone', value: viewItem.contactPhone },
                   { label: 'Surveyor', value: viewItem.surveyorName || '—' },
                   { label: 'Date Collected', value: fmtDate(viewItem.createdAt) },
+                  ...customQs.map((f) => ({
+                    label: `${f.labelEn}${f.labelOr ? ' / ' + f.labelOr : ''}`,
+                    value: viewItem.customAnswers?.[f.key] || '—',
+                  })),
+                  ...Object.entries(viewItem.customAnswers || {})
+                    .filter(([k]) => !customQs.some((f) => f.key === k))
+                    .map(([k, v]) => ({ label: k, value: String(v) })),
                 ].map((row) => (
                   <div key={row.label} className="flex items-start justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0">
                     <span className="shrink-0 text-[11px] text-muted-foreground sm:text-xs">{row.label}</span>
@@ -865,6 +898,48 @@ export default function SmallEnterpriseList({ refreshTrigger }: DataListProps) {
                     <Input id="edit-contactPhone" type="tel" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} className="text-sm" />
                   </div>
                 </div>
+                {customQs.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">Additional Questions</p>
+                    {customQs.map((f) => {
+                      const id = `edit-custom-${f.key}`;
+                      const set = (v: string) => setEditCustom((cur) => ({ ...cur, [f.key]: v }));
+                      const val = editCustom[f.key] ?? '';
+                      return (
+                        <div key={f.key} className="space-y-1.5" data-custom-key={f.key}>
+                          <Label htmlFor={id} className="text-xs">
+                            {f.labelEn}{f.labelOr ? ` / ${f.labelOr}` : ''}{f.required ? <span className="text-red-500"> *</span> : null}
+                          </Label>
+                          {f.input === 'textarea' ? (
+                            <Textarea id={id} rows={2} value={val} onChange={(e) => set(e.target.value)} className="text-sm" />
+                          ) : f.input === 'select' ? (
+                            <Select value={val} onValueChange={set}>
+                              <SelectTrigger className="text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                              <SelectContent className="max-h-64">{(f.options ?? []).map((o) => (<SelectItem key={o} value={o}>{o}</SelectItem>))}</SelectContent>
+                            </Select>
+                          ) : f.input === 'radio-yesno' ? (
+                            <Select value={val} onValueChange={set}>
+                              <SelectTrigger className="text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="yes">Yes / Eyee</SelectItem>
+                                <SelectItem value="no">No / Lakki</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              id={id}
+                              type={f.input === 'number' ? 'number' : 'text'}
+                              min={f.input === 'number' ? '0' : undefined}
+                              value={val}
+                              onChange={(e) => set(e.target.value)}
+                              className="text-sm"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => { setEditItem(null); setEditForm(null); }}>Cancel</Button>
