@@ -1,0 +1,606 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState } from 'react';
+     4→import { Button } from '@/components/ui/button';
+     5→import { Input } from '@/components/ui/input';
+     6→import { Label } from '@/components/ui/label';
+     7→import {
+     8→  Select,
+     9→  SelectContent,
+    10→  SelectItem,
+    11→  SelectTrigger,
+    12→  SelectValue,
+    13→} from '@/components/ui/select';
+    14→import {
+    15→  Card,
+    16→  CardContent,
+    17→  CardDescription,
+    18→  CardHeader,
+    19→  CardTitle,
+    20→} from '@/components/ui/card';
+    21→import { useToast } from '@/hooks/use-toast';
+    22→import {
+    23→  Factory,
+    24→  Loader2,
+    25→  RotateCcw,
+    26→  ChevronLeft,
+    27→  ChevronRight,
+    28→  Check,
+    29→  UserCircle,
+    30→  Phone,
+    31→  FileText,
+    32→  Eye,
+    33→} from 'lucide-react';
+    34→import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+    35→import { OWNERSHIP_TYPES } from '@/lib/location-data';
+    36→import { useSettings } from '@/components/SettingsProvider';
+    37→import {
+    38→  SURVEY_FIELDS_DEFAULT,
+    39→  surveyFieldEnabled,
+    40→  surveyFieldRequired,
+    41→  type IndustrySurveyFieldConfig,
+    42→} from '@/lib/industry-survey-fields';
+    43→
+    44→interface IndustrySurveyFormProps {
+    45→  onSubmit: () => void;
+    46→  surveyorName: string;
+    47→  surveyorId: string;
+    48→  isOnline?: boolean;
+    49→  onOfflineSave?: (data: Record<string, unknown>) => Promise<boolean>;
+    50→}
+    51→
+    52→const STEPS = [
+    53→  { id: 1, title: 'Establishment', titleOr: 'Indastrii', icon: Factory },
+    54→  { id: 2, title: 'Registration', titleOr: 'Galmee', icon: FileText },
+    55→  { id: 3, title: 'Contact', titleOr: 'Quunnamtii', icon: Phone },
+    56→  { id: 4, title: 'Review', titleOr: 'Mirkanaa', icon: Eye },
+    57→];
+    58→
+    59→/** Uniform question label: admin-managed English label + Afaan Oromoo sub-label + required star. */
+    60→function FieldLabel({ id, en, or, required }: { id: string; en: string; or?: string; required?: boolean }) {
+    61→  return (
+    62→    <Label htmlFor={id} className="text-xs sm:text-sm">
+    63→      {en}
+    64→      {or ? (
+    65→        <>
+    66→          <br />
+    67→          <span className="text-xs font-normal text-muted-foreground">{or}</span>
+    68→        </>
+    69→      ) : null}
+    70→      {required ? <span className="text-red-500"> *</span> : null}
+    71→    </Label>
+    72→  );
+    73→}
+    74→
+    75→export default function IndustrySurveyForm({
+    76→  onSubmit,
+    77→  surveyorName,
+    78→  surveyorId,
+    79→  isOnline = true,
+    80→  onOfflineSave,
+    81→}: IndustrySurveyFormProps) {
+    82→  const { toast } = useToast();
+    83→  const { subCities, sectors, areasFor } = useSettings();
+    84→  const [isSubmitting, setIsSubmitting] = useState(false);
+    85→  const [currentStep, setCurrentStep] = useState(1);
+    86→  const [selectedSubCity, setSelectedSubCity] = useState('');
+    87→  const [areas, setAreas] = useState<string[]>([]);
+    88→  const [dataConfirmed, setDataConfirmed] = useState('');
+    89→  // Admin-managed questionnaire (Settings → Survey); registry defaults until it loads.
+    90→  const [fields, setFields] = useState<IndustrySurveyFieldConfig[]>(
+    91→    SURVEY_FIELDS_DEFAULT.map((f) => ({ ...f }))
+    92→  );
+    93→
+    94→  useEffect(() => {
+    95→    let cancelled = false;
+    96→    fetch('/api/settings/survey-fields')
+    97→      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+    98→      .then((d) => {
+    99→        if (!cancelled && Array.isArray(d.fields) && d.fields.length > 0) setFields(d.fields);
+   100→      })
+   101→      .catch(() => {
+   102→        // offline — keep registry defaults
+   103→      });
+   104→    return () => {
+   105→      cancelled = true;
+   106→    };
+   107→  }, []);
+   108→
+   109→  const shown = (key: string) => surveyFieldEnabled(fields, key);
+   110→  const req = (key: string) => surveyFieldRequired(fields, key);
+   111→  const label = (key: string) => {
+   112→    const f = fields.find((x) => x.key === key);
+   113→    return { en: f?.labelEn ?? key, or: f?.labelOr ?? '' };
+   114→  };
+   115→
+   116→  const emptyForm = {
+   117→    establishmentName: '',
+   118→    sector: '',
+   119→    subCity: '',
+   120→    area: '',
+   121→    specificAddress: '',
+   122→    licenseNumber: '',
+   123→    ownershipType: '',
+   124→    hasEia: 'no',
+   125→    hasEmp: 'no',
+   126→    employeeCount: '',
+   127→    maleEmployees: '',
+   128→    femaleEmployees: '',
+   129→    startupCapital: '',
+   130→    contactName: '',
+   131→    contactPhone: '',
+   132→  };
+   133→
+   134→  const [formData, setFormData] = useState(emptyForm);
+   135→
+   136→  const handleSubCityChange = (value: string) => {
+   137→    setSelectedSubCity(value);
+   138→    setAreas(areasFor(value));
+   139→    setFormData((prev) => ({ ...prev, subCity: value, area: '' }));
+   140→  };
+   141→
+   142→  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+   143→    const { name, value } = e.target;
+   144→    setFormData((prev) => ({ ...prev, [name]: value }));
+   145→  };
+   146→
+   147→  const handleSelectChange = (name: string, value: string) => {
+   148→    setFormData((prev) => ({ ...prev, [name]: value }));
+   149→  };
+   150→
+   151→  /**
+   152→   * Sex breakdown inputs: when both male and female are filled and the total
+   153→   * is still empty, auto-fill the total with their sum.
+   154→   */
+   155→  const handleSexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+   156→    const { name, value } = e.target;
+   157→    setFormData((prev) => {
+   158→      const next = { ...prev, [name]: value } as typeof prev;
+   159→      const male = name === 'maleEmployees' ? value : next.maleEmployees;
+   160→      const female = name === 'femaleEmployees' ? value : next.femaleEmployees;
+   161→      if (next.employeeCount === '' && male !== '' && female !== '') {
+   162→        const sum = Number(male) + Number(female);
+   163→        if (Number.isFinite(sum) && sum >= 0) return { ...next, employeeCount: String(sum) };
+   164→      }
+   165→      return next;
+   166→    });
+   167→  };
+   168→
+   169→  /** Shared step validation for one male/female pair against its total. */
+   170→  const validateSexPair = (maleStr: string, femaleStr: string, totalStr: string, totalLabel: string): boolean => {
+   171→    const male = maleStr === '' ? 0 : Number(maleStr);
+   172→    const female = femaleStr === '' ? 0 : Number(femaleStr);
+   173→    if (!Number.isFinite(male) || male < 0 || !Number.isFinite(female) || female < 0) {
+   174→      toast({ title: 'Invalid Sex Counts / Lakkoofsa Sanyii Dogoggora', description: `Male and female ${totalLabel.toLowerCase()} must be non-negative numbers / Lakkoofsi dhiira fi dubartii lakkoofsa diidaa hin qabaatu`, variant: 'destructive' });
+   175→      return false;
+   176→    }
+   177→    if (male + female > 0 && male + female !== Number(totalStr)) {
+   178→      toast({ title: 'Sex Counts Mismatch / Lakkoofsa Sanyii Hin Wal Qabne', description: `Male + Female (${male + female}) must equal ${totalLabel} (${totalStr}) / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu`, variant: 'destructive' });
+   179→      return false;
+   180→    }
+   181→    return true;
+   182→  };
+   183→
+   184→  /** First missing required field of a step (missing = empty AND questionnaire-required). */
+   185→  const missingRequired = (keys: string[]): string | null => {
+   186→    for (const key of keys) {
+   187→      if (req(key) && !formData[key as keyof typeof formData]) return label(key).en;
+   188→    }
+   189→    return null;
+   190→  };
+   191→
+   192→  const validateStep = (step: number): boolean => {
+   193→    switch (step) {
+   194→      case 1: {
+   195→        const missing = missingRequired(['establishmentName', 'sector', 'subCity', 'area', 'specificAddress']);
+   196→        if (missing) {
+   197→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
+   198→          return false;
+   199→        }
+   200→        return true;
+   201→      }
+   202→      case 2: {
+   203→        const missing = missingRequired(['ownershipType']);
+   204→        if (missing) {
+   205→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
+   206→          return false;
+   207→        }
+   208→        if (!formData.employeeCount || Number(formData.employeeCount) < 0) {
+   209→          toast({ title: 'Invalid Employees / Lakkoofsa Hojjetaa Dogoggora', description: 'Enter a valid employee count / Lakkoofsa hojjetaa sirrii galchi', variant: 'destructive' });
+   210→          return false;
+   211→        }
+   212→        if (shown('employeeSex') && !validateSexPair(formData.maleEmployees, formData.femaleEmployees, formData.employeeCount, 'Employee Count')) return false;
+   213→        return true;
+   214→      }
+   215→      case 3: {
+   216→        const missing = missingRequired(['contactName', 'contactPhone']);
+   217→        if (missing) {
+   218→          toast({ title: 'Field Missing / Qabiyyee Hin Jiru', description: `Required: ${missing} / Barbaachisaadha`, variant: 'destructive' });
+   219→          return false;
+   220→        }
+   221→        {
+   222→          const phoneClean = formData.contactPhone.replace(/[\s-]/g, '');
+   223→          const ethPhoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
+   224→          if (!ethPhoneRegex.test(phoneClean)) {
+   225→            toast({ title: 'Invalid Phone / Bilbila Dogoggora', description: 'Enter valid Ethiopian number (e.g., +251 91 234 5678)', variant: 'destructive' });
+   226→            return false;
+   227→          }
+   228→        }
+   229→        return true;
+   230→      }
+   231→      case 4:
+   232→        if (dataConfirmed !== 'yes') {
+   233→          toast({ title: 'Confirmation Required / Mirkanaa\u2019uu Barbaachisaa', description: 'Please confirm data is true and authenticated / Daataan dhugaa fi mirkanaa\u2019eef mirkanaadhu', variant: 'destructive' });
+   234→          return false;
+   235→        }
+   236→        return true;
+   237→      default:
+   238→        return true;
+   239→    }
+   240→  };
+   241→
+   242→  const nextStep = () => { if (validateStep(currentStep)) setCurrentStep((s) => Math.min(s + 1, STEPS.length)); };
+   243→  const prevStep = () => { setCurrentStep((s) => Math.max(s - 1, 1)); };
+   244→
+   245→  const resetForm = () => {
+   246→    setFormData(emptyForm);
+   247→    setSelectedSubCity('');
+   248→    setAreas([]);
+   249→    setDataConfirmed('');
+   250→    setCurrentStep(1);
+   251→  };
+   252→
+   253→  const handleSubmit = async (e: React.FormEvent) => {
+   254→    e.preventDefault();
+   255→    if (!validateStep(currentStep)) return;
+   256→    const payload = {
+   257→      ...formData,
+   258→      employeeCount: Number(formData.employeeCount),
+   259→      maleEmployees: formData.maleEmployees === '' ? 0 : Number(formData.maleEmployees),
+   260→      femaleEmployees: formData.femaleEmployees === '' ? 0 : Number(formData.femaleEmployees),
+   261→      startupCapital: formData.startupCapital === '' ? null : Number(formData.startupCapital),
+   262→      hasEia: formData.hasEia === 'yes',
+   263→      hasEmp: formData.hasEmp === 'yes',
+   264→      surveyorName,
+   265→      surveyorId,
+   266→    };
+   267→    setIsSubmitting(true);
+   268→    if (isOnline) {
+   269→      try {
+   270→        const response = await fetch('/api/industries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+   271→        if (!response.ok) {
+   272→          const err = await response.json().catch(() => ({}));
+   273→          if (response.status >= 400 && response.status < 500) {
+   274→            // Server permanently rejected the record (validation) — queueing it offline would never succeed.
+   275→            toast({ title: 'Submission Rejected / Galmeen Morkame', description: err.error || 'Please correct the highlighted fields and submit again', variant: 'destructive' });
+   276→            return;
+   277→          }
+   278→          throw new Error(err.error || 'Server unavailable');
+   279→        }
+   280→        toast({ title: 'Survey Submitted! / Galma Qabame!', description: `${formData.establishmentName} recorded successfully / galmeen safiisan argame` });
+   281→        resetForm();
+   282→        onSubmit();
+   283→      } catch (error) {
+   284→        if (onOfflineSave) {
+   285→          const saved = await onOfflineSave(payload);
+   286→          if (saved) { toast({ title: 'Saved Offline / Offliin Kuusame', description: 'Will sync when connected / Netiirkii qunnamaa waanin dhiheenya' }); resetForm(); onSubmit(); }
+   287→          else { toast({ title: 'Submission Failed / Galmeen Hin Dhufne', description: error instanceof Error ? error.message : 'Please try again / Dabalataan yaali', variant: 'destructive' }); }
+   288→        } else { toast({ title: 'Submission Failed / Galmeen Hin Dhufne', description: error instanceof Error ? error.message : 'Please try again / Dabalataan yaali', variant: 'destructive' }); }
+   289→      } finally { setIsSubmitting(false); }
+   290→    } else {
+   291→      if (onOfflineSave) {
+   292→        const saved = await onOfflineSave(payload);
+   293→        if (saved) { toast({ title: 'Saved Offline / Offliin Kuusame', description: 'Will sync when connected / Netiirkii qunnamaa waanin dhiheenya' }); resetForm(); onSubmit(); }
+   294→        else { toast({ title: 'Save Failed / Hin Kuusanne', description: 'Storage full or unavailable / Qabiyyee dhiphaachaa ykn hin jiru', variant: 'destructive' }); }
+   295→      }
+   296→      setIsSubmitting(false);
+   297→    }
+   298→  };
+   299→
+   300→  /** Review step: only the questions the questionnaire shows. */
+   301→  const reviewItems = [
+   302→    shown('establishmentName') && { label: label('establishmentName').en, value: formData.establishmentName },
+   303→    shown('sector') && { label: label('sector').en, value: formData.sector },
+   304→    shown('subCity') && { label: label('subCity').en, value: formData.subCity },
+   305→    shown('area') && { label: label('area').en, value: formData.area },
+   306→    shown('specificAddress') && { label: label('specificAddress').en, value: formData.specificAddress },
+   307→    shown('licenseNumber') && { label: label('licenseNumber').en, value: formData.licenseNumber || '—' },
+   308→    shown('ownershipType') && { label: label('ownershipType').en, value: formData.ownershipType },
+   309→    shown('hasEia') && { label: 'EIA (Environmental Impact Assessment)', value: formData.hasEia === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+   310→    shown('hasEmp') && { label: 'EMP (Environmental Management Plan)', value: formData.hasEmp === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+   311→    shown('employeeCount') && { label: label('employeeCount').en, value: formData.employeeCount },
+   312→    shown('employeeSex') && { label: label('employeeSex').en, value: `${formData.maleEmployees || '—'} / ${formData.femaleEmployees || '—'}` },
+   313→    shown('startupCapital') && { label: label('startupCapital').en, value: formData.startupCapital ? `${formData.startupCapital} ETB` : '—' },
+   314→    shown('contactName') && { label: label('contactName').en, value: formData.contactName },
+   315→    shown('contactPhone') && { label: label('contactPhone').en, value: formData.contactPhone },
+   316→  ].filter(Boolean) as { label: string; value: string }[];
+   317→
+   318→  return (
+   319→    <div className="mx-auto max-w-2xl">
+   320→      {/* Step Indicator */}
+   321→      <div className="mb-4 sm:mb-6">
+   322→        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:gap-0 sm:pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+   323→          {STEPS.map((step, idx) => {
+   324→            const Icon = step.icon;
+   325→            const isActive = currentStep === step.id;
+   326→            const isCompleted = currentStep > step.id;
+   327→            return (
+   328→              <div key={step.id} className="flex flex-1 shrink-0 items-center">
+   329→                <button
+   330→                  type="button"
+   331→                  onClick={() => isCompleted && setCurrentStep(step.id)}
+   332→                  className={`flex w-full flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 transition-all sm:gap-1 sm:rounded-xl sm:px-2 sm:py-2 ${
+   333→                    isActive ? 'bg-teal-600 text-white shadow-md sm:shadow-lg sm:shadow-teal-100'
+   334→                      : isCompleted ? 'bg-teal-100 text-teal-700 cursor-pointer'
+   335→                      : 'bg-gray-100 text-gray-400'
+   336→                  }`}>
+   337→                  <div className={`flex h-7 w-7 items-center justify-center rounded-full sm:h-8 sm:w-8 ${isCompleted ? 'bg-teal-600 text-white' : ''}`}>
+   338→                    {isCompleted ? <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+   339→                  </div>
+   340→                  <span className="text-[9px] leading-tight font-medium text-center truncate w-full sm:text-[10px]">{step.title}</span>
+   341→                  <span className="hidden text-[8px] leading-tight text-center opacity-75 truncate w-full sm:block sm:text-[9px]">{step.titleOr}</span>
+   342→                </button>
+   343→                {idx < STEPS.length - 1 && (
+   344→                  <div className={`mx-0.5 h-0.5 flex-1 rounded sm:mx-1 ${currentStep > step.id ? 'bg-teal-500' : 'bg-gray-200'}`} />
+   345→                )}
+   346→              </div>
+   347→            );
+   348→          })}
+   349→        </div>
+   350→        <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">
+   351→          <span>Step {currentStep} of {STEPS.length} / Qajeelfannaa {currentStep} kiyya {STEPS.length} keessaa</span>
+   352→          <button type="button" onClick={resetForm} className="flex items-center gap-1 text-red-500 hover:text-red-700">
+   353→            <RotateCcw className="h-3 w-3" />
+   354→            <span className="hidden sm:inline">Reset / Balleessuu</span><span className="sm:hidden">Reset</span>
+   355→          </button>
+   356→        </div>
+   357→      </div>
+   358→
+   359→      <form onSubmit={handleSubmit}>
+   360→        <Card className="min-h-[300px] sm:min-h-[360px]">
+   361→          {/* Step 1: Establishment */}
+   362→          {currentStep === 1 && (
+   363→            <>
+   364→              <CardHeader className="pb-2 sm:pb-3">
+   365→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   366→                  <Factory className="h-4 w-4 shrink-0 text-teal-600 sm:h-5 sm:w-5" />
+   367→                  <span className="leading-tight">Odeeffannoo Indastrii<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Establishment information</span></span>
+   368→                </CardTitle>
+   369→                <CardDescription className="text-xs sm:text-sm">Basic details about the industrial establishment</CardDescription>
+   370→              </CardHeader>
+   371→              <CardContent className="space-y-3 sm:space-y-4">
+   372→                <div className="space-y-1.5 sm:space-y-2">
+   373→                  <FieldLabel id="establishmentName" en={label('establishmentName').en} or={label('establishmentName').or} required={req('establishmentName')} />
+   374→                  <Input id="establishmentName" name="establishmentName" placeholder="e.g., BISHOFTU FLOUR MILL" value={formData.establishmentName} onChange={handleChange} required className="text-sm sm:text-base" />
+   375→                </div>
+   376→                <div className="space-y-1.5 sm:space-y-2">
+   377→                  <FieldLabel id="sector" en={label('sector').en} or={label('sector').or} required={req('sector')} />
+   378→                  <Select value={formData.sector} onValueChange={(v) => handleSelectChange('sector', v)}>
+   379→                    <SelectTrigger id="sector" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+   380→                    <SelectContent className="max-h-64">{sectors.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
+   381→                  </Select>
+   382→                </div>
+   383→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   384→                  <div className="space-y-1.5 sm:space-y-2">
+   385→                    <FieldLabel id="subCity" en={label('subCity').en} or={label('subCity').or} required={req('subCity')} />
+   386→                    <Select value={formData.subCity} onValueChange={handleSubCityChange}>
+   387→                      <SelectTrigger id="subCity" className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
+   388→                      <SelectContent>{subCities.map((sc) => (<SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>))}</SelectContent>
+   389→                    </Select>
+   390→                  </div>
+   391→                  <div className="space-y-1.5 sm:space-y-2">
+   392→                    <FieldLabel id="area" en={label('area').en} or={label('area').or} required={req('area')} />
+   393→                    <Select value={formData.area} onValueChange={(v) => handleSelectChange('area', v)} disabled={!selectedSubCity}>
+   394→                      <SelectTrigger id="area" className="text-sm sm:text-base"><SelectValue placeholder={selectedSubCity ? 'Select / Filadhu' : 'Select sub-city first'} /></SelectTrigger>
+   395→                      <SelectContent>{areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}</SelectContent>
+   396→                    </Select>
+   397→                  </div>
+   398→                </div>
+   399→                {shown('specificAddress') && (
+   400→                  <div className="space-y-1.5 sm:space-y-2">
+   401→                    <FieldLabel id="specificAddress" en={label('specificAddress').en} or={label('specificAddress').or} required={req('specificAddress')} />
+   402→                    <Input id="specificAddress" name="specificAddress" placeholder="Landmark, street, plot number" value={formData.specificAddress} onChange={handleChange} className="text-sm sm:text-base" />
+   403→                  </div>
+   404→                )}
+   405→              </CardContent>
+   406→            </>
+   407→          )}
+   408→
+   409→          {/* Step 2: Registration & Size */}
+   410→          {currentStep === 2 && (
+   411→            <>
+   412→              <CardHeader className="pb-2 sm:pb-3">
+   413→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   414→                  <FileText className="h-4 w-4 shrink-0 text-teal-600 sm:h-5 sm:w-5" />
+   415→                  <span className="leading-tight">Galmee fi Safiisaa<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Registration &amp; size</span></span>
+   416→                </CardTitle>
+   417→                <CardDescription className="text-xs sm:text-sm">License, ownership and workforce details</CardDescription>
+   418→              </CardHeader>
+   419→              <CardContent className="space-y-3 sm:space-y-4">
+   420→                {shown('licenseNumber') && (
+   421→                  <div className="space-y-1.5 sm:space-y-2">
+   422→                    <FieldLabel id="licenseNumber" en={label('licenseNumber').en} or={label('licenseNumber').or} required={req('licenseNumber')} />
+   423→                    <Input id="licenseNumber" name="licenseNumber" placeholder="e.g., BW/IC/2015/0234" value={formData.licenseNumber} onChange={handleChange} className="text-sm sm:text-base" />
+   424→                  </div>
+   425→                )}
+   426→                {shown('ownershipType') && (
+   427→                  <div className="space-y-1.5 sm:space-y-2">
+   428→                    <FieldLabel id="ownershipType" en={label('ownershipType').en} or={label('ownershipType').or} required={req('ownershipType')} />
+   429→                    <RadioGroup value={formData.ownershipType} onValueChange={(v) => handleSelectChange('ownershipType', v)} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+   430→                      {OWNERSHIP_TYPES.map((t) => (
+   431→                        <div key={t} className="flex items-center space-x-2 rounded-lg border p-2.5 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+   432→                          <RadioGroupItem value={t} id={`ownership-${t}`} />
+   433→                          <Label htmlFor={`ownership-${t}`} className="cursor-pointer text-xs sm:text-sm font-normal">{t}</Label>
+   434→                        </div>
+   435→                      ))}
+   436→                    </RadioGroup>
+   437→                  </div>
+   438→                )}
+   439→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   440→                  <div className="space-y-1.5 sm:space-y-2">
+   441→                    <FieldLabel id="employeeCount" en={label('employeeCount').en} or={label('employeeCount').or} required={req('employeeCount')} />
+   442→                    <Input id="employeeCount" name="employeeCount" type="number" min="0" placeholder="e.g., 25" value={formData.employeeCount} onChange={handleChange} required className="text-sm sm:text-base" />
+   443→                  </div>
+   444→                  {shown('startupCapital') && (
+   445→                    <div className="space-y-1.5 sm:space-y-2">
+   446→                      <FieldLabel id="startupCapital" en={label('startupCapital').en} or={label('startupCapital').or} required={req('startupCapital')} />
+   447→                      <Input id="startupCapital" name="startupCapital" type="number" min="0" placeholder="e.g., 500000" value={formData.startupCapital} onChange={handleChange} className="text-sm sm:text-base" />
+   448→                    </div>
+   449→                  )}
+   450→                </div>
+   451→                {/* Employees by sex (male / female) — admin can hide this question */}
+   452→                {shown('employeeSex') && (
+   453→                  <div className="rounded-lg border border-teal-100 bg-teal-50/50 p-3 space-y-2.5">
+   454→                    <div className="flex items-center justify-between gap-2">
+   455→                      <FieldLabel id="maleEmployees" en={label('employeeSex').en} or={label('employeeSex').or} />
+   456→                      <span className="shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-[9px] font-medium text-teal-700 sm:text-[10px]">Optional / Filannoo</span>
+   457→                    </div>
+   458→                    <div className="grid grid-cols-2 gap-3">
+   459→                      <div className="space-y-1.5">
+   460→                        <Label htmlFor="maleEmployees" className="text-xs">Male / Dhiira</Label>
+   461→                        <Input id="maleEmployees" name="maleEmployees" type="number" min="0" placeholder="e.g., 12" value={formData.maleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+   462→                      </div>
+   463→                      <div className="space-y-1.5">
+   464→                        <Label htmlFor="femaleEmployees" className="text-xs">Female / Dubartii</Label>
+   465→                        <Input id="femaleEmployees" name="femaleEmployees" type="number" min="0" placeholder="e.g., 13" value={formData.femaleEmployees} onChange={handleSexChange} className="text-sm sm:text-base" />
+   466→                      </div>
+   467→                    </div>
+   468→                    <p className="text-[10px] leading-snug text-muted-foreground">Male + Female should equal the Employee Count — leave empty if not known / Dhiira fi Dubartii lakkoofsa waliigalaa wajjin wal qabachuu qabu</p>
+   469→                  </div>
+   470→                )}
+   471→                {/* Environmental compliance — admin can hide either question */}
+   472→                {(shown('hasEia') || shown('hasEmp')) && (
+   473→                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+   474→                    {shown('hasEia') && (
+   475→                      <div className="space-y-1.5 sm:space-y-2">
+   476→                        <FieldLabel id="eia-yes" en={label('hasEia').en} or={label('hasEia').or} />
+   477→                        <RadioGroup value={formData.hasEia} onValueChange={(v) => handleSelectChange('hasEia', v)} className="flex gap-4">
+   478→                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+   479→                            <RadioGroupItem value="yes" id="eia-yes" />
+   480→                            <Label htmlFor="eia-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+   481→                          </div>
+   482→                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+   483→                            <RadioGroupItem value="no" id="eia-no" />
+   484→                            <Label htmlFor="eia-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+   485→                          </div>
+   486→                        </RadioGroup>
+   487→                      </div>
+   488→                    )}
+   489→                    {shown('hasEmp') && (
+   490→                      <div className="space-y-1.5 sm:space-y-2">
+   491→                        <FieldLabel id="emp-yes" en={label('hasEmp').en} or={label('hasEmp').or} />
+   492→                        <RadioGroup value={formData.hasEmp} onValueChange={(v) => handleSelectChange('hasEmp', v)} className="flex gap-4">
+   493→                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+   494→                            <RadioGroupItem value="yes" id="emp-yes" />
+   495→                            <Label htmlFor="emp-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+   496→                          </div>
+   497→                          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+   498→                            <RadioGroupItem value="no" id="emp-no" />
+   499→                            <Label htmlFor="emp-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+   500→                          </div>
+   501→                        </RadioGroup>
+   502→                      </div>
+   503→                    )}
+   504→                  </div>
+   505→                )}
+   506→              </CardContent>
+   507→            </>
+   508→          )}
+   509→
+   510→          {/* Step 3: Contact */}
+   511→          {currentStep === 3 && (
+   512→            <>
+   513→              <CardHeader className="pb-2 sm:pb-3">
+   514→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   515→                  <UserCircle className="h-4 w-4 shrink-0 text-teal-600 sm:h-5 sm:w-5" />
+   516→                  <span className="leading-tight">Odeeffannoo Quunnamtii<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Contact information</span></span>
+   517→                </CardTitle>
+   518→                <CardDescription className="text-xs sm:text-sm">Who we can reach about this establishment</CardDescription>
+   519→              </CardHeader>
+   520→              <CardContent className="space-y-3 sm:space-y-4">
+   521→                <div className="space-y-1.5 sm:space-y-2">
+   522→                  <FieldLabel id="contactName" en={label('contactName').en} or={label('contactName').or} required={req('contactName')} />
+   523→                  <Input id="contactName" name="contactName" placeholder="Full name of manager / owner" value={formData.contactName} onChange={handleChange} required className="text-sm sm:text-base" />
+   524→                </div>
+   525→                <div className="space-y-1.5 sm:space-y-2">
+   526→                  <FieldLabel id="contactPhone" en={label('contactPhone').en} or={label('contactPhone').or} required={req('contactPhone')} />
+   527→                  <Input id="contactPhone" name="contactPhone" type="tel" placeholder="+251 9X XXX XXXX or 09XXXXXXXX" value={formData.contactPhone} onChange={handleChange} required className="text-sm sm:text-base" />
+   528→                  <p className="text-[10px] text-muted-foreground">Ethiopian format: +251 9X XXX XXXX or 09XXXXXXXX</p>
+   529→                </div>
+   530→              </CardContent>
+   531→            </>
+   532→          )}
+   533→
+   534→          {/* Step 4: Review */}
+   535→          {currentStep === 4 && (
+   536→            <>
+   537→              <CardHeader className="pb-2 sm:pb-3">
+   538→                <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+   539→                  <Eye className="h-4 w-4 shrink-0 text-teal-600 sm:h-5 sm:w-5" />
+   540→                  <span className="leading-tight">Mirkeenya Daataa<br /><span className="text-sm font-normal text-muted-foreground sm:text-base">Review &amp; confirm</span></span>
+   541→                </CardTitle>
+   542→                <CardDescription className="text-xs sm:text-sm">Check all information before submitting</CardDescription>
+   543→              </CardHeader>
+   544→              <CardContent className="space-y-3 sm:space-y-4">
+   545→                <div className="rounded-lg border bg-slate-50">
+   546→                  {reviewItems.map((item) => (
+   547→                    <div key={item.label} className="flex items-start justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0">
+   548→                      <span className="shrink-0 text-[11px] text-muted-foreground sm:text-xs">{item.label}</span>
+   549→                      <span className="text-right text-xs font-medium sm:text-sm">{item.value || '—'}</span>
+   550→                    </div>
+   551→                  ))}
+   552→                </div>
+   553→                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+   554→                  <p className="mb-2 text-xs font-medium text-amber-900 sm:text-sm">
+   555→                    I confirm that the information provided is true and authenticated / Ani daataan kenname dhugaa fi mirkanaa&#39;eef mirkaneera
+   556→                  </p>
+   557→                  <RadioGroup value={dataConfirmed} onValueChange={setDataConfirmed} className="flex gap-4">
+   558→                    <div className="flex items-center space-x-2">
+   559→                      <RadioGroupItem value="yes" id="confirm-yes" />
+   560→                      <Label htmlFor="confirm-yes" className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
+   561→                    </div>
+   562→                    <div className="flex items-center space-x-2">
+   563→                      <RadioGroupItem value="no" id="confirm-no" />
+   564→                      <Label htmlFor="confirm-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
+   565→                    </div>
+   566→                  </RadioGroup>
+   567→                </div>
+   568→              </CardContent>
+   569→            </>
+   570→          )}
+   571→        </Card>
+   572→
+   573→        {/* Navigation Buttons */}
+   574→        <div className="mt-3 flex gap-2 sm:mt-4 sm:gap-3">
+   575→          {currentStep > 1 && (
+   576→            <Button type="button" variant="outline" onClick={prevStep} className="flex-1 text-sm sm:text-base">
+   577→              <ChevronLeft className="h-4 w-4" />
+   578→              Back / Gara Duubatti
+   579→            </Button>
+   580→          )}
+   581→          {currentStep < STEPS.length ? (
+   582→            <Button type="button" onClick={nextStep} className="flex-[2] bg-teal-600 text-sm text-white hover:bg-teal-700 sm:text-base">
+   583→              Next / Itti fufi
+   584→              <ChevronRight className="h-4 w-4" />
+   585→            </Button>
+   586→          ) : (
+   587→            <Button type="submit" disabled={isSubmitting} className="flex-[2] bg-teal-600 text-sm text-white hover:bg-teal-700 sm:text-base">
+   588→              {isSubmitting ? (
+   589→                <>
+   590→                  <Loader2 className="h-4 w-4 animate-spin" />
+   591→                  Submitting...
+   592→                </>
+   593→              ) : (
+   594→                <>
+   595→                  <Check className="h-4 w-4" />
+   596→                  Submit Survey / Galchi
+   597→                </>
+   598→              )}
+   599→            </Button>
+   600→          )}
+   601→        </div>
+   602→      </form>
+   603→    </div>
+   604→  );
+   605→}
+   606→
