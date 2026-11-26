@@ -2,6 +2,13 @@ import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseSexCounts } from '@/lib/sex-counts';
 
+/** Parse an approval date ('YYYY-MM-DD' from the date input) — null when empty/invalid. */
+function toDate(v: unknown): Date | null {
+  if (v == null || v === '') return null;
+  const d = new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 // GET /api/industries/[id]
 export async function GET(
   _request: NextRequest,
@@ -88,6 +95,11 @@ export async function PUT(
         hasEmp: body.hasEmp != null
           ? (body.hasEmp === true || body.hasEmp === 'true' || body.hasEmp === 'yes' || body.hasEmp === 1)
           : existing.hasEmp,
+        eiaApprovalDate: body.eiaApprovalDate !== undefined ? toDate(body.eiaApprovalDate) : existing.eiaApprovalDate,
+        empApprovalDate: body.empApprovalDate !== undefined ? toDate(body.empApprovalDate) : existing.empApprovalDate,
+        currentStatus: body.currentStatus === 'INACTIVE' || body.currentStatus === 'ACTIVE'
+          ? body.currentStatus
+          : existing.currentStatus,
         employeeCount: employees != null && Number.isFinite(employees) ? Math.round(employees) : existing.employeeCount,
         maleEmployees: maleEmployees,
         femaleEmployees: femaleEmployees,

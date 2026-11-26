@@ -9,6 +9,13 @@ function toBool(v: unknown): boolean {
   return v === true || v === 'true' || v === 'yes' || v === 1;
 }
 
+/** Parse an approval date ('YYYY-MM-DD' from the date input) — null when empty/invalid. */
+function toDate(v: unknown): Date | null {
+  if (v == null || v === '') return null;
+  const d = new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 // POST /api/industries — create an industry record
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +30,9 @@ export async function POST(request: NextRequest) {
       ownershipType,
       hasEia,
       hasEmp,
+      eiaApprovalDate,
+      empApprovalDate,
+      currentStatus,
       employeeCount,
       maleEmployees,
       femaleEmployees,
@@ -69,6 +79,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: sex.error }, { status: 400 });
     }
 
+    // Approval dates follow the questionnaire: a required EIA/EMP approval date
+    // must be present when the corresponding question is answered "Yes".
+    const eiaDate = toDate(eiaApprovalDate);
+    const empDate = toDate(empApprovalDate);
+    if (eiaDate == null && need('eiaApprovalDate') && toBool(hasEia)) {
+      return NextResponse.json({ error: 'EIA Date of Approval is required when EIA is Yes' }, { status: 400 });
+    }
+    if (empDate == null && need('empApprovalDate') && toBool(hasEmp)) {
+      return NextResponse.json({ error: 'EMP Date of Approval is required when EMP is Yes' }, { status: 400 });
+    }
+    const status = currentStatus === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
     // Validate Ethiopian phone number
     const phoneClean = String(contactPhone).replace(/[\s-]/g, '');
     const ethPhoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
@@ -92,6 +114,9 @@ export async function POST(request: NextRequest) {
         ownershipType,
         hasEia: toBool(hasEia),
         hasEmp: toBool(hasEmp),
+        eiaApprovalDate: eiaDate,
+        empApprovalDate: empDate,
+        currentStatus: status,
         employeeCount: Math.round(employees),
         maleEmployees: sex.male,
         femaleEmployees: sex.female,

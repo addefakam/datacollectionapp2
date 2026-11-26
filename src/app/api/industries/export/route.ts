@@ -32,7 +32,10 @@ export async function GET(request: NextRequest) {
       'License Number',
       'Ownership Type',
       'EIA (Environmental Impact Assessment)',
+      'EIA Date of Approval',
       'EMP (Environmental Management Plan)',
+      'EMP Date of Approval',
+      'Current Status',
       'Employee Count',
       'Male Employees',
       'Female Employees',
@@ -43,6 +46,8 @@ export async function GET(request: NextRequest) {
       'Date Collected',
     ];
 
+    const isoDate = (d: Date | null) => (d ? d.toISOString().split('T')[0] : '');
+
     const rows = industries.map((ind) => [
       ind.establishmentName,
       ind.sector,
@@ -52,7 +57,10 @@ export async function GET(request: NextRequest) {
       ind.licenseNumber || '',
       ind.ownershipType,
       ind.hasEia ? 'Yes' : 'No',
+      isoDate(ind.eiaApprovalDate),
       ind.hasEmp ? 'Yes' : 'No',
+      isoDate(ind.empApprovalDate),
+      ind.currentStatus === 'INACTIVE' ? 'Inactive' : 'Active',
       ind.employeeCount,
       ind.maleEmployees,
       ind.femaleEmployees,

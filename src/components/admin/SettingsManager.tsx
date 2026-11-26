@@ -403,7 +403,7 @@ function CategoriesSection() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to add');
-      toast({ title: 'Category added / Goossa dabalame' });
+      toast({ title: 'Sector added / Goossa dabalame' });
       setNewName('');
       await reload();
     } catch (err) {
@@ -431,7 +431,7 @@ function CategoriesSection() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
-      toast({ title: 'Category updated / Fooyyee\'eera' });
+      toast({ title: 'Sector updated / Fooyyee\'eera' });
       setEditTarget(null);
       await reload();
     } catch (err) {
@@ -454,8 +454,8 @@ function CategoriesSection() {
       toast({
         title:
           data.industriesAffected > 0
-            ? `Deleted. ${data.industriesAffected} existing record(s) still keep this category.`
-            : 'Category deleted / Balleessera',
+            ? `Deleted. ${data.industriesAffected} existing record(s) still keep this sector.`
+            : 'Sector deleted / Balleessera',
       });
       setDeleteTarget(null);
       await reload();
@@ -474,7 +474,7 @@ function CategoriesSection() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Factory className="h-4 w-4 text-teal-600" />
-          Industry Categories / Goossota Indastrii
+          Industry Sectors / Goossota Indastrii
         </CardTitle>
         <CardDescription>
           Sectors offered in the Industry Survey form and data filters.
@@ -487,7 +487,7 @@ function CategoriesSection() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && add()}
-            placeholder="New category / Goossa haaraa"
+            placeholder="New sector / Goossa haaraa"
           />
           <Button size="sm" onClick={add} disabled={adding} className="shrink-0">
             {adding ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
@@ -539,7 +539,7 @@ function CategoriesSection() {
       <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Edit Category / Goossa Sirreessuu</DialogTitle>
+            <DialogTitle>Edit Sector / Goossa Sirreessuu</DialogTitle>
           </DialogHeader>
           <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
           <DialogFooter>
@@ -558,7 +558,7 @@ function CategoriesSection() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete category?</AlertDialogTitle>
+            <AlertDialogTitle>Delete sector?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget?.name} will be removed from the selection lists. Existing survey
               records are not changed.
@@ -597,7 +597,7 @@ export default function SettingsManager() {
           </TabsTrigger>
           <TabsTrigger value="categories" className="gap-1.5">
             <Factory className="h-4 w-4" />
-            <span className="text-[11px] sm:text-sm">Categories</span>
+            <span className="text-[11px] sm:text-sm">Sectors</span>
           </TabsTrigger>
           <TabsTrigger value="survey" className="gap-1.5">
             <ClipboardList className="h-4 w-4" />

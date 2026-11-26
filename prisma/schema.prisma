@@ -110,6 +110,9 @@ model Industry {
   ownershipType     String
   hasEia            Boolean  @default(false) // Environmental Impact Assessment done
   hasEmp            Boolean  @default(false) // Environmental Management Plan prepared
+  eiaApprovalDate   DateTime? // Date the EIA was approved (when hasEia)
+  empApprovalDate   DateTime? // Date the EMP was approved (when hasEmp)
+  currentStatus     String   @default("ACTIVE") // ACTIVE or INACTIVE operational status
   employeeCount     Int      @default(0)
   maleEmployees     Int      @default(0) // employees by sex: male
   femaleEmployees   Int      @default(0) // employees by sex: female

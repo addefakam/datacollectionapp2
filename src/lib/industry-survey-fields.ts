@@ -19,6 +19,8 @@ export type IndustrySurveyInput =
   | 'number'
   | 'select'
   | 'radio-yesno'
+  | 'radio-status'
+  | 'date'
   | 'sex-pair';
 
 export interface IndustrySurveyFieldDef {
@@ -167,6 +169,16 @@ export const INDUSTRY_SURVEY_FIELDS: IndustrySurveyFieldDef[] = [
     requiredFixed: true, // yes/no always has an answer — required is meaningless
   },
   {
+    key: 'eiaApprovalDate',
+    step: 2,
+    labelEn: 'EIA Date of Approval',
+    labelOr: 'Guyyaa Mirkeenya EIA',
+    input: 'date',
+    required: false,
+    locked: false,
+    requiredFixed: false,
+  },
+  {
     key: 'hasEmp',
     step: 2,
     labelEn: 'EMP — Environmental Management Plan',
@@ -175,6 +187,26 @@ export const INDUSTRY_SURVEY_FIELDS: IndustrySurveyFieldDef[] = [
     required: false,
     locked: false,
     requiredFixed: true,
+  },
+  {
+    key: 'empApprovalDate',
+    step: 2,
+    labelEn: 'EMP Date of Approval',
+    labelOr: 'Guyyaa Mirkeenya EMP',
+    input: 'date',
+    required: false,
+    locked: false,
+    requiredFixed: false,
+  },
+  {
+    key: 'currentStatus',
+    step: 2,
+    labelEn: 'Current Status',
+    labelOr: 'Haala Ammaa',
+    input: 'radio-status',
+    required: false,
+    locked: false,
+    requiredFixed: true, // always answered — defaults to Active
   },
   // ---- Step 3: Contact ----
   {

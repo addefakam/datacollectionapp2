@@ -123,6 +123,9 @@ export default function IndustrySurveyForm({
     ownershipType: '',
     hasEia: 'no',
     hasEmp: 'no',
+    eiaApprovalDate: '',
+    empApprovalDate: '',
+    currentStatus: 'ACTIVE',
     employeeCount: '',
     maleEmployees: '',
     femaleEmployees: '',
@@ -261,6 +264,9 @@ export default function IndustrySurveyForm({
       startupCapital: formData.startupCapital === '' ? null : Number(formData.startupCapital),
       hasEia: formData.hasEia === 'yes',
       hasEmp: formData.hasEmp === 'yes',
+      eiaApprovalDate: formData.eiaApprovalDate || null,
+      empApprovalDate: formData.empApprovalDate || null,
+      currentStatus: formData.currentStatus,
       surveyorName,
       surveyorId,
     };
@@ -306,8 +312,9 @@ export default function IndustrySurveyForm({
     shown('specificAddress') && { label: label('specificAddress').en, value: formData.specificAddress },
     shown('licenseNumber') && { label: label('licenseNumber').en, value: formData.licenseNumber || '—' },
     shown('ownershipType') && { label: label('ownershipType').en, value: formData.ownershipType },
-    shown('hasEia') && { label: 'EIA (Environmental Impact Assessment)', value: formData.hasEia === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
-    shown('hasEmp') && { label: 'EMP (Environmental Management Plan)', value: formData.hasEmp === 'yes' ? 'Yes / Eyee' : 'No / Lakki' },
+    shown('hasEia') && { label: label('hasEia').en, value: formData.hasEia === 'yes' ? `Yes / Eyee${formData.eiaApprovalDate ? ` — ${formData.eiaApprovalDate}` : ''}` : 'No / Lakki' },
+    shown('hasEmp') && { label: label('hasEmp').en, value: formData.hasEmp === 'yes' ? `Yes / Eyee${formData.empApprovalDate ? ` — ${formData.empApprovalDate}` : ''}` : 'No / Lakki' },
+    shown('currentStatus') && { label: label('currentStatus').en, value: formData.currentStatus === 'ACTIVE' ? 'Active' : 'Inactive' },
     shown('employeeCount') && { label: label('employeeCount').en, value: formData.employeeCount },
     shown('employeeSex') && { label: label('employeeSex').en, value: `${formData.maleEmployees || '—'} / ${formData.femaleEmployees || '—'}` },
     shown('startupCapital') && { label: label('startupCapital').en, value: formData.startupCapital ? `${formData.startupCapital} ETB` : '—' },
@@ -484,6 +491,12 @@ export default function IndustrySurveyForm({
                             <Label htmlFor="eia-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
                           </div>
                         </RadioGroup>
+                        {formData.hasEia === 'yes' && shown('eiaApprovalDate') && (
+                          <div className="space-y-1.5">
+                            <FieldLabel id="eiaApprovalDate" en={label('eiaApprovalDate').en} or={label('eiaApprovalDate').or} required={req('eiaApprovalDate')} />
+                            <Input id="eiaApprovalDate" name="eiaApprovalDate" type="date" value={formData.eiaApprovalDate} onChange={handleChange} className="text-sm sm:text-base" />
+                          </div>
+                        )}
                       </div>
                     )}
                     {shown('hasEmp') && (
@@ -499,8 +512,30 @@ export default function IndustrySurveyForm({
                             <Label htmlFor="emp-no" className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
                           </div>
                         </RadioGroup>
+                        {formData.hasEmp === 'yes' && shown('empApprovalDate') && (
+                          <div className="space-y-1.5">
+                            <FieldLabel id="empApprovalDate" en={label('empApprovalDate').en} or={label('empApprovalDate').or} required={req('empApprovalDate')} />
+                            <Input id="empApprovalDate" name="empApprovalDate" type="date" value={formData.empApprovalDate} onChange={handleChange} className="text-sm sm:text-base" />
+                          </div>
+                        )}
                       </div>
                     )}
+                  </div>
+                )}
+                {/* Current operational status — Active / Inactive radio question */}
+                {shown('currentStatus') && (
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <FieldLabel id="status-active" en={label('currentStatus').en} or={label('currentStatus').or} required={req('currentStatus')} />
+                    <RadioGroup value={formData.currentStatus} onValueChange={(v) => handleSelectChange('currentStatus', v)} className="flex gap-4">
+                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-teal-500 has-data-[state=checked]:bg-teal-50">
+                        <RadioGroupItem value="ACTIVE" id="status-active" />
+                        <Label htmlFor="status-active" className="cursor-pointer text-xs sm:text-sm">Active</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-amber-500 has-data-[state=checked]:bg-amber-50">
+                        <RadioGroupItem value="INACTIVE" id="status-inactive" />
+                        <Label htmlFor="status-inactive" className="cursor-pointer text-xs sm:text-sm">Inactive</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                 )}
               </CardContent>

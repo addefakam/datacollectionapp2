@@ -52,11 +52,22 @@ export async function POST(request: NextRequest) {
       if (val.includes('ownership') || val.includes('gosa abbaa')) {
         headers.ownershipType = colNumber;
       }
+      // Approval-date and status columns must be matched BEFORE the yes/no
+      // headers — "EIA Date of Approval" also contains the word "EIA".
+      if (/(^|\W)eia(\W|$)/.test(val) && (val.includes('date') || val.includes('mirkeenya'))) {
+        headers.eiaApprovalDate = colNumber;
+      }
+      if (/(^|\W)emp(\W|$)/.test(val) && (val.includes('date') || val.includes('mirkeenya'))) {
+        headers.empApprovalDate = colNumber;
+      }
+      if (val.includes('status') || val.includes('haala')) {
+        headers.currentStatus = colNumber;
+      }
       // Word-boundary match so "Employee Count" is not mistaken for EMP
-      if (/(^|\W)eia(\W|$)/.test(val)) {
+      if (/(^|\W)eia(\W|$)/.test(val) && !val.includes('date') && !val.includes('mirkeenya')) {
         headers.hasEia = colNumber;
       }
-      if (/(^|\W)emp(\W|$)/.test(val) || val.includes('management plan')) {
+      if ((/(^|\W)emp(\W|$)/.test(val) || val.includes('management plan')) && !val.includes('date') && !val.includes('mirkeenya')) {
         headers.hasEmp = colNumber;
       }
       // Sex breakdown columns must be matched before the generic employee
@@ -92,6 +103,19 @@ export async function POST(request: NextRequest) {
     const phoneRegex = /^(\+251|251|0)?(9|7)\d{8}$/;
     // Yes/No cell values: Yes, Y, True, 1, Eyee
     const parseYesNo = (v: string) => /^(yes|y|true|1|eyee)$/.test(v.trim().toLowerCase());
+    // Status cell values: Active/Sochii → ACTIVE; Inactive/Cufame → INACTIVE; empty → default ACTIVE
+    const parseStatus = (v: string) => {
+      const s = v.trim().toLowerCase();
+      if (/^(inactive|in active|cufame|sochii hin jiru)$/.test(s)) return 'INACTIVE';
+      return 'ACTIVE';
+    };
+    // Date cell values: ExcelJS may give a Date object or a string
+    const parseDateCell = (raw: unknown): Date | null => {
+      if (raw == null || raw === '') return null;
+      if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+      const d = new Date(String(raw).trim());
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
     const results = { success: 0, failed: 0, errors: [] as string[] };
 
     // Read data rows (skip header)
@@ -113,6 +137,9 @@ export async function POST(request: NextRequest) {
       const ownershipType = getCell(headers.ownershipType!);
       const hasEia = headers.hasEia ? parseYesNo(getCell(headers.hasEia)) : false;
       const hasEmp = headers.hasEmp ? parseYesNo(getCell(headers.hasEmp)) : false;
+      const eiaApprovalDate = headers.eiaApprovalDate ? parseDateCell(row.getCell(headers.eiaApprovalDate).value) : null;
+      const empApprovalDate = headers.empApprovalDate ? parseDateCell(row.getCell(headers.empApprovalDate).value) : null;
+      const currentStatus = headers.currentStatus ? parseStatus(getCell(headers.currentStatus)) : 'ACTIVE';
       const employeeCount = getCell(headers.employeeCount!);
       const maleEmployees = headers.maleEmployees ? getCell(headers.maleEmployees) : '';
       const femaleEmployees = headers.femaleEmployees ? getCell(headers.femaleEmployees) : '';
@@ -162,6 +189,9 @@ export async function POST(request: NextRequest) {
             ownershipType,
             hasEia,
             hasEmp,
+            eiaApprovalDate,
+            empApprovalDate,
+            currentStatus,
             employeeCount: Math.round(employees),
             maleEmployees: sex.male,
             femaleEmployees: sex.female,

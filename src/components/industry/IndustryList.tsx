@@ -86,6 +86,9 @@ interface Industry {
   ownershipType: string;
   hasEia: boolean;
   hasEmp: boolean;
+  eiaApprovalDate: string | null;
+  empApprovalDate: string | null;
+  currentStatus: string;
   employeeCount: number;
   maleEmployees: number;
   femaleEmployees: number;
@@ -107,6 +110,9 @@ interface EditForm {
   ownershipType: string;
   hasEia: string;
   hasEmp: string;
+  eiaApprovalDate: string;
+  empApprovalDate: string;
+  currentStatus: string;
   employeeCount: string;
   maleEmployees: string;
   femaleEmployees: string;
@@ -131,6 +137,7 @@ const INDUSTRY_COLUMNS: ColumnDef[] = [
   { key: 'licenseNo', label: 'License No' },
   { key: 'ownership', label: 'Ownership' },
   { key: 'eia', label: 'EIA / EMP' },
+  { key: 'status', label: 'Status' },
   { key: 'employees', label: 'Employees' },
   { key: 'capital', label: 'Capital (ETB)' },
   { key: 'contact', label: 'Contact' },
@@ -228,6 +235,9 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
       ownershipType: item.ownershipType,
       hasEia: item.hasEia ? 'yes' : 'no',
       hasEmp: item.hasEmp ? 'yes' : 'no',
+      eiaApprovalDate: item.eiaApprovalDate ? item.eiaApprovalDate.slice(0, 10) : '',
+      empApprovalDate: item.empApprovalDate ? item.empApprovalDate.slice(0, 10) : '',
+      currentStatus: item.currentStatus === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
       employeeCount: String(item.employeeCount),
       maleEmployees: String(item.maleEmployees || ''),
       femaleEmployees: String(item.femaleEmployees || ''),
@@ -250,6 +260,9 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
         startupCapital: editForm.startupCapital === '' ? null : Number(editForm.startupCapital),
         hasEia: editForm.hasEia === 'yes',
         hasEmp: editForm.hasEmp === 'yes',
+        eiaApprovalDate: editForm.eiaApprovalDate || null,
+        empApprovalDate: editForm.empApprovalDate || null,
+        currentStatus: editForm.currentStatus,
       };
       const res = await fetch(`/api/industries/${editItem.id}`, {
         method: 'PUT',
@@ -435,6 +448,7 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                     {colVis.isVisible('licenseNo') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">License No</TableHead>)}
                     {colVis.isVisible('ownership') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Ownership</TableHead>)}
                     {colVis.isVisible('eia') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">EIA / EMP</TableHead>)}
+                    {colVis.isVisible('status') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Status</TableHead>)}
                     {colVis.isVisible('employees') && (<TableHead className="text-center font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Employees</TableHead>)}
                     {colVis.isVisible('capital') && (<TableHead className="text-right font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Capital (ETB)</TableHead>)}
                     {colVis.isVisible('contact') && (<TableHead className="font-semibold uppercase tracking-wider text-[10px] text-teal-900/60">Contact</TableHead>)}
@@ -470,6 +484,21 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                             <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EIA {item.hasEia ? '✓' : '✗'}</span>
                             <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>EMP {item.hasEmp ? '✓' : '✗'}</span>
                           </div>
+                          {(item.hasEia && item.eiaApprovalDate) || (item.hasEmp && item.empApprovalDate) ? (
+                            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                              {item.hasEia && item.eiaApprovalDate && <span>EIA {fmtDate(item.eiaApprovalDate)}</span>}
+                              {item.hasEia && item.eiaApprovalDate && item.hasEmp && item.empApprovalDate && <span> · </span>}
+                              {item.hasEmp && item.empApprovalDate && <span>EMP {fmtDate(item.empApprovalDate)}</span>}
+                            </p>
+                          ) : null}
+                        </TableCell>
+                      )}
+                      {colVis.isVisible('status') && (
+                        <TableCell className="whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.currentStatus === 'INACTIVE' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${item.currentStatus === 'INACTIVE' ? 'bg-amber-500' : 'bg-green-500'}`} />
+                            {item.currentStatus === 'INACTIVE' ? 'Inactive' : 'Active'}
+                          </span>
                         </TableCell>
                       )}
                       {colVis.isVisible('employees') && (
@@ -514,6 +543,10 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                         <Badge variant="outline" className="bg-teal-50 text-[10px] text-teal-700">{item.sector}</Badge>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${item.currentStatus === 'INACTIVE' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${item.currentStatus === 'INACTIVE' ? 'bg-amber-500' : 'bg-green-500'}`} />
+                          {item.currentStatus === 'INACTIVE' ? 'Inactive' : 'Active'}
+                        </span>
                         <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{item.subCity} — {item.area}</span>
                       </div>
                     </div>
@@ -545,13 +578,22 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                       <FileBadge className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                       <p className="truncate font-mono text-[11px] text-muted-foreground">{item.licenseNumber || '—'}</p>
                     </div>
-                    <div className="flex shrink-0 gap-1">
-                      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${item.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
-                        {item.hasEia ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EIA
-                      </span>
-                      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${item.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
-                        {item.hasEmp ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EMP
-                      </span>
+                    <div className="flex shrink-0 flex-col items-end gap-0.5">
+                      <div className="flex gap-1">
+                        <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${item.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                          {item.hasEia ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EIA
+                        </span>
+                        <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${item.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                          {item.hasEmp ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />} EMP
+                        </span>
+                      </div>
+                      {(item.hasEia && item.eiaApprovalDate) || (item.hasEmp && item.empApprovalDate) ? (
+                        <p className="text-[9px] leading-tight text-muted-foreground">
+                          {item.hasEia && item.eiaApprovalDate && <span>EIA {fmtDate(item.eiaApprovalDate)}</span>}
+                          {item.hasEia && item.eiaApprovalDate && item.hasEmp && item.empApprovalDate && <span> · </span>}
+                          {item.hasEmp && item.empApprovalDate && <span>EMP {fmtDate(item.empApprovalDate)}</span>}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -603,6 +645,9 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   <DialogTitle className="pr-8 text-lg font-bold text-white leading-tight">{viewItem.establishmentName}</DialogTitle>
                   <DialogDescription className="mt-1.5 flex flex-wrap items-center gap-1.5 text-teal-50 text-xs">
                     <span className="rounded-full bg-white/15 px-2 py-0.5 backdrop-blur-sm">{viewItem.sector}</span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 backdrop-blur-sm font-semibold ${viewItem.currentStatus === 'INACTIVE' ? 'bg-amber-400/25 text-amber-100' : 'bg-white/15'}`}>
+                      {viewItem.currentStatus === 'INACTIVE' ? 'Inactive' : 'Active'}
+                    </span>
                     <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{viewItem.area} &middot; {viewItem.subCity}</span>
                   </DialogDescription>
                 </DialogHeader>
@@ -672,14 +717,26 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                   <div className="rounded-lg border space-y-0 divide-y">
                     <div className="flex items-center justify-between px-3 py-2.5">
                       <span className="text-xs text-muted-foreground">EIA — Environmental Impact Assessment</span>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${viewItem.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {viewItem.hasEia ? <><Check className="h-3 w-3" /> Yes / Eyee</> : <><X className="h-3 w-3" /> No / Lakki</>}
+                      <span className="flex items-center gap-2">
+                        {viewItem.eiaApprovalDate && <span className="text-[10px] text-muted-foreground">{fmtDate(viewItem.eiaApprovalDate)}</span>}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${viewItem.hasEia ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {viewItem.hasEia ? <><Check className="h-3 w-3" /> Yes / Eyee</> : <><X className="h-3 w-3" /> No / Lakki</>}
+                        </span>
                       </span>
                     </div>
                     <div className="flex items-center justify-between px-3 py-2.5">
                       <span className="text-xs text-muted-foreground">EMP — Environmental Management Plan</span>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${viewItem.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {viewItem.hasEmp ? <><Check className="h-3 w-3" /> Yes / Eyee</> : <><X className="h-3 w-3" /> No / Lakki</>}
+                      <span className="flex items-center gap-2">
+                        {viewItem.empApprovalDate && <span className="text-[10px] text-muted-foreground">{fmtDate(viewItem.empApprovalDate)}</span>}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${viewItem.hasEmp ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {viewItem.hasEmp ? <><Check className="h-3 w-3" /> Yes / Eyee</> : <><X className="h-3 w-3" /> No / Lakki</>}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">Haala Ammaa / Current Status</span>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${viewItem.currentStatus === 'INACTIVE' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                        {viewItem.currentStatus === 'INACTIVE' ? 'Inactive' : 'Active'}
                       </span>
                     </div>
                   </div>
@@ -822,6 +879,12 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                         <SelectItem value="no">No / Lakki</SelectItem>
                       </SelectContent>
                     </Select>
+                    {editForm.hasEia === 'yes' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-eia-date" className="text-xs">EIA Date of Approval</Label>
+                        <Input id="edit-eia-date" type="date" value={editForm.eiaApprovalDate} onChange={(e) => setEditForm({ ...editForm, eiaApprovalDate: e.target.value })} className="text-sm" />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs">EMP — Management Plan</Label>
@@ -832,6 +895,25 @@ export default function IndustryList({ refreshTrigger }: IndustryListProps) {
                         <SelectItem value="no">No / Lakki</SelectItem>
                       </SelectContent>
                     </Select>
+                    {editForm.hasEmp === 'yes' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-emp-date" className="text-xs">EMP Date of Approval</Label>
+                        <Input id="edit-emp-date" type="date" value={editForm.empApprovalDate} onChange={(e) => setEditForm({ ...editForm, empApprovalDate: e.target.value })} className="text-sm" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Current Status / Haala Ammaa</Label>
+                  <div className="flex gap-2">
+                    <label className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${editForm.currentStatus === 'ACTIVE' ? 'border-teal-500 bg-teal-50 font-medium text-teal-800' : 'text-muted-foreground'}`}>
+                      <input type="radio" name="edit-current-status" value="ACTIVE" checked={editForm.currentStatus === 'ACTIVE'} onChange={() => setEditForm({ ...editForm, currentStatus: 'ACTIVE' })} className="accent-teal-700" />
+                      Active
+                    </label>
+                    <label className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${editForm.currentStatus === 'INACTIVE' ? 'border-amber-500 bg-amber-50 font-medium text-amber-800' : 'text-muted-foreground'}`}>
+                      <input type="radio" name="edit-current-status" value="INACTIVE" checked={editForm.currentStatus === 'INACTIVE'} onChange={() => setEditForm({ ...editForm, currentStatus: 'INACTIVE' })} className="accent-amber-600" />
+                      Inactive
+                    </label>
                   </div>
                 </div>
               </div>

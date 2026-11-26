@@ -109,25 +109,25 @@ goto_records() {
 # ---------- Industry -----------------------------------------------------------
 goto_records "Industry"
 s=$(table_state); echo "industry initial: $s"
-echo "$s" | rg -q '"headerCount":14' && ok "Industry table shows all 14 headers" || bad "Industry header count wrong ($s)"
+echo "$s" | rg -q '"headerCount":15' && ok "Industry table shows all 15 headers" || bad "Industry header count wrong ($s)"
 
 open_columns
 s=$(table_state); echo "industry menu: $s"
 echo "$s" | rg -q '"menuOpen":true'  && ok "Columns dropdown opens" || bad "Columns dropdown did not open ($s)"
-echo "$s" | rg -q '"colItems":12'    && ok "12 column rows listed" || bad "expected 12 column rows ($s)"
+echo "$s" | rg -q '"colItems":13'    && ok "13 column rows listed" || bad "expected 13 column rows ($s)"
 echo "$s" | rg -q '"unchecked":0'    && ok "all rows checked initially" || bad "some rows unchecked at start ($s)"
 
 click_col_row 5
 s=$(table_state); echo "after hide: $s"
-echo "$s" | rg -q '"headerCount":13' && ok "clicking a column row hides that column (14 → 13 headers)" || bad "row click did not hide a column ($s)"
+echo "$s" | rg -q '"headerCount":14' && ok "clicking a column row hides that column (15 → 14 headers)" || bad "row click did not hide a column ($s)"
 echo "$s" | rg -q '"menuOpen":true'  && ok "menu stays open after toggling" || bad "menu closed on toggle ($s)"
 echo "$s" | rg -q '"unchecked":1'    && ok "row indicator now unchecked" || bad "row indicator did not update ($s)"
-echo "$s" | rg -q '"badge":"11/12"'  && ok "button badge shows 11/12" || bad "badge missing/wrong ($s)"
+echo "$s" | rg -q '"badge":"12/13"'  && ok "button badge shows 12/13" || bad "badge missing/wrong ($s)"
 agent-browser screenshot "$SHOTS/columns-menu-one-hidden.png" > /dev/null 2>&1 || true
 
 click_col_row 5
 s=$(table_state); echo "after restore: $s"
-echo "$s" | rg -q '"headerCount":14' && ok "clicking again restores the column (13 → 14)" || bad "second click did not restore ($s)"
+echo "$s" | rg -q '"headerCount":15' && ok "clicking again restores the column (14 → 15)" || bad "second click did not restore ($s)"
 echo "$s" | rg -q '"unchecked":0'    && ok "row indicator back to checked" || bad "indicator stuck unchecked ($s)"
 
 # Show all item is the last menuitem
@@ -135,18 +135,18 @@ pointer_seq "(() => { const m = document.querySelector('[role=\"menu\"]'); if (!
 sleep 1
 s=$(table_state); echo "after show-all: $s"
 echo "$s" | rg -q '"menuOpen":false' && ok "'Show all' closes the menu" || bad "menu did not close after Show all ($s)"
-echo "$s" | rg -q '"headerCount":14' && ok "'Show all' leaves every column visible" || bad "Show all broke visibility ($s)"
+echo "$s" | rg -q '"headerCount":15' && ok "'Show all' leaves every column visible" || bad "Show all broke visibility ($s)"
 
 # hide two more (menu stays open between toggles), then reload page → persistence
 open_columns
 click_col_row 2
 click_col_row 3
 s=$(table_state); echo "two hidden: $s"
-echo "$s" | rg -q '"headerCount":12' && ok "two columns hidden (14 → 12)" || bad "double hide failed ($s)"
+echo "$s" | rg -q '"headerCount":13' && ok "two columns hidden (15 → 13)" || bad "double hide failed ($s)"
 agent-browser open "$BASE/"; agent-browser wait --load networkidle; sleep 3
 goto_records "Industry"
 s=$(table_state); echo "after reload: $s"
-echo "$s" | rg -q '"headerCount":12' && ok "hidden set persists across reload (localStorage)" || bad "persistence failed ($s)"
+echo "$s" | rg -q '"headerCount":13' && ok "hidden set persists across reload (localStorage)" || bad "persistence failed ($s)"
 pointer_seq "Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Columns'))"; sleep 1
 pointer_seq "(() => { const m = document.querySelector('[role=\"menu\"]'); if (!m) return null; const it = Array.from(m.querySelectorAll('[role^=\"menuitem\"]')); return it[it.length - 1] || null; })()"
 sleep 1
