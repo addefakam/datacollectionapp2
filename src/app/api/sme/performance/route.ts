@@ -11,7 +11,12 @@ import {
   type SmeStatus,
   type SmeUnitStatus,
 } from '@/lib/sme';
-import { smeRegisteredInPeriod, smeScopeStanding } from '@/lib/sme-server';
+import {
+  loadSmeTargetsForPeriod,
+  smeRegisteredInPeriod,
+  smeScopeStanding,
+  smeTargetScopeKey,
+} from '@/lib/sme-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,27 +85,24 @@ export async function GET(request: NextRequest) {
 
     // ------------------------------------------------------------------
     // ACTIVE targets for the period at the row level (and the CITY-level
-    // target when showing the city overview).
+    // target when showing the city overview). Periods are matched by
+    // overlap — not exact datetime equality — so targets still resolve when
+    // the server timezone differs from the one used when the target was
+    // created (exact matching zeroed every row: "Target 0, Registered 1").
     // ------------------------------------------------------------------
-    const targetWhere = {
-      status: 'ACTIVE' as const,
+    const targetByScope = await loadSmeTargetsForPeriod(
+      scopeLevel === 'city' ? 'SUB_CITY' : 'WOREDA',
       periodType,
-      periodStart: start,
-      periodEnd: end,
-      level: scopeLevel === 'city' ? 'SUB_CITY' : 'WOREDA',
-    };
-    const targets = await db.smeTarget.findMany({ where: targetWhere });
-    const targetByScope = new Map<string, number>();
-    for (const t of targets) {
-      const key = scopeLevel === 'city' ? t.subCity : `${t.subCity}||${t.area}`;
-      targetByScope.set(key, (targetByScope.get(key) ?? 0) + t.targetValue);
-    }
+      start,
+      end
+    );
+    const targetOf = (subCity: string, area: string) =>
+      targetByScope.get(smeTargetScopeKey(subCity, area))?.targetValue ?? 0;
 
     let cityTarget: number | null = null;
     if (scopeLevel === 'city') {
-      const cityGoal = await db.smeTarget.findFirst({
-        where: { status: 'ACTIVE', level: 'CITY', periodType, periodStart: start },
-      });
+      const cityGoals = await loadSmeTargetsForPeriod('CITY', periodType, start, end);
+      const cityGoal = cityGoals.get(smeTargetScopeKey('', ''));
       cityTarget = cityGoal ? cityGoal.targetValue : null;
     }
 
@@ -109,7 +111,7 @@ export async function GET(request: NextRequest) {
     // ------------------------------------------------------------------
     const rows = await Promise.all(
       units.map(async (u) => {
-        const target = targetByScope.get(scopeLevel === 'city' ? u.subCity : `${u.subCity}||${u.area}`) ?? 0;
+        const target = targetOf(u.subCity, u.area);
         const [actual, standing] = await Promise.all([
           smeRegisteredInPeriod(u.subCity, u.area || undefined, start, end),
           smeScopeStanding(u.subCity, u.area || undefined),

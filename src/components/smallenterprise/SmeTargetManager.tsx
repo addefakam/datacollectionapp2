@@ -839,8 +839,8 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
                             <YAxis tick={{ fontSize: 10, fill: '#134e4a' }} allowDecimals={false} />
                             <Tooltip contentStyle={chartTooltipStyle} />
                             <Legend wrapperStyle={{ fontSize: 11 }} />
-                            <Bar dataKey="Target" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={20} />
-                            <Bar dataKey="Registered" fill="#0d9488" radius={[6, 6, 0, 0]} barSize={20} />
+                            <Bar dataKey="Target" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={20} isAnimationActive={false} />
+                            <Bar dataKey="Registered" fill="#0d9488" radius={[6, 6, 0, 0]} barSize={20} isAnimationActive={false} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -857,6 +857,7 @@ export default function SmeTargetManager({ refreshTrigger }: SmeTargetManagerPro
                             <Legend wrapperStyle={{ fontSize: 11 }} />
                             {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
                               <Bar
+                              isAnimationActive={false}
                                 key={s}
                                 dataKey={SME_STATUS_META[s].label}
                                 stackId="pipe"

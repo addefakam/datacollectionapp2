@@ -307,6 +307,18 @@ export default function SmePerformanceDashboard() {
   }
 
   const isCityOverview = data.scope.level === 'city';
+
+  // City overview: when the city-wide goal exists but has not been distributed
+  // to sub-cities yet, the per-row targets sum to 0. Read the KPI cards
+  // against the city-wide goal so the page stays internally consistent —
+  // a "No Target Set 0" card next to a footnote reading "City-wide target: N"
+  // is exactly the kind of contradiction this dashboard must not show.
+  const cityGoalOnly =
+    isCityOverview && data.kpis.totalTarget === 0 && data.cityTarget != null && data.cityTarget > 0;
+  const effectiveTarget = cityGoalOnly ? (data.cityTarget as number) : data.kpis.totalTarget;
+  const effectiveAchievement =
+    effectiveTarget > 0 ? Math.round((data.kpis.totalRegistered / effectiveTarget) * 1000) / 10 : 0;
+
   const targetChartData = data.rows.map((r) => ({
     label: r.label,
     Target: r.target,
@@ -593,9 +605,9 @@ export default function SmePerformanceDashboard() {
 
       {/* ============ KPI cards ============ */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <KpiCard icon={<Target className="h-4 w-4" />} label={data.kpis.totalTarget > 0 ? 'Assigned Target' : 'No Target Set'} value={fmt(data.kpis.totalTarget)} sub="enterprises to establish" />
+        <KpiCard icon={<Target className="h-4 w-4" />} label={effectiveTarget > 0 ? 'Assigned Target' : 'No Target Set'} value={fmt(effectiveTarget)} sub={cityGoalOnly ? 'city-wide goal — not yet distributed' : 'enterprises to establish'} />
         <KpiCard icon={<Store className="h-4 w-4" />} label="Registered" value={fmt(data.kpis.totalRegistered)} sub={`in ${data.period.label.toLowerCase()}`} onClick={() => openKpiPanel('registered')} title="Click to view the registered records" />
-        <KpiCard icon={<Gauge className="h-4 w-4" />} label="Achievement" value={`${data.kpis.achievementPct}%`} sub="of assigned targets" highlight={data.kpis.achievementPct >= 100 ? 'emerald' : data.kpis.achievementPct >= 60 ? 'teal' : 'red'} onClick={() => openKpiPanel('achievement')} title="Click to view achievement per unit" />
+        <KpiCard icon={<Gauge className="h-4 w-4" />} label="Achievement" value={`${effectiveAchievement}%`} sub="of assigned targets" highlight={effectiveAchievement >= 100 ? 'emerald' : effectiveAchievement >= 60 ? 'teal' : 'red'} onClick={() => openKpiPanel('achievement')} title="Click to view achievement per unit" />
         <KpiCard icon={<Clock className="h-4 w-4" />} label="Pending SMEs" value={fmt(data.kpis.pending)} sub="not yet operational" onClick={() => openKpiPanel('pending')} title="Click to view the pending records" />
         <KpiCard icon={<CheckCircle2 className="h-4 w-4" />} label="Operational" value={fmt(data.kpis.operational)} sub={`${data.kpis.operationalRate}% of standing`} highlight="emerald" onClick={() => openKpiPanel('operational')} title="Click to view the operational records" />
         <KpiCard icon={<Users className="h-4 w-4" />} label="Members" value={fmt(data.kpis.members)} sub={`avg ${fmt(data.kpis.avgMembers)} per SME · F ${fmt(data.kpis.femaleMembers)}`} />
@@ -674,7 +686,7 @@ export default function SmePerformanceDashboard() {
         </Card>
       )}
 
-      {data.kpis.standingTotal === 0 && data.kpis.totalTarget === 0 ? (
+      {data.kpis.standingTotal === 0 && effectiveTarget === 0 ? (
         <Card className="rounded-2xl border-teal-100">
           <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
             <Store className="h-10 w-10 text-teal-300" />
@@ -704,6 +716,7 @@ export default function SmePerformanceDashboard() {
                       <Tooltip contentStyle={chartTooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar
+                          isAnimationActive={false}
                         dataKey="Target"
                         fill="#f59e0b"
                         radius={[6, 6, 0, 0]}
@@ -712,6 +725,7 @@ export default function SmePerformanceDashboard() {
                         onClick={(entry: { payload?: { subCity: string; area: string } }) => selectChartRow(entry)}
                       />
                       <Bar
+                          isAnimationActive={false}
                         dataKey="Registered"
                         fill="#0d9488"
                         radius={[6, 6, 0, 0]}
@@ -755,6 +769,7 @@ export default function SmePerformanceDashboard() {
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
                         <Bar
+                          isAnimationActive={false}
                           key={s}
                           dataKey={SME_STATUS_META[s].label}
                           stackId="pipe"
@@ -805,6 +820,7 @@ export default function SmePerformanceDashboard() {
                           <Legend wrapperStyle={{ fontSize: 11 }} />
                           {(['REGISTERED', 'FULLY_LEGALIZED', 'AWAITING_OPERATION', 'OPERATIONAL'] as SmeStatus[]).map((s) => (
                             <Bar
+                          isAnimationActive={false}
                               key={s}
                               dataKey={SME_STATUS_META[s].label}
                               stackId="type"

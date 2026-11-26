@@ -32,14 +32,17 @@ export async function GET(request: NextRequest) {
     if (area) where.area = area;
     const periodType = searchParams.get('periodType');
     if (periodType && isSmePeriodType(periodType)) where.periodType = periodType;
-    // Exact period match when both periodType + ref are given
+    // Exact period match when both periodType + ref are given — matched by
+    // overlap (same-type periods of the same length overlap only when they
+    // are the same logical period), so stored boundaries computed under a
+    // different server timezone still resolve instead of listing nothing.
     const refStr = searchParams.get('ref');
     if (refStr && periodType && isSmePeriodType(periodType)) {
       const ref = new Date(refStr);
       if (!Number.isNaN(ref.getTime())) {
         const { start, end } = smePeriodRange(periodType, ref);
-        where.periodStart = start;
-        where.periodEnd = end;
+        where.periodStart = { lte: end };
+        where.periodEnd = { gte: start };
       }
     }
 
@@ -127,7 +130,9 @@ export async function POST(request: NextRequest) {
     }
     const { start, end } = smePeriodRange(periodType, ref);
 
-    // No duplicate ACTIVE target for the same scope & period
+    // No duplicate ACTIVE target for the same scope & logical period —
+    // overlap-based, so a row stored under drifted (timezone-shifted)
+    // boundaries still blocks a second target for the same period.
     const duplicate = await db.smeTarget.findFirst({
       where: {
         status: 'ACTIVE',
@@ -135,7 +140,8 @@ export async function POST(request: NextRequest) {
         subCity: scopeSubCity,
         area: scopeArea,
         periodType,
-        periodStart: start,
+        periodStart: { lte: end },
+        periodEnd: { gte: start },
       },
     });
     if (duplicate) {
