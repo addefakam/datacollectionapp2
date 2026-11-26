@@ -385,14 +385,11 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* Small Enterprise manage workspace: performance dashboard + survey
-              questionnaire — records live in their own Records tab (admin) */}
+          {/* Small Enterprise manage workspace: survey questionnaire only —
+              performance dashboard lives in its own tab, records in Records */}
           {isAdmin && (
             <TabsContent value="mseManage" className="mt-2 sm:mt-3">
-              <div className="space-y-4">
-                <SmePerformanceDashboard />
-                <SurveyQuestionsSection sector="small-enterprise" />
-              </div>
+              <SurveyQuestionsSection sector="small-enterprise" />
             </TabsContent>
           )}
 
