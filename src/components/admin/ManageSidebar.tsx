@@ -176,7 +176,8 @@ interface SidebarNavProps {
   isAdmin: boolean;
 }
 
-/** Vertical list of ALL management pages — collapsible, folded at load.
+/** Vertical list of ALL management pages — collapsible, fully folded at load:
+ *  no group opens by itself, fading hairlines separate the tabs.
  *  Sector modules sit directly under the sidebar; initiative modules (e.g. Small
  *  Enterprise) are listed inside the expandable "Initiatives" tab — expanding it
  *  shows the initiatives, each unfolding to its Survey/Records/Stats/Goals pages.
@@ -192,18 +193,20 @@ export function SidebarNav({ activeTab, onSelect, isAdmin }: SidebarNavProps) {
     .filter((g) => g.section !== 'initiatives')
     .find((g) => g.items.some((i) => i.tab === activeTab))?.key;
 
-  // Start folded: at load only the active tab's own path is open, everything
-  // else (including the Initiatives tab) stays collapsed until clicked.
-  const [openGroups, setOpenGroups] = React.useState<string[]>(() =>
-    activeModuleKey ? ['initiatives'] : activePlainGroup ? [activePlainGroup] : []
-  );
-  const [openModules, setOpenModules] = React.useState<string[]>(() =>
-    activeModuleKey ? [activeModuleKey] : []
-  );
+  // At load time nothing is unfolded — every group starts collapsed until the
+  // user opens it, no matter which page is currently active.
+  const [openGroups, setOpenGroups] = React.useState<string[]>([]);
+  const [openModules, setOpenModules] = React.useState<string[]>([]);
 
-  // When navigation lands inside a folded area, unfold exactly that path.
-  // Runs only when the destination changes, so manual collapsing still sticks.
+  // After load, navigation that lands inside a folded area unfolds exactly that
+  // path. The first run is skipped so loading never opens a group; afterwards it
+  // runs only when the destination changes, so manual collapsing still sticks.
+  const mountedRef = React.useRef(false);
   React.useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
     if (activeModuleKey) {
       setOpenGroups((prev) => (prev.includes('initiatives') ? prev : [...prev, 'initiatives']));
       setOpenModules((prev) => (prev.includes(activeModuleKey) ? prev : [...prev, activeModuleKey]));
@@ -270,7 +273,7 @@ export function SidebarNav({ activeTab, onSelect, isAdmin }: SidebarNavProps) {
   };
 
   return (
-    <Accordion type="multiple" value={openGroups} onValueChange={setOpenGroups} className="w-full">
+    <Accordion type="multiple" value={openGroups} onValueChange={setOpenGroups} className="sidebar-nav w-full">
       {dataGroups.length > 0 && (
         <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800/45">
           {DATA_SECTION_LABEL}
@@ -437,7 +440,7 @@ interface MobileSidebarProps {
 /** Mobile/tablet (<lg): hamburger in the header opens the same vertical list as a drawer. */
 export function MobileSidebar({ activeTab, onSelect, isAdmin }: MobileSidebarProps) {
   const [open, setOpen] = React.useState(false);
-  // Remount on open so every group is expanded again
+  // Remount on open so the nav always starts fully folded again
   const [menuEpoch, setMenuEpoch] = React.useState(0);
 
   return (
