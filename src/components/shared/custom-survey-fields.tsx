@@ -13,10 +13,10 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -25,26 +25,84 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { SurveyFieldConfig, SurveySectorId } from '@/lib/survey-fields';
+import {
+  QuestionCard,
+  SegmentedYesNo,
+  surveyInputClass,
+  surveySelectClass,
+} from '@/components/shared/survey-ui';
 
-/** Bilingual label of one custom question with the required star. */
-export function CustomQuestionLabel({
-  id,
-  field,
-}: {
-  id: string;
-  field: SurveyFieldConfig;
-}) {
+const CUSTOM_INPUT_TITLES: Record<string, string> = {
+  text: 'Short answer',
+  number: 'Number',
+  textarea: 'Paragraph',
+  select: 'Choice list',
+  'radio-yesno': 'Yes / No',
+};
+
+/** Small quiet chip naming the answer type of an admin-added question. */
+function AnswerTypeBadge({ input }: { input: string }) {
   return (
-    <Label htmlFor={id} className="text-xs sm:text-sm">
-      {field.labelEn}
-      {field.labelOr ? (
-        <>
-          <br />
-          <span className="text-xs font-normal text-muted-foreground">{field.labelOr}</span>
-        </>
-      ) : null}
-      {field.required ? <span className="text-red-500"> *</span> : null}
-    </Label>
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-teal-700 ring-1 ring-teal-600/15">
+      <Sparkles className="h-2.5 w-2.5" />
+      {CUSTOM_INPUT_TITLES[input] ?? 'Custom'}
+    </span>
+  );
+}
+
+/**
+ * Input control of one custom question, styled with the elegant survey kit.
+ * Label-less — the caller renders the bilingual label (QuestionCard or
+ * CustomQuestionLabel).
+ */
+export function CustomQuestionControl({
+  field,
+  value,
+  onChange,
+  id,
+}: {
+  field: SurveyFieldConfig;
+  value: string;
+  onChange: (v: string) => void;
+  id: string;
+}) {
+  if (field.input === 'textarea') {
+    return (
+      <Textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        className="rounded-xl border-emerald-900/10 bg-white text-sm shadow-none transition-colors placeholder:text-slate-400 focus-visible:border-emerald-600/50 focus-visible:ring-emerald-600/20 sm:text-base"
+      />
+    );
+  }
+  if (field.input === 'select') {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id} className={surveySelectClass}>
+          <SelectValue placeholder="Select / Filadhu" />
+        </SelectTrigger>
+        <SelectContent className="max-h-64">
+          {(field.options ?? []).map((o) => (
+            <SelectItem key={o} value={o}>{o}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+  if (field.input === 'radio-yesno') {
+    return <SegmentedYesNo id={id} value={value} onChange={onChange} />;
+  }
+  return (
+    <Input
+      id={id}
+      type={field.input === 'number' ? 'number' : 'text'}
+      min={field.input === 'number' ? '0' : undefined}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={surveyInputClass}
+    />
   );
 }
 
@@ -65,38 +123,15 @@ export function CustomQuestionField({
 }) {
   const id = `${idPrefix}-${field.key}`;
   return (
-    <div key={field.key} data-custom-key={field.key} className="space-y-1.5 sm:space-y-2">
-      <CustomQuestionLabel id={id} field={field} />
-      {field.input === 'textarea' ? (
-        <Textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} rows={3} className="text-sm sm:text-base" />
-      ) : field.input === 'select' ? (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger id={id} className="text-sm sm:text-base"><SelectValue placeholder="Select / Filadhu" /></SelectTrigger>
-          <SelectContent className="max-h-64">
-            {(field.options ?? []).map((o) => (<SelectItem key={o} value={o}>{o}</SelectItem>))}
-          </SelectContent>
-        </Select>
-      ) : field.input === 'radio-yesno' ? (
-        <RadioGroup value={value} onValueChange={onChange} className="flex gap-4">
-          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-amber-500 has-data-[state=checked]:bg-amber-50">
-            <RadioGroupItem value="yes" id={`${id}-yes`} />
-            <Label htmlFor={`${id}-yes`} className="cursor-pointer text-xs sm:text-sm">Yes / Eyee</Label>
-          </div>
-          <div className="flex items-center space-x-2 rounded-lg border px-3 py-2 has-data-[state=checked]:border-amber-500 has-data-[state=checked]:bg-amber-50">
-            <RadioGroupItem value="no" id={`${id}-no`} />
-            <Label htmlFor={`${id}-no`} className="cursor-pointer text-xs sm:text-sm">No / Lakki</Label>
-          </div>
-        </RadioGroup>
-      ) : (
-        <Input
-          id={id}
-          type={field.input === 'number' ? 'number' : 'text'}
-          min={field.input === 'number' ? '0' : undefined}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="text-sm sm:text-base"
-        />
-      )}
+    <div key={field.key} data-custom-key={field.key}>
+      <QuestionCard
+        en={field.labelEn}
+        or={field.labelOr}
+        required={field.required}
+        badge={field.input ? <AnswerTypeBadge input={field.input} /> : undefined}
+      >
+        <CustomQuestionControl field={field} value={value} onChange={onChange} id={id} />
+      </QuestionCard>
     </div>
   );
 }
@@ -201,24 +236,34 @@ export function CustomQuestionViewRows({
   const orphans = Object.entries(answers ?? {}).filter(([k]) => !fields.some((f) => f.key === k));
   if (fields.length === 0 && orphans.length === 0) return null;
   return (
-    <div>
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <div className="h-1 w-1 rounded-full bg-teal-500" />
-        <h4 className="text-xs font-bold text-teal-700 uppercase tracking-wide">
+    <div data-slot="survey-custom-view">
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500" />
+        <h4 className="text-xs font-bold uppercase tracking-wide text-teal-700">
           Additional Questions / Gaaffii Dabalataa
         </h4>
       </div>
-      <div className="rounded-lg border space-y-0 divide-y">
-        {fields.map((f) => (
-          <div key={f.key} data-custom-key={f.key} className="flex items-center justify-between gap-2 px-3 py-2.5">
-            <span className="text-xs text-muted-foreground">{f.labelEn}</span>
-            <span className="text-sm font-semibold text-right">{answers?.[f.key] || '-'}</span>
+      <div className="overflow-hidden rounded-xl border border-emerald-900/[0.08] bg-white">
+        {fields.map((f, i) => (
+          <div
+            key={f.key}
+            data-custom-key={f.key}
+            className={`flex items-center justify-between gap-2 px-3 py-2.5 ${i > 0 ? 'border-t border-emerald-900/[0.06]' : ''}`}
+          >
+            <span className="text-xs text-slate-500">
+              {f.labelEn}
+              {f.labelOr ? <span className="text-slate-400"> · {f.labelOr}</span> : null}
+            </span>
+            <span className="text-right text-sm font-semibold text-slate-800">{answers?.[f.key] || '-'}</span>
           </div>
         ))}
-        {orphans.map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between gap-2 px-3 py-2.5">
-            <span className="text-xs text-muted-foreground">{k}</span>
-            <span className="text-sm font-semibold text-right">{v || '-'}</span>
+        {orphans.map(([k, v], i) => (
+          <div
+            key={k}
+            className={`flex items-center justify-between gap-2 px-3 py-2.5 ${fields.length + i > 0 ? 'border-t border-emerald-900/[0.06]' : ''}`}
+          >
+            <span className="text-xs text-slate-400">{k}</span>
+            <span className="text-right text-sm font-semibold text-slate-800">{v || '-'}</span>
           </div>
         ))}
       </div>
@@ -242,8 +287,8 @@ export function CustomQuestionEditFields({
   if (fields.length === 0) return null;
   const set = (key: string, v: string) => onChange({ ...value, [key]: v });
   return (
-    <>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/60">
+    <div className="space-y-3" data-slot="survey-custom-edit">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-700">
         Additional Questions / Gaaffii Dabalataa
       </p>
       {fields.map((f) => {
@@ -251,10 +296,10 @@ export function CustomQuestionEditFields({
         const val = value[f.key] ?? '';
         return (
           <div key={f.key} data-custom-key={f.key} className="space-y-1.5">
-            <Label htmlFor={id} className="text-xs">
+            <Label htmlFor={id} className="text-xs font-medium text-slate-700">
               {f.labelEn}
-              {f.labelOr ? ` / ${f.labelOr}` : ''}
-              {f.required ? <span className="text-red-500"> *</span> : null}
+              {f.labelOr ? <span className="font-normal text-slate-400"> · {f.labelOr}</span> : ''}
+              {f.required ? <span className="ml-0.5 text-rose-500">*</span> : null}
             </Label>
             {f.input === 'textarea' ? (
               <Textarea id={id} rows={2} value={val} onChange={(e) => set(f.key, e.target.value)} className="text-sm" />
@@ -286,6 +331,6 @@ export function CustomQuestionEditFields({
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
