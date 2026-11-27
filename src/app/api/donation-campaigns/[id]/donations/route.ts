@@ -121,7 +121,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({
       data: donations.map((d) => ({
         ...d,
-        departmentName: d.department.name,
+        // defensive: an orphaned entry must never break the entries list
+        departmentName: d.department?.name ?? 'Unlisted office',
         department: undefined,
         reportDate: d.reportDate.toISOString(),
         createdAt: d.createdAt.toISOString(),

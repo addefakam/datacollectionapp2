@@ -40,7 +40,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       id: a.id,
       campaignId: a.campaignId,
       departmentId: a.departmentId,
-      departmentName: a.department.name,
+      // defensive: an orphaned assignment must never break the campaign detail
+      departmentName: a.department?.name ?? 'Unlisted office',
       minimumAmount: a.minimumAmount,
       note: a.note,
     }));
@@ -48,7 +49,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       id: d.id,
       campaignId: d.campaignId,
       departmentId: d.departmentId,
-      departmentName: d.department.name,
+      departmentName: d.department?.name ?? 'Unlisted office',
       reportDate: d.reportDate.toISOString(),
       cashAmount: d.cashAmount,
       inKindValue: d.inKindValue,

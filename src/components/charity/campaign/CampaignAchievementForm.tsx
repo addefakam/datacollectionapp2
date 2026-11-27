@@ -8,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -30,6 +32,7 @@ import {
   Users,
   StickyNote,
   CircleCheck,
+  CircleAlert,
   Clock,
   Trash2,
   Info,
@@ -54,6 +57,11 @@ interface EntryRow {
   reportedByName: string | null;
 }
 
+interface DepartmentOption {
+  id: string;
+  name: string;
+}
+
 interface CampaignAchievementFormProps {
   onSubmit: () => void;
   userName: string;
@@ -69,6 +77,7 @@ function localToday(): string {
 export default function CampaignAchievementForm({ onSubmit, userName, isAdmin }: CampaignAchievementFormProps) {
   const { toast } = useToast();
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [campaignId, setCampaignId] = useState('');
@@ -85,10 +94,19 @@ export default function CampaignAchievementForm({ onSubmit, userName, isAdmin }:
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/donation-campaigns');
-      const d = res.ok ? await res.json() : { data: [] };
-      const list: CampaignRow[] = Array.isArray(d.data) ? d.data : [];
+      // departments feed the office fallback — a campaign without a
+      // distribution must still let every office record what it received
+      const [c, d] = await Promise.all([
+        fetch('/api/donation-campaigns').then((r) => (r.ok ? r.json() : { data: [] })),
+        fetch('/api/departments').then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const list: CampaignRow[] = Array.isArray(c.data) ? c.data : [];
       setCampaigns(list);
+      setDepartments(
+        Array.isArray(d)
+          ? d.filter((x: DepartmentOption | null) => x && x.id && x.name).map((x: DepartmentOption) => ({ id: x.id, name: x.name }))
+          : []
+      );
     } catch {
       setCampaigns([]);
     } finally {
@@ -106,6 +124,16 @@ export default function CampaignAchievementForm({ onSubmit, userName, isAdmin }:
     () => campaign?.analysis.offices.find((o) => o.departmentId === officeId) ?? null,
     [campaign, officeId]
   );
+
+  // office picker groups: assigned offices keep their distributed minimum;
+  // every other registered office is still selectable ("no minimum set") so
+  // recording NEVER gets stuck — even for a campaign without a distribution
+  const officeGroups = useMemo(() => {
+    if (!campaign) return null;
+    const assignedIds = new Set(campaign.assignments.map((a) => a.departmentId));
+    const others = departments.filter((d) => !assignedIds.has(d.id));
+    return { assignments: campaign.assignments, others };
+  }, [campaign, departments]);
 
   // entries of the selected office within the selected campaign
   const loadEntries = useCallback(async (cid: string, deptId: string) => {
@@ -292,40 +320,86 @@ export default function CampaignAchievementForm({ onSubmit, userName, isAdmin }:
 
           {campaign && (
             <>
-              {/* office picker from the distribution */}
+              {/* office picker: distribution first, every other office as fallback */}
               <div className="space-y-1.5 sm:space-y-2">
                 <Label className="text-xs sm:text-sm">Office that received the donations <span className="text-red-500">*</span></Label>
+                {campaign.assignments.length === 0 && (
+                  <p className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
+                    <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      This campaign has no office distribution yet — the coordination office can set minimums under &ldquo;Set Goal &amp; Distribute&rdquo;.
+                      You can still record which office received the donations; its entries count toward the campaign total as &ldquo;no minimum set&rdquo;.
+                    </span>
+                  </p>
+                )}
                 <Select value={officeId} onValueChange={setOfficeId}>
                   <SelectTrigger className="text-sm sm:text-base">
                     <SelectValue placeholder="Select office" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {campaign.assignments.map((a) => (
-                      <SelectItem key={a.departmentId} value={a.departmentId}>
-                        {a.departmentName} — minimum {money(a.minimumAmount, campaign.currency)}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-72">
+                    {officeGroups && officeGroups.assignments.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                          Assigned offices — minimum to collect
+                        </SelectLabel>
+                        {officeGroups.assignments.map((a) => (
+                          <SelectItem key={a.departmentId} value={a.departmentId}>
+                            {a.departmentName} — minimum {money(a.minimumAmount, campaign.currency)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {officeGroups && officeGroups.others.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                          {officeGroups.assignments.length > 0 ? 'Other offices — no minimum set' : 'Offices'}
+                        </SelectLabel>
+                        {officeGroups.others.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name} — no minimum set
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {officeGroups && officeGroups.assignments.length === 0 && officeGroups.others.length === 0 && (
+                      <SelectLabel className="text-xs font-normal text-muted-foreground">
+                        No offices registered yet — ask the admin to add offices under Settings
+                      </SelectLabel>
+                    )}
                   </SelectContent>
                 </Select>
-                {campaign.assignments.length === 0 && (
-                  <p className="text-[11px] text-amber-700">This campaign has no office distribution yet.</p>
-                )}
               </div>
 
               {office && (
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-xs sm:text-sm">
-                  <p className="font-semibold text-emerald-900">{office.departmentName}</p>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
-                      <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, office.attainmentPct ?? 0)}%` }} />
-                    </div>
-                    <span className="font-bold text-emerald-800">{pct(office.attainmentPct)}</span>
-                  </div>
-                  <p className="mt-1 text-emerald-800/70">
-                    {money(office.collected, campaign.currency)} collected of {money(office.minimumAmount, campaign.currency)} minimum
-                    {' · '}{money(office.gap, campaign.currency)} remaining
-                    {' · '}last record: {office.lastReportDate ? office.lastReportDate.slice(0, 10) : 'none'}
+                  <p className="font-semibold text-emerald-900">
+                    {office.departmentName}
+                    {!office.assigned && (
+                      <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 align-middle text-[10px] font-semibold text-violet-700">
+                        no minimum set
+                      </span>
+                    )}
                   </p>
+                  {office.assigned ? (
+                    <>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
+                          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, office.attainmentPct ?? 0)}%` }} />
+                        </div>
+                        <span className="font-bold text-emerald-800">{pct(office.attainmentPct)}</span>
+                      </div>
+                      <p className="mt-1 text-emerald-800/70">
+                        {money(office.collected, campaign.currency)} collected of {money(office.minimumAmount, campaign.currency)} minimum
+                        {' · '}{money(office.gap, campaign.currency)} remaining
+                        {' · '}last record: {office.lastReportDate ? office.lastReportDate.slice(0, 10) : 'none'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-1 text-emerald-800/70">
+                      {money(office.collected, campaign.currency)} collected so far — this office has no distributed minimum; its entries count toward the campaign total
+                      {' · '}last record: {office.lastReportDate ? office.lastReportDate.slice(0, 10) : 'none'}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -401,6 +475,16 @@ export default function CampaignAchievementForm({ onSubmit, userName, isAdmin }:
                     ))}
                   </div>
                 </div>
+              )}
+
+              {campaign.status !== 'ACTIVE' && (
+                <p className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800 sm:text-xs">
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    This campaign is {campaign.status.toLowerCase()} — new achievement records are closed.
+                    The coordination office can reopen it under &ldquo;Set Goal &amp; Distribute&rdquo;.
+                  </span>
+                </p>
               )}
 
               <div className="flex items-center justify-between gap-2 border-t pt-3">

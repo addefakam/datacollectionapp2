@@ -156,7 +156,9 @@ export async function GET(request: NextRequest) {
         id: a.id,
         campaignId: a.campaignId,
         departmentId: a.departmentId,
-        departmentName: a.department.name,
+        // defensive: an orphaned assignment (department removed out-of-band)
+        // must never break the whole campaigns list
+        departmentName: a.department?.name ?? 'Unlisted office',
         minimumAmount: a.minimumAmount,
         note: a.note,
       }));
@@ -165,7 +167,7 @@ export async function GET(request: NextRequest) {
         assignmentDTOs,
         donations.map((d) => ({
           departmentId: d.departmentId,
-          departmentName: d.department.name,
+          departmentName: d.department?.name ?? 'Unlisted office',
           reportDate: d.reportDate,
           cashAmount: d.cashAmount,
           inKindValue: d.inKindValue,
